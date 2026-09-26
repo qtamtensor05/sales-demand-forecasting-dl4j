@@ -1,10 +1,13 @@
+### Java / Maven ###
 target/
+*.class
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
 .kotlin
 
 ### IntelliJ IDEA ###
+.idea/
 .idea/modules.xml
 .idea/jarRepositories.xml
 .idea/compiler.xml
@@ -37,3 +40,30 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+### Windows ###
+Thumbs.db
+Desktop.ini
+
+### Local datasets and generated reports ###
+/data/**
+!/data/.gitkeep
+/output/**
+!/output/.gitkeep
+
+### Trained models and checkpoints ###
+/models/**
+!/models/.gitkeep
+/checkpoints/
+
+### Logs and JVM crash dumps ###
+*.log
+hs_err_pid*
+replay_pid*
+*.hprof
+
+### Local environment settings ###
+.env
+.env.*
+!.env.example
+!.env.sample
