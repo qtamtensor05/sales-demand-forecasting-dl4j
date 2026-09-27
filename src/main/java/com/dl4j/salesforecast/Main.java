@@ -2,6 +2,7 @@ package com.dl4j.salesforecast;
 
 import com.dl4j.salesforecast.analysis.SalesDataAnalyzer;
 import com.dl4j.salesforecast.analysis.TimeSeriesAnalyzer;
+import com.dl4j.salesforecast.evaluation.WeeklyNaiveBaseline;
 import com.dl4j.salesforecast.preprocessing.SalesPreprocessor;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -19,5 +20,6 @@ public class Main {
         TimeSeriesAnalyzer.TimeSeriesResult series = TimeSeriesAnalyzer.analyze(trainPath, 1, 1);
         SalesPreprocessor.PreprocessingResult prepared = SalesPreprocessor.preprocess(series);
         SalesPreprocessor.printSummary(prepared);
+        WeeklyNaiveBaseline.evaluateAndPrint(prepared);
     }
 }
