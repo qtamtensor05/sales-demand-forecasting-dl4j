@@ -76,6 +76,8 @@ class TimeSeriesAnalyzerTest {
         assertThrows(IllegalArgumentException.class, () -> analyze("2020-01-01,2,1,4\n"));
         assertThrows(IllegalArgumentException.class, () -> analyze("2020-02-30,1,1,4\n"));
         assertThrows(IllegalArgumentException.class, () -> analyze("2020-01-01,1,1,-1\n"));
+        assertThrows(IllegalArgumentException.class,
+                () -> TimeSeriesAnalyzer.analyze("unused.csv", 0, 1));
         Path missingHeader = directory.resolve("invalid.csv");
         Files.writeString(missingHeader, "date,store,item\n2020-01-01,1,1\n");
         assertThrows(IllegalArgumentException.class,

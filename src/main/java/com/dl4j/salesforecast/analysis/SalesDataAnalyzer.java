@@ -4,7 +4,6 @@ import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -62,7 +61,7 @@ public class SalesDataAnalyzer {
         LocalDate maxDate = null;
 
         try (
-                Reader reader = new FileReader(filePath);
+                Reader reader = Files.newBufferedReader(Path.of(filePath), StandardCharsets.UTF_8);
 
                 CSVParser parser = CSVFormat.DEFAULT
                         .builder()
@@ -74,17 +73,21 @@ public class SalesDataAnalyzer {
 
             for (CSVRecord record : parser) {
 
-                LocalDate date =
-                        LocalDate.parse(record.get("date"));
+                LocalDate date = LocalDate.parse(record.get("date").trim());
 
                 int store =
-                        Integer.parseInt(record.get("store"));
+                        Integer.parseInt(record.get("store").trim());
 
                 int item =
-                        Integer.parseInt(record.get("item"));
+                        Integer.parseInt(record.get("item").trim());
 
                 int sales =
-                        Integer.parseInt(record.get("sales"));
+                        Integer.parseInt(record.get("sales").trim());
+
+                if (store <= 0 || item <= 0 || sales < 0) {
+                    throw new IllegalArgumentException("Store/item IDs must be positive and sales must be non-negative (record "
+                            + record.getRecordNumber() + ")");
+                }
 
                 totalRecords++;
 

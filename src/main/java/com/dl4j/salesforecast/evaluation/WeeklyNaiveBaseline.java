@@ -15,13 +15,16 @@ public final class WeeklyNaiveBaseline {
 
     private WeeklyNaiveBaseline() { }
 
-    /** Uses observed sales in each test window's history; targets remain in original units. */
-    public static BaselineResult evaluate(Split testSplit) {
-        if (testSplit == null || testSplit.getWindows().isEmpty()) {
-            throw new IllegalArgumentException("Test split must contain at least one forecast window.");
+    /** Uses observed sales in each split window's history; targets remain in original units. */
+    public static BaselineResult evaluate(Split split) {
+        if (split == null || split.getWindows().isEmpty()) {
+            throw new IllegalArgumentException("Split must contain at least one forecast window.");
         }
-        List<Window> windows = testSplit.getWindows();
+        List<Window> windows = split.getWindows();
         int forecastDays = windows.get(0).getRawTarget().size();
+        if (forecastDays <= 0 || forecastDays > SEASON_LENGTH_DAYS) {
+            throw new IllegalArgumentException("Weekly-naive forecasting supports 1 to 7 forecast days.");
+        }
         List<Accumulator> accumulators = new ArrayList<>();
         for (int horizon = 0; horizon < forecastDays; horizon++) {
             accumulators.add(new Accumulator());
@@ -30,7 +33,10 @@ public final class WeeklyNaiveBaseline {
         for (Window window : windows) {
             int historyLength = window.getRawInput().size();
             if (historyLength < SEASON_LENGTH_DAYS
+                    || window.getInputDates().size() != historyLength
+                    || window.getRawInput().size() != historyLength
                     || window.getRawTarget().size() != forecastDays
+                    || window.getTarget().size() != forecastDays
                     || window.getTargetDates().size() != forecastDays) {
                 throw new IllegalArgumentException("Windows must have aligned dates/sales, a consistent forecast length, "
                         + "and at least 7 days of input history.");
@@ -59,7 +65,7 @@ public final class WeeklyNaiveBaseline {
                 overall.meanAbsoluteError(), overall.rootMeanSquaredError());
     }
 
-    /** Evaluate the existing preprocessor's test split and show metrics by forecast horizon. */
+    /** Evaluate the preprocessor's test split and show metrics by forecast horizon. */
     public static BaselineResult evaluateAndPrint(SalesPreprocessor.PreprocessingResult prepared) {
         if (prepared == null) {
             throw new IllegalArgumentException("Preprocessing result must not be null.");
@@ -70,10 +76,14 @@ public final class WeeklyNaiveBaseline {
     }
 
     public static void print(BaselineResult result, int storeId, int itemId) {
+        print(result, storeId, itemId, "TEST");
+    }
+
+    public static void print(BaselineResult result, int storeId, int itemId, String splitName) {
         System.out.println("\n==========================================\nWEEKLY NAIVE BASELINE\n==========================================");
         System.out.printf("Store / Item : %d / %d%n", storeId, itemId);
         System.out.println("Rule         : predict sales(t) using observed sales(t - 7 days)");
-        System.out.println("Evaluation   : rolling 2017 test windows; metrics in original sales units");
+        System.out.printf("Evaluation   : rolling %s windows; metrics in original sales units%n", splitName);
         System.out.println("Horizon | Forecasts | MAE      | RMSE");
         for (HorizonMetrics metrics : result.horizons) {
             System.out.printf(Locale.ROOT, "%7d | %9d | %8.4f | %.4f%n",

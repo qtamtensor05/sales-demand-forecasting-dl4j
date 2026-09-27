@@ -29,6 +29,9 @@ public final class TimeSeriesAnalyzer {
     }
 
     public static TimeSeriesResult analyze(String filePath, int storeId, int itemId) {
+        if (storeId <= 0 || itemId <= 0) {
+            throw new IllegalArgumentException("Store and item IDs must be positive.");
+        }
         List<Observation> observations = readSeries(filePath, storeId, itemId);
         if (observations.isEmpty()) {
             throw new IllegalArgumentException(

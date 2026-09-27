@@ -31,12 +31,18 @@ class SalesLstmForecasterTest {
                 TimeSeriesAnalyzer.analyze(file.toString(), 1, 1),
                 start.plusDays(70), start.plusDays(84), 30, 7);
 
-        SalesLstmForecaster.TrainingResult trained = SalesLstmForecaster.train(prepared, 2, 4, 0.001);
+        SalesLstmForecaster.TuningResult tuning = SalesLstmForecaster.tuneOnValidation(prepared, 2, 1);
+        assertEquals(3, tuning.getCandidates().size());
+        assertTrue(tuning.getCandidates().stream().allMatch(candidate -> candidate.getEpochsRun() <= 2));
+        assertSame(tuning.getBest(), tuning.getCandidates().stream()
+                .min(java.util.Comparator.comparingDouble(SalesLstmForecaster.FitResult::getBestValidationRmse))
+                .orElseThrow());
+        SalesLstmForecaster.TrainingResult trained = SalesLstmForecaster.evaluateTest(tuning.getBest());
 
-        assertEquals(2, trained.getEpochsRun());
-        assertTrue(trained.getBestEpoch() >= 1 && trained.getBestEpoch() <= 2);
+        assertTrue(trained.getEpochsRun() >= 1 && trained.getEpochsRun() <= 2);
+        assertTrue(trained.getBestEpoch() >= 1 && trained.getBestEpoch() <= trained.getEpochsRun());
         assertTrue(Double.isFinite(trained.getBestValidationRmse()));
-        assertEquals(2, trained.getHistory().size());
+        assertEquals(trained.getEpochsRun(), trained.getHistory().size());
         assertEquals(7, trained.getTestMetrics().getHorizons().size());
         assertEquals(29L * 7, trained.getTestMetrics().getForecastCount());
 
