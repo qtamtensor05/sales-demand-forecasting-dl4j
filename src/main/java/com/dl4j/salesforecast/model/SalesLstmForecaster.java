@@ -66,7 +66,7 @@ public final class SalesLstmForecaster {
                 .seed(RANDOM_SEED)
                 .updater(new Adam(learningRate))
                 .list()
-                .layer(new LSTM.Builder().nIn(1).nOut(hiddenUnits)
+                .layer(new LSTM.Builder().nIn(SalesPreprocessor.getInputFeatureNames().size()).nOut(hiddenUnits)
                         .activation(Activation.TANH).build())
                 .layer(new RnnOutputLayer.Builder(LossFunctions.LossFunction.MSE)
                         .nIn(hiddenUnits).nOut(forecastDays)
@@ -195,14 +195,25 @@ public final class SalesLstmForecaster {
     }
 
     private static INDArray toFeatures(List<Window> windows, int inputDays) {
-        INDArray features = Nd4j.zeros(DataType.FLOAT, windows.size(), 1, inputDays);
+        int featureCount = SalesPreprocessor.getInputFeatureNames().size();
+        INDArray features = Nd4j.zeros(DataType.FLOAT, windows.size(), featureCount, inputDays);
         for (int row = 0; row < windows.size(); row++) {
-            List<Double> input = windows.get(row).getInput();
-            if (input.size() != inputDays) {
-                throw new IllegalArgumentException("Window input length does not match preprocessing configuration.");
+            List<List<Double>> inputFeatures = windows.get(row).getInputFeatures();
+            if (inputFeatures.size() != inputDays) {
+                throw new IllegalArgumentException("Window feature length does not match preprocessing configuration.");
             }
             for (int time = 0; time < inputDays; time++) {
-                features.putScalar(new long[]{row, 0, time}, input.get(time));
+                List<Double> featureVector = inputFeatures.get(time);
+                if (featureVector.size() != featureCount) {
+                    throw new IllegalArgumentException("Window has missing or unexpected input features.");
+                }
+                for (int feature = 0; feature < featureCount; feature++) {
+                    double value = featureVector.get(feature);
+                    if (!Double.isFinite(value)) {
+                        throw new IllegalArgumentException("Input features must contain only finite values.");
+                    }
+                    features.putScalar(new long[]{row, feature, time}, value);
+                }
             }
         }
         return features;
@@ -210,7 +221,10 @@ public final class SalesLstmForecaster {
 
     private static void requireDimensions(Window window, int inputDays, int forecastDays) {
         if (window.getTarget().size() != forecastDays || window.getRawTarget().size() != forecastDays
-                || window.getRawInput().size() != inputDays) {
+                || window.getRawInput().size() != inputDays
+                || window.getInputFeatures().size() != inputDays
+                || window.getInputFeatures().stream().anyMatch(row ->
+                        row.size() != SalesPreprocessor.getInputFeatureNames().size())) {
             throw new IllegalArgumentException("Window date, input and target dimensions are inconsistent.");
         }
     }

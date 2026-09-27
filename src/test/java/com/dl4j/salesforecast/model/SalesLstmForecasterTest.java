@@ -47,9 +47,12 @@ class SalesLstmForecasterTest {
         assertEquals(29L * 7, trained.getTestMetrics().getForecastCount());
 
         SalesPreprocessor.Window testWindow = prepared.getTest().getWindows().get(0);
-        INDArray input = Nd4j.zeros(1, 1, 30);
+        int featureCount = SalesPreprocessor.getInputFeatureNames().size();
+        INDArray input = Nd4j.zeros(1, featureCount, 30);
         for (int t = 0; t < 30; t++) {
-            input.putScalar(new long[]{0, 0, t}, testWindow.getInput().get(t));
+            for (int feature = 0; feature < featureCount; feature++) {
+                input.putScalar(new long[]{0, feature, t}, testWindow.getInputFeatures().get(t).get(feature));
+            }
         }
         INDArray sequenceOutput = trained.getNetwork().output(input, false);
         assertArrayEquals(new long[]{1, 7, 30}, sequenceOutput.shape());

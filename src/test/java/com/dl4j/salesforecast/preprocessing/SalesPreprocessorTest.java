@@ -19,8 +19,8 @@ class SalesPreprocessorTest {
 
     private TimeSeriesResult series(boolean constant) throws IOException {
         StringBuilder csv = new StringBuilder("date,store,item,sales\n");
-        for (int i = 0; i < 16; i++) {
-            int sales = constant && i < 8 ? 5 : i;
+        for (int i = 0; i < 50; i++) {
+            int sales = constant ? 5 : i;
             csv.append(start.plusDays(i)).append(",1,1,").append(sales).append('\n');
         }
         Path file = directory.resolve("train.csv");
@@ -31,19 +31,20 @@ class SalesPreprocessorTest {
     @Test
     void splitsTargetsAndUsesOnlyPastInputsWithTrainOnlyScaling() throws IOException {
         SalesPreprocessor.PreprocessingResult result = SalesPreprocessor.preprocess(
-                series(false), start.plusDays(7), start.plusDays(11), 3, 2);
-        assertEquals(4, result.getTrain().getWindows().size());
-        assertEquals(3, result.getValidation().getWindows().size());
-        assertEquals(3, result.getTest().getWindows().size());
+                series(false), start.plusDays(24), start.plusDays(34), 3, 2);
+        assertEquals(8, result.getTrain().getWindows().size());
+        assertEquals(9, result.getValidation().getWindows().size());
+        assertEquals(14, result.getTest().getWindows().size());
         assertEquals(0, result.getScaler().getMin());
-        assertEquals(7, result.getScaler().getMax());
-        assertEquals(15.0 / 7, result.getTest().getNormalizedSales().get(3), 1e-12);
+        assertEquals(24, result.getScaler().getMax());
+        assertEquals(35.0 / 24, result.getTest().getNormalizedSales().get(0), 1e-12);
         SalesPreprocessor.Window first = result.getValidation().getWindows().get(0);
-        assertEquals(List.of(5.0, 6.0, 7.0), first.getRawInput());
-        assertEquals(List.of(8.0, 9.0), first.getRawTarget());
+        assertEquals(List.of(22.0, 23.0, 24.0), first.getRawInput());
+        assertEquals(List.of(25.0, 26.0), first.getRawTarget());
         for (SalesPreprocessor.Split split : List.of(result.getTrain(), result.getValidation(), result.getTest())) {
             for (SalesPreprocessor.Window window : split.getWindows()) {
                 assertEquals(3, window.getInput().size());
+                assertEquals(3, window.getInputFeatures().size());
                 assertEquals(2, window.getTarget().size());
                 assertTrue(split.getDates().containsAll(window.getTargetDates()));
                 assertEquals(window.getInputDates().get(2).plusDays(1), window.getTargetDates().get(0));
@@ -53,6 +54,15 @@ class SalesPreprocessorTest {
                 }
             }
         }
+        assertEquals(List.of("sales", "sales_lag_7", "rolling_mean_7", "rolling_mean_14",
+                        "day_of_week_sin", "day_of_week_cos"), SalesPreprocessor.getInputFeatureNames());
+        List<Double> lastInputFeatures = result.getTrain().getWindows().get(0).getInputFeatures().get(2);
+        assertEquals(15.0 / 24, lastInputFeatures.get(0), 1e-12);
+        assertEquals(8.0 / 24, lastInputFeatures.get(1), 1e-12);
+        assertEquals(12.0 / 24, lastInputFeatures.get(2), 1e-12);
+        assertEquals(8.5 / 24, lastInputFeatures.get(3), 1e-12);
+        assertEquals(Math.sin(2.0 * Math.PI * 3 / 7), lastInputFeatures.get(4), 1e-12);
+        assertEquals(Math.cos(2.0 * Math.PI * 3 / 7), lastInputFeatures.get(5), 1e-12);
         assertThrows(UnsupportedOperationException.class, () -> first.getInput().clear());
         assertThrows(UnsupportedOperationException.class, () -> result.getTrain().getWindows().clear());
     }
@@ -60,26 +70,28 @@ class SalesPreprocessorTest {
     @Test
     void constantTrainingSeriesHasFiniteReversibleScaling() throws IOException {
         SalesPreprocessor.PreprocessingResult result = SalesPreprocessor.preprocess(
-                series(true), start.plusDays(7), start.plusDays(11), 3, 2);
+                series(true), start.plusDays(24), start.plusDays(34), 3, 2);
         assertEquals(1, result.getScaler().getScale());
         assertTrue(result.getTrain().getNormalizedSales().stream().allMatch(value -> value == 0));
-        assertEquals(3, result.getValidation().getNormalizedSales().get(0));
-        assertEquals(8, result.getScaler().inverseTransform(3));
+        assertEquals(0, result.getValidation().getNormalizedSales().get(0));
+        assertEquals(5, result.getScaler().inverseTransform(0));
+        assertTrue(result.getTrain().getWindows().get(0).getInputFeatures().stream()
+                .flatMap(List::stream).allMatch(Double::isFinite));
     }
 
     @Test
     void rejectsInvalidBoundariesLengthsAndIncompleteSeries() throws IOException {
         TimeSeriesResult series = series(false);
         assertThrows(IllegalArgumentException.class, () -> SalesPreprocessor.preprocess(
-                series, start.plusDays(7), start.plusDays(11), 0, 2));
+                series, start.plusDays(24), start.plusDays(34), 0, 2));
         assertThrows(IllegalArgumentException.class, () -> SalesPreprocessor.preprocess(
-                series, start.plusDays(11), start.plusDays(7), 3, 2));
+                series, start.plusDays(34), start.plusDays(24), 3, 2));
         assertThrows(IllegalArgumentException.class, () -> SalesPreprocessor.preprocess(
-                series, start.plusDays(7), start.plusDays(15), 3, 2));
+                series, start.plusDays(24), start.plusDays(49), 3, 2));
         assertThrows(IllegalArgumentException.class, () -> SalesPreprocessor.preprocess(
                 series, start.plusDays(7), start.plusDays(11), 7, 2));
         assertThrows(IllegalArgumentException.class, () -> SalesPreprocessor.preprocess(
-                series, start.plusDays(7), start.plusDays(11), 3, 5));
+                series, start.plusDays(24), start.plusDays(34), 3, 20));
         Path file = directory.resolve("bad.csv");
         for (String rows : List.of("2020-01-01,1,1,1\n2020-01-03,1,1,2\n",
                 "2020-01-01,1,1,1\n2020-01-01,1,1,2\n")) {
@@ -104,7 +116,7 @@ class SalesPreprocessorTest {
         assertEquals(1095, result.getTrain().getDates().size());
         assertEquals(366, result.getValidation().getDates().size());
         assertEquals(365, result.getTest().getDates().size());
-        assertEquals(1059, result.getTrain().getWindows().size());
+        assertEquals(1046, result.getTrain().getWindows().size());
         assertEquals(360, result.getValidation().getWindows().size());
         assertEquals(359, result.getTest().getWindows().size());
         assertEquals(LocalDate.of(2016, 1, 1), result.getValidation().getWindows().get(0).getTargetDates().get(0));

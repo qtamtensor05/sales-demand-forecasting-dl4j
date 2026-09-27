@@ -18,13 +18,13 @@ class WeeklyNaiveBaselineTest {
 
     private SalesPreprocessor.PreprocessingResult preprocess(int inputDays, int forecastDays) throws IOException {
         StringBuilder csv = new StringBuilder("date,store,item,sales\n");
-        for (int i = 0; i < 20; i++) {
+        for (int i = 0; i < 42; i++) {
             csv.append(start.plusDays(i)).append(",1,1,").append(i).append('\n');
         }
         Path file = directory.resolve("train.csv");
         Files.writeString(file, csv);
         return SalesPreprocessor.preprocess(TimeSeriesAnalyzer.analyze(file.toString(), 1, 1),
-                start.plusDays(9), start.plusDays(13), inputDays, forecastDays);
+                start.plusDays(25), start.plusDays(35), inputDays, forecastDays);
     }
 
     @Test

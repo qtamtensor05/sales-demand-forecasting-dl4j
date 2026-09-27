@@ -10,7 +10,18 @@ import java.util.Objects;
 
 /** Chronological splitting and train-only scaling; no model training. */
 public final class SalesPreprocessor {
+    private static final int LAG_DAYS = 7;
+    private static final int ROLLING_SHORT_DAYS = 7;
+    private static final int ROLLING_LONG_DAYS = 14;
+    private static final int FEATURE_HISTORY_DAYS = ROLLING_LONG_DAYS;
+    private static final int FIRST_FEATURE_DAY_INDEX = FEATURE_HISTORY_DAYS - 1;
+    private static final List<String> INPUT_FEATURE_NAMES = List.of(
+            "sales", "sales_lag_7", "rolling_mean_7", "rolling_mean_14",
+            "day_of_week_sin", "day_of_week_cos");
+
     private SalesPreprocessor() { }
+
+    public static List<String> getInputFeatureNames() { return INPUT_FEATURE_NAMES; }
 
     /** Defaults for the Store Item Demand Forecasting dataset. */
     public static PreprocessingResult preprocess(TimeSeriesResult series) {
@@ -43,10 +54,11 @@ public final class SalesPreprocessor {
             if (!date.isAfter(trainEnd)) { trainSize++; }
             if (!date.isAfter(validationEnd)) { validationLimit++; }
         }
-        if ((long) trainSize < (long) inputDays + forecastDays
+        if ((long) trainSize < (long) inputDays + FIRST_FEATURE_DAY_INDEX + forecastDays
                 || validationLimit - trainSize < forecastDays
                 || dates.size() - validationLimit < forecastDays) {
-            throw new IllegalArgumentException("Each split must contain a full target window; train also needs input history.");
+            throw new IllegalArgumentException("Each split must contain a full target window; train also needs "
+                    + FEATURE_HISTORY_DAYS + " days of causal feature history before its input window.");
         }
 
         double min = Double.POSITIVE_INFINITY;
@@ -58,35 +70,73 @@ public final class SalesPreprocessor {
         MinMaxScaler scaler = new MinMaxScaler(min, max);
         List<Double> normalized = new ArrayList<>();
         for (double value : raw) { normalized.add(scaler.transform(value)); }
-        Split train = createSplit("TRAIN", 0, trainSize, dates, raw, normalized, inputDays, forecastDays);
+        List<List<Double>> inputFeatures = createInputFeatures(dates, raw, scaler);
+        Split train = createSplit("TRAIN", 0, trainSize, dates, raw, normalized, inputFeatures,
+                inputDays, forecastDays);
         Split validation = createSplit("VALIDATION", trainSize, validationLimit,
-                dates, raw, normalized, inputDays, forecastDays);
+                dates, raw, normalized, inputFeatures, inputDays, forecastDays);
         Split test = createSplit("TEST", validationLimit, dates.size(),
-                dates, raw, normalized, inputDays, forecastDays);
+                dates, raw, normalized, inputFeatures, inputDays, forecastDays);
         return new PreprocessingResult(series.getStoreId(), series.getItemId(), inputDays,
                 forecastDays, scaler, train, validation, test);
     }
 
     private static Split createSplit(String name, int from, int to, List<LocalDate> dates,
                                      List<Double> raw, List<Double> normalized,
+                                     List<List<Double>> inputFeatures,
                                      int inputDays, int forecastDays) {
         List<Window> windows = new ArrayList<>();
-        // Targets stay inside this split; inputs may use earlier observed history.
-        for (int target = Math.max(from, inputDays); target <= to - forecastDays; target++) {
+        // Targets stay inside this split; causal features need 14 days before the input starts.
+        int firstFeatureReadyTarget = inputDays + FIRST_FEATURE_DAY_INDEX;
+        for (int target = Math.max(from, firstFeatureReadyTarget); target <= to - forecastDays; target++) {
             windows.add(new Window(dates.subList(target - inputDays, target),
                     dates.subList(target, target + forecastDays),
                     raw.subList(target - inputDays, target), raw.subList(target, target + forecastDays),
                     normalized.subList(target - inputDays, target),
-                    normalized.subList(target, target + forecastDays)));
+                    normalized.subList(target, target + forecastDays),
+                    inputFeatures.subList(target - inputDays, target)));
         }
         return new Split(name, dates.subList(from, to), raw.subList(from, to),
                 normalized.subList(from, to), windows);
+    }
+
+    /** All sales-derived features use observations on or before their feature date. */
+    private static List<List<Double>> createInputFeatures(List<LocalDate> dates, List<Double> raw,
+                                                          MinMaxScaler scaler) {
+        List<List<Double>> features = new ArrayList<>(raw.size());
+        for (int day = 0; day < raw.size(); day++) {
+            if (day < FIRST_FEATURE_DAY_INDEX) {
+                features.add(List.of());
+                continue;
+            }
+            double rolling7 = mean(raw, day - ROLLING_SHORT_DAYS + 1, day + 1);
+            double rolling14 = mean(raw, day - ROLLING_LONG_DAYS + 1, day + 1);
+            int dayOfWeek = dates.get(day).getDayOfWeek().getValue() - 1; // Monday = 0
+            double angle = 2.0 * Math.PI * dayOfWeek / 7.0;
+            features.add(List.of(
+                    scaler.transform(raw.get(day)),
+                    scaler.transform(raw.get(day - LAG_DAYS)),
+                    scaler.transform(rolling7),
+                    scaler.transform(rolling14),
+                    Math.sin(angle),
+                    Math.cos(angle)));
+        }
+        return features;
+    }
+
+    private static double mean(List<Double> values, int fromInclusive, int toExclusive) {
+        double sum = 0.0;
+        for (int i = fromInclusive; i < toExclusive; i++) { sum += values.get(i); }
+        return sum / (toExclusive - fromInclusive);
     }
 
     public static void printSummary(PreprocessingResult result) {
         System.out.println("\n==========================================\nSALES PREPROCESSING\n==========================================");
         System.out.printf("Store / Item : %d / %d%nWindow       : %d -> %d days%n",
                 result.storeId, result.itemId, result.inputDays, result.forecastDays);
+        System.out.println("Input features: " + INPUT_FEATURE_NAMES);
+        System.out.printf("Feature warm-up: %d days (windows start after causal history is available)%n",
+                FEATURE_HISTORY_DAYS);
         System.out.printf(Locale.ROOT, "Train min/max: %.0f / %.0f%n", result.scaler.min, result.scaler.max);
         System.out.println("Scaler fitted on train only; values are not clipped.");
         System.out.println("Validation/test use observed history before each forecast.");
@@ -137,16 +187,20 @@ public final class SalesPreprocessor {
         private final List<Double> rawTarget;
         private final List<Double> input;
         private final List<Double> target;
+        private final List<List<Double>> inputFeatures;
 
         private Window(List<LocalDate> inputDates, List<LocalDate> targetDates,
                        List<Double> rawInput, List<Double> rawTarget,
-                       List<Double> input, List<Double> target) {
+                       List<Double> input, List<Double> target, List<List<Double>> inputFeatures) {
             this.inputDates = List.copyOf(inputDates);
             this.targetDates = List.copyOf(targetDates);
             this.rawInput = List.copyOf(rawInput);
             this.rawTarget = List.copyOf(rawTarget);
             this.input = List.copyOf(input);
             this.target = List.copyOf(target);
+            List<List<Double>> copiedFeatures = new ArrayList<>(inputFeatures.size());
+            for (List<Double> row : inputFeatures) { copiedFeatures.add(List.copyOf(row)); }
+            this.inputFeatures = List.copyOf(copiedFeatures);
         }
         public List<LocalDate> getInputDates() { return inputDates; }
         public List<LocalDate> getTargetDates() { return targetDates; }
@@ -154,6 +208,8 @@ public final class SalesPreprocessor {
         public List<Double> getRawTarget() { return rawTarget; }
         public List<Double> getInput() { return input; }
         public List<Double> getTarget() { return target; }
+        /** One immutable feature vector per input day, in getInputFeatureNames() order. */
+        public List<List<Double>> getInputFeatures() { return inputFeatures; }
     }
 
     public static final class Split {
