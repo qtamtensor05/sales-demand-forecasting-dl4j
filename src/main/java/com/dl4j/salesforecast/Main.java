@@ -3,6 +3,7 @@ package com.dl4j.salesforecast;
 import com.dl4j.salesforecast.analysis.SalesDataAnalyzer;
 import com.dl4j.salesforecast.analysis.TimeSeriesAnalyzer;
 import com.dl4j.salesforecast.evaluation.WeeklyNaiveBaseline;
+import com.dl4j.salesforecast.model.AutoregressiveLstmForecaster;
 import com.dl4j.salesforecast.model.SalesLstmForecaster;
 import com.dl4j.salesforecast.preprocessing.SalesPreprocessor;
 import java.io.IOException;
@@ -30,9 +31,13 @@ public class Main {
                 SalesLstmForecaster.DEFAULT_EARLY_STOPPING_PATIENCE);
         SalesLstmForecaster.printTuningSummary(tuning);
 
-        // Read test metrics only after the validation-only configuration search is complete.
-        WeeklyNaiveBaseline.evaluateAndPrint(prepared);
-        SalesLstmForecaster.TrainingResult lstm = SalesLstmForecaster.evaluateTest(tuning.getBest());
-        SalesLstmForecaster.printSummary(lstm);
+        SalesLstmForecaster.FitResult direct = tuning.getBest();
+        AutoregressiveLstmForecaster.FitResult autoregressive = AutoregressiveLstmForecaster.fit(
+                prepared, SalesLstmForecaster.DEFAULT_SEARCH_EPOCHS,
+                direct.getHiddenUnits(), direct.getLearningRate(),
+                SalesLstmForecaster.DEFAULT_EARLY_STOPPING_PATIENCE);
+        AutoregressiveLstmForecaster.printSummary(autoregressive);
+        AutoregressiveLstmForecaster.printComparison(direct.getValidationMetrics(), validationBaseline,
+                autoregressive.getValidationMetrics());
     }
 }
