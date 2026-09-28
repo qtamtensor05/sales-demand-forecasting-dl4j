@@ -48,6 +48,12 @@ public final class SalesLstmForecaster {
     /** Train and select an epoch using validation only. Does not access the test split. */
     public static FitResult fit(PreprocessingResult prepared, int maxEpochs,
                                 int hiddenUnits, double learningRate, int patience) {
+        return fit(prepared, maxEpochs, hiddenUnits, learningRate, patience, RANDOM_SEED);
+    }
+
+    /** Fits using the supplied seed; only train and validation are used. */
+    public static FitResult fit(PreprocessingResult prepared, int maxEpochs,
+                                int hiddenUnits, double learningRate, int patience, long randomSeed) {
         if (prepared == null) { throw new IllegalArgumentException("Preprocessing result is required."); }
         if (maxEpochs <= 0 || hiddenUnits <= 0 || patience <= 0 || !(learningRate > 0.0)
                 || !Double.isFinite(learningRate)) {
@@ -63,7 +69,7 @@ public final class SalesLstmForecaster {
         }
 
         MultiLayerConfiguration configuration = new NeuralNetConfiguration.Builder()
-                .seed(RANDOM_SEED)
+                .seed(randomSeed)
                 .updater(new Adam(learningRate))
                 .list()
                 .layer(new LSTM.Builder().nIn(SalesPreprocessor.getInputFeatureNames().size()).nOut(hiddenUnits)
@@ -110,7 +116,7 @@ public final class SalesLstmForecaster {
         ForecastMetrics bestValidationMetrics = evaluate(network, validation, validationFeatures,
                 inputDays, forecastDays, prepared.getScaler());
         return new FitResult(network, prepared, history.size(), bestEpoch, bestValidationRmse,
-                bestValidationMetrics, history, hiddenUnits, learningRate, patience);
+                bestValidationMetrics, history, hiddenUnits, learningRate, patience, randomSeed);
     }
 
     /** Evaluate the selected validation checkpoint on test after all choices are fixed. */
@@ -406,9 +412,11 @@ public final class SalesLstmForecaster {
         private final int hiddenUnits;
         private final double learningRate;
         private final int patience;
+        private final long randomSeed;
         private FitResult(MultiLayerNetwork network, PreprocessingResult prepared, int epochsRun,
                           int bestEpoch, double bestValidationRmse, ForecastMetrics validationMetrics,
-                          List<EpochMetrics> history, int hiddenUnits, double learningRate, int patience) {
+                          List<EpochMetrics> history, int hiddenUnits, double learningRate, int patience,
+                          long randomSeed) {
             this.network = network;
             this.prepared = prepared;
             this.epochsRun = epochsRun;
@@ -419,6 +427,7 @@ public final class SalesLstmForecaster {
             this.hiddenUnits = hiddenUnits;
             this.learningRate = learningRate;
             this.patience = patience;
+            this.randomSeed = randomSeed;
         }
         public MultiLayerNetwork getNetwork() { return network; }
         public int getEpochsRun() { return epochsRun; }
@@ -429,6 +438,7 @@ public final class SalesLstmForecaster {
         public int getHiddenUnits() { return hiddenUnits; }
         public double getLearningRate() { return learningRate; }
         public int getPatience() { return patience; }
+        public long getRandomSeed() { return randomSeed; }
     }
 
     public static final class TuningResult {

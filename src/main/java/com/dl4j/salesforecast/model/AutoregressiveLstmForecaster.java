@@ -35,6 +35,12 @@ public final class AutoregressiveLstmForecaster {
     /** Fits and early-stops on recursively generated validation forecasts; does not access test. */
     public static FitResult fit(PreprocessingResult prepared, int maxEpochs,
                                 int hiddenUnits, double learningRate, int patience) {
+        return fit(prepared, maxEpochs, hiddenUnits, learningRate, patience, RANDOM_SEED);
+    }
+
+    /** Fits using the supplied seed; only train and validation are used. */
+    public static FitResult fit(PreprocessingResult prepared, int maxEpochs,
+                                int hiddenUnits, double learningRate, int patience, long randomSeed) {
         if (prepared == null) { throw new IllegalArgumentException("Preprocessing result is required."); }
         if (maxEpochs <= 0 || hiddenUnits <= 0 || patience <= 0 || !(learningRate > 0.0)
                 || !Double.isFinite(learningRate)) {
@@ -51,7 +57,7 @@ public final class AutoregressiveLstmForecaster {
 
         int featureCount = SalesPreprocessor.getInputFeatureNames().size();
         MultiLayerConfiguration configuration = new NeuralNetConfiguration.Builder()
-                .seed(RANDOM_SEED)
+                .seed(randomSeed)
                 .updater(new Adam(learningRate))
                 .list()
                 .layer(new LSTM.Builder().nIn(featureCount).nOut(hiddenUnits)
@@ -96,7 +102,7 @@ public final class AutoregressiveLstmForecaster {
         ForecastMetrics bestValidationMetrics = evaluate(network, validation, validationFeatures,
                 inputDays, forecastDays, featureCount, prepared.getScaler());
         return new FitResult(network, maxEpochs, history.size(), bestEpoch, bestValidationMetrics,
-                history, hiddenUnits, learningRate, patience);
+                history, hiddenUnits, learningRate, patience, randomSeed);
     }
 
     /** Generates rolling-origin forecasts; each prediction is fed into the following step. */
@@ -288,9 +294,10 @@ public final class AutoregressiveLstmForecaster {
         private final int hiddenUnits;
         private final double learningRate;
         private final int patience;
+        private final long randomSeed;
         private FitResult(MultiLayerNetwork network, int maxEpochs, int epochsRun, int bestEpoch,
                           ForecastMetrics validationMetrics, List<EpochMetrics> history,
-                          int hiddenUnits, double learningRate, int patience) {
+                          int hiddenUnits, double learningRate, int patience, long randomSeed) {
             this.network = network;
             this.maxEpochs = maxEpochs;
             this.epochsRun = epochsRun;
@@ -300,6 +307,7 @@ public final class AutoregressiveLstmForecaster {
             this.hiddenUnits = hiddenUnits;
             this.learningRate = learningRate;
             this.patience = patience;
+            this.randomSeed = randomSeed;
         }
         public MultiLayerNetwork getNetwork() { return network; }
         public int getMaxEpochs() { return maxEpochs; }
@@ -310,6 +318,7 @@ public final class AutoregressiveLstmForecaster {
         public int getHiddenUnits() { return hiddenUnits; }
         public double getLearningRate() { return learningRate; }
         public int getPatience() { return patience; }
+        public long getRandomSeed() { return randomSeed; }
     }
 
     public static final class EpochMetrics {

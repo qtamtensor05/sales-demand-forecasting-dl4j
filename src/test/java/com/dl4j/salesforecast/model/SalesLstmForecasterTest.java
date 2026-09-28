@@ -47,8 +47,9 @@ class SalesLstmForecasterTest {
         assertEquals(29L * 7, trained.getTestMetrics().getForecastCount());
 
         AutoregressiveLstmForecaster.FitResult autoregressive = AutoregressiveLstmForecaster.fit(
-                prepared, 2, tuning.getBest().getHiddenUnits(), tuning.getBest().getLearningRate(), 1);
+                prepared, 2, tuning.getBest().getHiddenUnits(), tuning.getBest().getLearningRate(), 1, 42L);
         assertTrue(autoregressive.getEpochsRun() >= 1 && autoregressive.getEpochsRun() <= 2);
+        assertEquals(42L, autoregressive.getRandomSeed());
         assertEquals(7, autoregressive.getValidationMetrics().getHorizons().size());
         assertEquals(8L * 7, autoregressive.getValidationMetrics().getForecastCount());
         assertTrue(Double.isFinite(autoregressive.getValidationMetrics().getMae()));
