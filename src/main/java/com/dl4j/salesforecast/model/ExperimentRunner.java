@@ -10,8 +10,8 @@ import java.util.Locale;
 /** Repeats validation-only model comparisons with fixed configurations and multiple seeds. */
 public final class ExperimentRunner {
     public static final List<Long> DEFAULT_SEEDS = List.of(42L, 123L, 2026L, 7L, 99L);
-    private static final int DEFAULT_HIDDEN_UNITS = 32;
-    private static final double DEFAULT_LEARNING_RATE = 0.001;
+    public static final int DEFAULT_HIDDEN_UNITS = 32;
+    public static final double DEFAULT_LEARNING_RATE = 0.001;
 
     private ExperimentRunner() { }
 

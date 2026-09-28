@@ -5,23 +5,22 @@
 ```text
 data/train.csv
   ├─ SalesDataAnalyzer → output/sales-statistics.txt
-  └─ TimeSeriesAnalyzer(store=1, item=1)
-       ↓
-     SalesPreprocessor (causal lag/rolling/calendar features; scaler fit trên train)
-       ↓
-     WeeklyNaiveBaseline + SalesLstmForecaster
-       ├─ direct 7-output LSTM: grid cấu hình và chọn epoch bằng validation
-       └─ autoregressive LSTM: one-step fit, rollout 7 ngày và chọn epoch bằng validation
-            └─ so sánh cả hai với weekly naive; Main không tính metric test
+  └─ MultiSeriesExperimentRunner
+       ├─ phân tầng tertile theo mean sales giai đoạn train
+       ├─ TimeSeriesAnalyzer → SalesPreprocessor riêng cho mỗi chuỗi
+       └─ Weekly Naive + Direct LSTM + Autoregressive LSTM
+            └─ 5 seed; macro-average theo 12 chuỗi trên validation; không đọc test
 ```
 
-`Main` hiện gọi `ExperimentRunner` cho store 1 + item 1. Runner cố định cấu hình 32 units,
-learning rate 0,001 đã chọn trên validation ở bước trước, rồi lặp Direct và Autoregressive với seed
-42, 123, 2026, 7, 99. Cấu hình không tune lại theo từng seed. Mọi metric runner chỉ dùng validation;
-weekly naive là mốc cố định và không tính test.
+`Main` hiện gọi `MultiSeriesExperimentRunner`. Runner xếp hạng các cặp bằng mean sales mỗi ngày
+trên train (2013–2015), chia ba tertile LOW/MEDIUM/HIGH và chọn mặc định bốn quantile đại diện mỗi
+nhóm. Mỗi chuỗi dùng scaler fit riêng trên train, cấu hình 32 units / learning rate 0,001, và cùng
+năm seed 42, 123, 2026, 7, 99 cho Direct lẫn Autoregressive. Không tune lại cấu hình theo chuỗi/seed;
+weekly naive tính một lần trên validation mỗi chuỗi. Macro trước hết lấy trung bình năm seed trong
+từng chuỗi, sau đó lấy trung bình không trọng số giữa 12 chuỗi. Không đọc test.
 
 Cấu hình LSTM dùng 30 ngày đầu vào, dự báo trực tiếp
-7 ngày, Adam và seed cố định. Mỗi ngày input có 6 kênh: sales, lag-7, rolling mean 7/14 ngày,
+7 ngày, Adam và seed tường minh. Mỗi ngày input có 6 kênh: sales, lag-7, rolling mean 7/14 ngày,
 day-of-week sin/cos. Feature sales chỉ sử dụng ngày hiện tại/quá khứ; 14 ngày warm-up đầu không
 được đưa vào cửa sổ. Tensor input `[batch, 6, 30]`, labels `[batch, 7, 30]`, mask `[batch, 30]`.
 Grid thử (hidden units, learning rate): (16, 0,001), (32, 0,001),
@@ -31,9 +30,46 @@ chạy hiện tại không tính metric test. Autoregressive được fit với 
 (32 units, 0,001) để so sánh kiến trúc có kiểm soát; mỗi bước dự báo một sales value,
 tạo lại lag/rolling/calendar features và
 dùng giá trị dự báo làm lịch sử cho bước kế tiếp. Checkpoint AR được chọn bằng RMSE rollout 7 ngày.
-`Main` hiện so sánh trên validation; lần chạy này không tính metric test.
+`Main` chạy các so sánh trên validation; hiện không tính metric test.
 
-## Kết quả multi-seed validation gần nhất
+## Kết quả multi-series validation gần nhất
+
+Đã chạy 12 chuỗi (4 LOW, 4 MEDIUM, 4 HIGH) trên validation 2016. Tertile được xác định chỉ từ
+mean sales theo ngày trong train 2013–2015; các chuỗi không có đủ 1.095 ngày train duy nhất bị loại
+khỏi tập ứng viên. Báo cáo chi tiết từng cặp và macro được ghi ở
+`output/multi-series-validation.txt` (file cục bộ được Git ignore); số liệu chính được lưu bên dưới.
+
+| Nhóm | Store | Item | Mean sales train |
+| --- | ---: | ---: | ---: |
+| LOW | 7 | 34 | 16,7397 |
+| LOW | 1 | 16 | 21,8311 |
+| LOW | 7 | 21 | 26,3790 |
+| LOW | 3 | 37 | 31,0292 |
+| MEDIUM | 7 | 6 | 37,7361 |
+| MEDIUM | 7 | 35 | 42,7763 |
+| MEDIUM | 1 | 31 | 49,3443 |
+| MEDIUM | 1 | 35 | 55,1534 |
+| HIGH | 2 | 43 | 61,2292 |
+| HIGH | 9 | 12 | 68,3991 |
+| HIGH | 2 | 24 | 78,9160 |
+| HIGH | 10 | 28 | 91,8986 |
+
+Mỗi ô dưới đây là macro mean ± sample std giữa 12 chuỗi, tính trên metric đã bình quân năm seed
+trong từng chuỗi. Đây là độ phân tán giữa chuỗi, không phải sai số chuẩn hay khoảng tin cậy.
+
+| Phương pháp | Macro MAE | Macro RMSE |
+| --- | ---: | ---: |
+| Weekly naive | 8,7365 ± 2,4252 | 11,1435 ± 3,1713 |
+| Direct LSTM | 10,3217 ± 4,1082 | 13,0076 ± 5,1836 |
+| Autoregressive LSTM | 9,7157 ± 3,5308 | 12,1396 ± 4,4385 |
+
+Weekly naive vẫn có macro MAE/RMSE thấp nhất. AR thấp hơn Direct 0,6060 MAE và 0,8680 RMSE theo
+macro, nhưng vẫn kém weekly naive lần lượt 0,9792 MAE và 0,9961 RMSE. AR có RMSE bình quân seed
+thấp hơn Direct ở 11/12 chuỗi; điều này không làm nó trở thành mô hình tốt nhất tổng thể vì baseline
+tuần thắng cả hai neural model. Chưa đánh giá trên mọi 500 chuỗi, không có khoảng tin cậy/bootstrap,
+và test 2017 không được đọc trong lượt này.
+
+### Kết quả single-series multi-seed trước đó
 
 Dataset cục bộ: 913.000 dòng, 500 cặp store-item, 1.826 ngày mỗi cặp, tổng sales 47.704.512.
 Train 2013–2015 (1.046 windows sau warm-up), validation 2016 (360 windows), test 2017 (359 windows).
@@ -85,18 +121,18 @@ Do đó số dự báo đếm theo window × horizon, không phải số ngày l
 
 ## Kiểm chứng và giới hạn
 
-Các kiểm thử bao gồm chia cửa sổ, kiểm tra analyzer, weekly baseline, direct LSTM, autoregressive
-rollout 7 bước và thống kê sample standard deviation. `mvn test` đạt 13 tests; `mvn -B compile
-exec:java` chạy đủ 10 lượt LSTM và tổng hợp validation trên `data/train.csv`, `BUILD SUCCESS` sau
-15:17 phút; không tính metric test.
+Các kiểm thử bao gồm chia cửa sổ, kiểm tra analyzer, weekly baseline, hai forecaster, thống kê
+sample standard deviation và chọn tertile đại diện. `mvn test` đạt 15 tests; `mvn -B compile
+exec:java` chạy 12 chuỗi × 5 seed × 2 mô hình (120 lượt huấn luyện), `BUILD SUCCESS` sau 2:05 giờ;
+không tính metric test.
 Kết quả chi tiết trong [nhật ký](change-log.md).
 
-Mô hình mới thử trên một chuỗi; dù đã lặp năm seed, vẫn chưa đánh giá trên các store-item khác,
-chưa có kiểm định thống kê, và AR vẫn dùng units/rate được chọn trước bằng Direct. Việc chọn epoch
-bằng validation ở mỗi lượt cũng có nghĩa validation là dữ liệu tuning. Test 2017 đã được quan sát
-trong các bước trước; lượt chạy này không đọc test.
+Thí nghiệm mới chỉ lấy 12/500 chuỗi, dùng cùng cấu hình được chọn trước, và validation chọn epoch
+ở từng seed nên vẫn là dữ liệu tuning. Macro std đo phân tán giữa các chuỗi, không phải độ bất định
+của 500 chuỗi; chưa bootstrap hoặc đánh giá theo mọi cặp. Test 2017 đã được quan sát trong các bước
+trước; lượt chạy này không đọc test.
 
-Bước kế tiếp: ghi nhận AR có RMSE validation trung bình thấp nhất nhưng lợi thế nhỏ và không thắng
-đa số seed; chưa chốt kiến trúc tổng quát. Mở rộng đánh giá có kiểm soát sang nhiều cặp store-item,
-giữ test 2017 ngoài quá trình chọn. Cần thống nhất cách tổng hợp nhiều chuỗi (macro theo chuỗi hoặc
-gộp mọi dự báo) trước khi báo cáo kết quả.
+Bước kế tiếp: điều tra vì sao weekly naive tiếp tục thắng macro trên tập đại diện, tập trung phân
+tích sai số theo nhóm LOW/MEDIUM/HIGH và horizon trước khi thay đổi mô hình. Sau khi quyết định
+feature/kiến trúc dựa trên validation, có thể tăng số chuỗi; test 2017 từng được xem trước đây nên
+không dùng làm holdout mới.

@@ -287,3 +287,33 @@ mượn units/rate của Direct, không có kiểm định ý nghĩa. Tiếp the
 cách tổng hợp metric phù hợp; không chọn mô hình bằng test 2017 đã được quan sát trước đây.
 
 **Commit đề xuất:** `feat: compare LSTM strategies across random seeds`
+
+## 16. Đánh giá macro trên nhiều chuỗi đại diện
+
+**Nhu cầu:** mở rộng đánh giá khỏi Store 1–Item 1 để xem baseline và hai LSTM có hành vi khác nhau
+ở các mức doanh số khác nhau; không gộp mọi dự báo rồi để chuỗi scale cao chi phối metric.
+
+**Thay đổi:** thêm `MultiSeriesExperimentRunner`. Nó tính mean sales/ngày trong train 2013–2015,
+lọc profile có 1.095 ngày train duy nhất, chia các cặp thành tertile LOW/MEDIUM/HIGH và lấy đều
+bốn đại diện mỗi nhóm (12 chuỗi). Với mỗi chuỗi, preprocessing và scaler được tạo riêng, scaler vẫn
+fit train-only; chạy weekly naive cùng Direct/AR với cấu hình 32 units, learning rate 0,001, tối đa
+30 epoch, patience 5 và seed 42, 123, 2026, 7, 99. Kết quả LSTM được bình quân qua seed trong mỗi
+chuỗi trước macro-average không trọng số. Main ghi báo cáo vào `output/multi-series-validation.txt`.
+
+**Kết quả validation:** macro Weekly naive MAE/RMSE 8,7365 ± 2,4252 / 11,1435 ± 3,1713;
+Direct 10,3217 ± 4,1082 / 13,0076 ± 5,1836; Autoregressive 9,7157 ± 3,5308 / 12,1396 ± 4,4385.
+Độ lệch chuẩn là sample std giữa 12 điểm macro theo chuỗi, không phải CI. AR thấp hơn Direct về macro
+MAE 0,6060 và RMSE 0,8680, đồng thời có mean RMSE thấp hơn ở 11/12 chuỗi. Weekly naive vẫn thấp
+hơn AR về MAE 0,9792 và RMSE 0,9961; vì vậy hai neural model chưa vượt baseline tổng thể.
+
+**Kiểm tra:** `mvn test` — 15 tests, 0 failures/errors; chọn tertile và vị trí quantile có test.
+`mvn -B compile exec:java` trên dataset thật — 12 chuỗi × 5 seed × 2 LSTM (120 fits), `BUILD SUCCESS`
+sau 2:05 giờ; báo cáo kiểm tra có đủ 12 cặp và macro. `git diff --check` cùng link Markdown được
+chạy sau cập nhật tài liệu.
+
+**Giới hạn và tiếp theo:** chỉ 12/500 cặp; stratification từ giai đoạn train; mô hình dùng cùng cấu
+hình đã chọn trước và validation chọn checkpoint; chưa có bootstrap/CI. Cần phân tích theo horizon và
+từng tier để tìm nguyên nhân weekly naive tốt hơn trước khi mở rộng toàn bộ dữ liệu. Test 2017 không
+được chạy và đã từng được xem trong các bước trước.
+
+**Commit đề xuất:** `feat: evaluate forecasts across representative series`

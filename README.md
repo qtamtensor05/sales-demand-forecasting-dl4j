@@ -2,7 +2,7 @@
 
 Dự án Java hướng tới dự báo nhu cầu bán hàng với DeepLearning4J (DL4J).
 Phiên bản hiện tại phân tích dữ liệu bán hàng CSV và xuất báo cáo thống kê dạng văn bản.
-Đã có weekly naive, direct LSTM và autoregressive LSTM cho một chuỗi store-item; runner hiện lặp hai LSTM qua năm seed và chỉ đánh giá validation.
+Đã có weekly naive, Direct LSTM và Autoregressive LSTM; runner đánh giá 12 chuỗi store-item đại diện theo doanh số train, lặp hai LSTM qua năm seed và chỉ dùng validation.
 
 Xem [tài liệu quá trình thực hiện](docs/README.md) để theo dõi từng bước, lý do và kết quả.
 
@@ -37,8 +37,10 @@ Chạy các lệnh từ thư mục chứa `pom.xml`.
    mvn compile exec:java
    ```
 
-3. Mở `output/sales-statistics.txt`. Thư mục được tạo tự động; mỗi lần chạy sẽ ghi đè báo cáo.
-   Console hiển thị đường dẫn báo cáo.
+3. Mở `output/sales-statistics.txt` và `output/multi-series-validation.txt`. Thư mục được tạo
+   tự động; mỗi lần chạy sẽ ghi đè báo cáo. Mặc định phần thực nghiệm có 12 chuỗi × 5 seed × 2 LSTM
+   (120 lượt huấn luyện), mất khoảng 2 giờ trên máy CPU đã đo; điều chỉnh `DEFAULT_SAMPLES_PER_STRATUM`
+   trong `MultiSeriesExperimentRunner` nếu cần giảm số chuỗi khi thử nhanh.
 
 Trong IntelliJ IDEA, mở dự án Maven, chọn JDK 11 và chạy
 `com.dl4j.salesforecast.Main` với working directory là thư mục gốc dự án.
@@ -89,6 +91,7 @@ src/main/java/com/dl4j/salesforecast/
   model/SalesLstmForecaster.java      # Direct LSTM dự báo 7 ngày
   model/AutoregressiveLstmForecaster.java # LSTM dự báo tuần tự từng ngày
   model/ExperimentRunner.java         # So sánh hai mô hình trên năm seed
+  model/MultiSeriesExperimentRunner.java # Chọn tertile LOW/MEDIUM/HIGH và macro-average
 examples/train.csv                  # Dữ liệu mẫu tự tạo, được đưa lên Git
 data/                               # Dữ liệu cục bộ, bỏ qua bởi Git
 output/                             # Báo cáo được sinh ra, bỏ qua bởi Git
@@ -97,8 +100,8 @@ pom.xml                             # Dependency và cấu hình Maven
 
 ## Phân tích một chuỗi thời gian
 
-`Main` cũng gọi `TimeSeriesAnalyzer.analyze("data/train.csv", 1, 1)` và in báo cáo
-chuỗi đó ra console. Đổi hai ID để phân tích cửa hàng/sản phẩm khác.
+Để phân tích thủ công một chuỗi cụ thể, gọi `TimeSeriesAnalyzer.analyze` với store/item mong muốn.
+`Main` hiện gọi analyzer ở chế độ yên lặng cho các cặp được chọn bởi thí nghiệm nhiều chuỗi.
 
 ```java
 TimeSeriesAnalyzer.TimeSeriesResult result =
@@ -126,18 +129,17 @@ train.csv -> SalesDataAnalyzer -> TimeSeriesAnalyzer
 ```
 
 `TimeSeriesAnalyzer` cung cấp chuỗi đã sắp xếp và thông tin chất lượng cho
-`SalesPreprocessor`. `ExperimentRunner` giữ cấu hình 32 units, learning rate 0,001,
-giới hạn 30 epoch và patience 5; chạy direct và autoregressive lần lượt với seed 42, 123,
-2026, 7, 99. Mỗi seed chọn checkpoint theo validation của chính mô hình. Báo cáo gồm metric
-từng seed, mean ± sample standard deviation (mẫu số n−1) và weekly naive cố định. Runner không
-tính metric test; không tune lại cấu hình theo từng seed. Kết quả chạy mới nhất được ghi trong
-[trạng thái hiện tại](docs/current-state.md).
+`SalesPreprocessor`. `MultiSeriesExperimentRunner` xếp hạng store-item theo mean sales 2013–2015,
+chọn bốn chuỗi từ mỗi tertile LOW/MEDIUM/HIGH, rồi dùng cấu hình 32 units, learning rate 0,001,
+tối đa 30 epoch, patience 5 và seed 42, 123, 2026, 7, 99. Mỗi scaler chỉ fit trên train của
+chuỗi tương ứng. Với mỗi cặp, runner bình quân metric LSTM qua seed trước rồi macro-average không
+trọng số giữa chuỗi. Báo cáo được ghi vào `output/multi-series-validation.txt`; không tính test.
+Xem kết quả và giới hạn trong [trạng thái hiện tại](docs/current-state.md).
 
 ## Tiền xử lý
 
-`Main` gọi `SalesPreprocessor.preprocess(series)` và in tóm tắt cùng cửa sổ đầu
-của mỗi tập ra console. `ExperimentRunner` chạy hai kiến trúc LSTM trên train/validation
-và so sánh với weekly naive; Main hiện không đọc test hoặc in test metrics.
+`Main` gọi `MultiSeriesExperimentRunner` để chạy đại diện LOW/MEDIUM/HIGH. Main lưu báo cáo
+validation ở `output/multi-series-validation.txt`; không đọc test hoặc in test metrics.
 Mặc định:
 
 | Tập | Thời gian | Số ngày | Cửa sổ 30 → 7 |
@@ -211,13 +213,13 @@ Sau mỗi dự báo, chương trình nối prediction vào lịch sử, cập nh
 weekday của ngày đích kế tiếp để dựng input mới, rồi dự báo tiếp cho đến đủ 7 ngày. Checkpoint của
 mô hình này được chọn theo RMSE rollout 7 bước trên validation. Để so sánh kiến trúc có kiểm soát,
 nó dùng cùng seed, hidden units và learning rate của direct model đã chọn; bước này chưa tìm grid
-riêng cho autoregressive. `Main` gọi `ExperimentRunner`, in kết quả từng seed và tổng hợp weekly
-naive vs direct LSTM vs autoregressive LSTM trên validation, không tính metric test.
+riêng cho autoregressive. `Main` gọi `MultiSeriesExperimentRunner`, in tiến độ seed và xuất macro
+weekly naive vs Direct LSTM vs Autoregressive LSTM trên validation, không tính metric test.
 
 Sau mỗi epoch lưu checkpoint tốt nhất theo metric validation phù hợp: RMSE direct 7 output hoặc
 RMSE rollout AR. Cả hai dừng sớm sau 5 epoch liên tiếp không cải thiện.
 
-Kết quả multi-seed hiện tại và mức ổn định so với weekly baseline nằm trong
+Kết quả macro nhiều chuỗi và mức so sánh với weekly baseline nằm trong
 [trạng thái dự án](docs/current-state.md). Test 2017 đã được quan sát trong các lần chạy trước,
 nên không còn là holdout hoàn toàn chưa từng xem.
 

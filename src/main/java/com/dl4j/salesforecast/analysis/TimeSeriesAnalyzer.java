@@ -29,6 +29,15 @@ public final class TimeSeriesAnalyzer {
     }
 
     public static TimeSeriesResult analyze(String filePath, int storeId, int itemId) {
+        return analyze(filePath, storeId, itemId, true);
+    }
+
+    /** Reads and validates one series without printing its detailed diagnostic report. */
+    public static TimeSeriesResult analyzeQuietly(String filePath, int storeId, int itemId) {
+        return analyze(filePath, storeId, itemId, false);
+    }
+
+    private static TimeSeriesResult analyze(String filePath, int storeId, int itemId, boolean printReport) {
         if (storeId <= 0 || itemId <= 0) {
             throw new IllegalArgumentException("Store and item IDs must be positive.");
         }
@@ -39,7 +48,7 @@ public final class TimeSeriesAnalyzer {
         }
         observations.sort(Comparator.comparing(observation -> observation.date));
         TimeSeriesResult result = new TimeSeriesResult(storeId, itemId, observations);
-        printReport(result);
+        if (printReport) { printReport(result); }
         return result;
     }
 
