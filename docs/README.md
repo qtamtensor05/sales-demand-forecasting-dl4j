@@ -22,3 +22,12 @@ Quy trình cho trợ lý được khai báo tại [AGENTS.md](../AGENTS.md) và
 Đây là hướng dẫn cho agent khi làm việc trong repository, không phải chương trình tự chạy sau thao tác IDE/Git.
 Với tác vụ huấn luyện dài, skill yêu cầu lưu đầy đủ log nhưng chỉ đọc và tổng hợp sau khi tiến trình kết thúc;
 agent không liên tục đọc kết quả của từng epoch khi tiến trình vẫn hoạt động bình thường.
+
+Các workflow kỹ thuật project-native được tách thành ba skill tự khám phá:
+
+- [debugging-and-error-recovery](../.agents/skills/debugging-and-error-recovery/SKILL.md) cho chẩn đoán nguyên nhân gốc;
+- [test-driven-development](../.agents/skills/test-driven-development/SKILL.md) cho thay đổi hành vi có regression test;
+- [code-review-and-quality](../.agents/skills/code-review-and-quality/SKILL.md) cho review trước merge.
+
+Các skill này được điều chỉnh cho Java 11, Maven, DL4J và các bất biến dữ liệu của dự án; chúng không tự cấp quyền
+sửa code, chạy thí nghiệm dài, nâng dependency, commit hoặc push ngoài phạm vi yêu cầu của người dùng.

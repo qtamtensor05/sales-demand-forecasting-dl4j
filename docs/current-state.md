@@ -148,3 +148,17 @@ từng epoch. Sau khi tiến trình dừng, agent đọc log một lần để l
 Log từng phần chỉ được đọc sớm khi tiến trình thất bại, có dấu hiệu treo, cần chẩn đoán, hoặc người
 dùng yêu cầu theo dõi trực tiếp. Quy tắc này thay đổi cách agent quan sát tiến trình, không thay đổi
 code huấn luyện, dữ liệu, train-only normalization hay ranh giới chia theo thời gian.
+
+## Skill kỹ thuật của dự án
+
+Repository có thêm ba workflow tự khám phá trong `.agents/skills/`. `debugging-and-error-recovery`
+định tuyến chẩn đoán qua các biên CSV, thời gian, preprocessing, tensor, model và báo cáo; mặc định
+chỉ chẩn đoán nếu người dùng chưa yêu cầu sửa. `test-driven-development` dùng JUnit 5 và fixture nhỏ
+theo red-green-refactor cho thay đổi hành vi, bảo vệ train-only scaler, split thời gian, causal
+features, shape/mask và validation-only selection. `code-review-and-quality` review theo findings,
+ưu tiên data leakage, metric alignment, DL4J correctness, Java 11, test, security và performance;
+mặc định không sửa code.
+
+Ba skill dùng lại quy tắc log huấn luyện dài của `sales-project-progress`, không tự chạy thí nghiệm
+120 fits, nâng dependency, commit hay push. Đây là thay đổi workflow agent; code Java, pipeline dữ
+liệu, normalization và split hiện tại không đổi.

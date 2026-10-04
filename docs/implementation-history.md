@@ -342,3 +342,31 @@ agent, không tự sửa cách chương trình Java ghi log. Agent vẫn có th�
 trình do giới hạn timeout của công cụ và có thể đọc log sớm cho chẩn đoán hoặc khi người dùng yêu cầu.
 
 **Commit đề xuất:** `docs: defer training log review until completion`
+
+## 18. Bổ sung workflow debugging, TDD và code review cho agent
+
+**Nhu cầu:** triển khai các nội dung skill đã được khảo sát và đề xuất, nhưng điều chỉnh theo Java
+11, Maven, DL4J cùng các bất biến dữ liệu riêng của dự án thay vì cài nguyên bộ bên thứ ba.
+
+**Thay đổi:** thêm ba skill project-native. `debugging-and-error-recovery` yêu cầu tái hiện, định vị
+biên sai, kiểm chứng từng giả thuyết và phân biệt lỗi code với fixture/môi trường/dao động ngẫu nhiên.
+`test-driven-development` áp dụng red-green-refactor bằng JUnit 5, dùng fixture tổng hợp nhỏ và bảo
+vệ train-only scaler, chronological split, causal feature, tensor/mask cùng validation-only model
+selection. `code-review-and-quality` báo findings theo mức độ nghiêm trọng, ưu tiên leakage, căn
+chỉnh metric/horizon, DL4J correctness, Java 11, test, security và performance. Cả ba tuân theo
+quiet-log workflow và không tự commit/push, nâng dependency hoặc chạy thí nghiệm dài.
+
+**Kết quả:** agent có workflow chuyên biệt, tự khám phá cho chẩn đoán, triển khai có test và review,
+trong khi quyền sửa code vẫn phụ thuộc yêu cầu người dùng. Không thay đổi mã Java, dữ liệu,
+normalization, ranh giới split hoặc kết quả mô hình.
+
+**Kiểm tra:** đã gọi validator `skill-creator` cho cả ba skill nhưng công cụ không khởi động vì
+môi trường Python thiếu mô-đun `yaml`; thay vào đó kiểm tra thủ công frontmatter/tên thư mục và
+placeholder cho cả ba skill. Kiểm tra liên kết Markdown cùng `git diff --check`. Không chạy Maven
+vì thay đổi chỉ gồm hướng dẫn agent và tài liệu.
+
+**Giới hạn:** validator tự động chưa chạy hoàn chỉnh do thiếu PyYAML; chưa forward-test hành vi của
+skill trong phiên Codex mới và chưa benchmark hiệu quả so với workflow trước. Skill đưa ra quy
+trình, không tự bảo đảm agent hoặc code không có lỗi.
+
+**Commit đề xuất:** `feat: add project-native engineering agent skills`

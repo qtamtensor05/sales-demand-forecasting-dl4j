@@ -349,3 +349,38 @@ từ repository bên ngoài nên cần kiểm tra lại commit/license trước 
 đối chứng các skill trên repository này và chưa audit bảo mật toàn bộ script của nguồn đề xuất.
 
 **Commit đề xuất:** `docs: evaluate agent skill sources for DL4J workflow`
+
+## 012 - 2026-10-04 - Thêm ba skill kỹ thuật project-native
+
+**Mục tiêu:** bổ sung nội dung skill debugging, TDD và code review đã đề xuất sau khảo sát, phù hợp
+với dự án Java 11/Maven/DL4J hiện tại.
+
+**Lý do:** các bộ skill phổ biến cung cấp workflow hữu ích nhưng bản đầy đủ có nhiều quy tắc
+frontend, commit, orchestration hoặc lifecycle không cần thiết và có thể xung đột với
+`sales-project-progress`. Phiên bản project-native giữ phần có giá trị và mã hóa trực tiếp các rủi
+ro leakage, chronological split, tensor/mask, metric và lượt training dài của repository.
+
+**Thay đổi:** tạo `.agents/skills/debugging-and-error-recovery/SKILL.md` để tái hiện và định vị
+nguyên nhân gốc trước khi sửa; tạo `.agents/skills/test-driven-development/SKILL.md` để áp dụng
+red-green-refactor bằng JUnit 5 cho thay đổi hành vi; tạo
+`.agents/skills/code-review-and-quality/SKILL.md` để review findings theo correctness, leakage,
+maintainability, security và performance. Ba skill có phạm vi kích hoạt riêng, giữ Java 11,
+train-only normalization, chronological split, validation-only selection và quiet-log workflow.
+Chúng không tự cho phép sửa code, chạy training dài, nâng dependency, commit hoặc push.
+
+**Tệp ảnh hưởng:** ba `SKILL.md` mới trong `.agents/skills/`, `docs/README.md`,
+`docs/current-state.md`, `docs/implementation-history.md` và `docs/change-log.md`.
+
+**Kết quả:** repository có ba workflow kỹ thuật tự khám phá, ngắn gọn và không phụ thuộc MCP hoặc
+script ngoài. Không thay đổi source Java, Maven dependency, dữ liệu, normalization, split hoặc kết
+quả thí nghiệm.
+
+**Kiểm tra:** đã gọi validator `skill-creator` cho từng skill nhưng cả ba lượt đều dừng trước khi
+đọc skill vì Python thiếu mô-đun `yaml`. Kiểm tra thủ công frontmatter, tên thư mục và scaffold
+placeholder; kiểm tra liên kết Markdown cùng `git diff --check`. Không chạy Maven vì không có thay
+đổi hành vi chương trình.
+
+**Giới hạn:** chưa đánh giá hành vi trong một phiên Codex mới; validator tự động chưa chạy hoàn
+chỉnh do thiếu PyYAML. Các workflow cần agent tuân thủ và không thay thế review/test thực tế.
+
+**Commit đề xuất:** `feat: add project-native engineering agent skills`
