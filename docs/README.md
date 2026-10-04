@@ -20,3 +20,5 @@ Tên commit trong tài liệu là đề xuất, không đồng nghĩa đã commi
 Quy trình cho trợ lý được khai báo tại [AGENTS.md](../AGENTS.md) và
 [skill sales-project-progress](../.agents/skills/sales-project-progress/SKILL.md).
 Đây là hướng dẫn cho agent khi làm việc trong repository, không phải chương trình tự chạy sau thao tác IDE/Git.
+Với tác vụ huấn luyện dài, skill yêu cầu lưu đầy đủ log nhưng chỉ đọc và tổng hợp sau khi tiến trình kết thúc;
+agent không liên tục đọc kết quả của từng epoch khi tiến trình vẫn hoạt động bình thường.

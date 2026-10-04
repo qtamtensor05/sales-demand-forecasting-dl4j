@@ -39,3 +39,20 @@ entries. One completed request needs one log entry, not one entry per tool call.
 
 Suggesting a title does not authorize `git add`, commit, push, dependency upgrades, or
 unrelated implementation. This skill is an agent workflow, not a background task or Git hook.
+
+## Long-running training
+
+For training or experiment commands that print progress by epoch, capture complete stdout and
+stderr in stable log files and wait for the process to finish before reading or summarizing those
+logs. Do not repeatedly tail, poll, or inspect epoch output while the run is healthy.
+
+When the execution tool cannot wait until completion in one call, keep the same process/session
+alive and use the least frequent status-only checks needed by the tool. Check process liveness or
+exit state without reading the growing log, and give the user brief elapsed-status updates without
+repeating epoch metrics. After termination, read the final log once, record the exit code, and
+extract the final metrics, selected configuration, duration, warnings, and errors needed for
+validation and documentation.
+
+Inspect partial logs before completion only when the process exits unsuccessfully, appears stalled,
+requires diagnosis, or the user explicitly requests live progress. Never discard training output
+merely to avoid reading it during execution.

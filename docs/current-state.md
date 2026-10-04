@@ -136,3 +136,15 @@ Bước kế tiếp: điều tra vì sao weekly naive tiếp tục thắng macro
 tích sai số theo nhóm LOW/MEDIUM/HIGH và horizon trước khi thay đổi mô hình. Sau khi quyết định
 feature/kiến trúc dựa trên validation, có thể tăng số chuỗi; test 2017 từng được xem trước đây nên
 không dùng làm holdout mới.
+
+## Quy trình agent cho lượt huấn luyện dài
+
+Skill dự án lưu toàn bộ stdout/stderr của các lệnh huấn luyện hoặc thí nghiệm dài vào log ổn định,
+chờ tiến trình kết thúc rồi mới đọc và tổng hợp kết quả. Khi công cụ không thể chờ trong một lần gọi,
+agent chỉ kiểm tra trạng thái sống/exit ở tần suất tối thiểu cần thiết, không `tail` hay đọc metric
+từng epoch. Sau khi tiến trình dừng, agent đọc log một lần để lấy exit code, metric cuối, cấu hình
+được chọn, thời lượng, cảnh báo và lỗi phục vụ kiểm chứng/tài liệu.
+
+Log từng phần chỉ được đọc sớm khi tiến trình thất bại, có dấu hiệu treo, cần chẩn đoán, hoặc người
+dùng yêu cầu theo dõi trực tiếp. Quy tắc này thay đổi cách agent quan sát tiến trình, không thay đổi
+code huấn luyện, dữ liệu, train-only normalization hay ranh giới chia theo thời gian.

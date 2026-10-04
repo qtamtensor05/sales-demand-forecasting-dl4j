@@ -317,3 +317,28 @@ từng tier để tìm nguyên nhân weekly naive tốt hơn trước khi mở r
 được chạy và đã từng được xem trong các bước trước.
 
 **Commit đề xuất:** `feat: evaluate forecasts across representative series`
+
+## 17. Giảm đọc log trong lúc huấn luyện dài
+
+**Nhu cầu:** khi agent chạy huấn luyện hoặc thí nghiệm dài, không liên tục đọc log kết quả từng
+epoch; chỉ đọc và tổng hợp kết quả cuối cùng sau khi tiến trình hoàn tất.
+
+**Thay đổi:** bổ sung quy tắc `Long-running training` vào skill dự án. Agent phải lưu đầy đủ
+stdout/stderr vào log ổn định, chờ tiến trình kết thúc và chỉ sau đó đọc log để lấy exit code,
+metric cuối, cấu hình được chọn, thời lượng, cảnh báo và lỗi. Nếu công cụ buộc phải kiểm tra nhiều
+lần, agent chỉ kiểm tra trạng thái tiến trình ở tần suất tối thiểu, không đọc phần log đang tăng.
+Chỉ đọc log sớm khi tiến trình lỗi, có dấu hiệu treo, cần chẩn đoán, hoặc người dùng yêu cầu live.
+
+**Kết quả:** hướng dẫn agent nay phân biệt việc kiểm tra tiến trình còn sống với việc đọc log epoch,
+giảm thao tác đọc và tránh tổng hợp các kết quả trung gian như kết quả cuối. Không thay đổi mã Java,
+pipeline huấn luyện, train-only normalization hay ranh giới split theo thời gian.
+
+**Kiểm tra:** đã gọi validator của `skill-creator` nhưng công cụ không chạy được vì môi trường
+Python thiếu mô-đun `yaml`; frontmatter bắt buộc và tên thư mục được kiểm tra thủ công. Liên kết
+Markdown và `git diff --check` được kiểm tra sau khi cập nhật tài liệu.
+
+**Giới hạn:** validator tự động chưa chạy hoàn chỉnh do thiếu PyYAML. Đây là quy tắc thực thi cho
+agent, không tự sửa cách chương trình Java ghi log. Agent vẫn có thể cần kiểm tra trạng thái tiến
+trình do giới hạn timeout của công cụ và có thể đọc log sớm cho chẩn đoán hoặc khi người dùng yêu cầu.
+
+**Commit đề xuất:** `docs: defer training log review until completion`

@@ -270,3 +270,37 @@ thí nghiệm trước, validation dùng chọn epoch. Weekly naive vẫn là mo
 nên phân tích theo horizon/tier trước khi sửa mô hình. Test 2017 đã từng được xem và không được đọc ở đây.
 
 **Commit đề xuất:** `feat: evaluate forecasts across representative series`
+
+## 010 - 2026-10-04 - Chỉ đọc log huấn luyện sau khi tiến trình hoàn tất
+
+**Mục tiêu:** bổ sung quy tắc để agent không liên tục đọc kết quả từng epoch trong các lượt huấn
+luyện hoặc thí nghiệm dài, mà đọc và tổng hợp log sau khi có kết quả cuối cùng.
+
+**Lý do:** đọc log lặp lại trong lúc tiến trình khỏe mạnh tạo thao tác không cần thiết và dễ khiến
+kết quả trung gian bị hiểu như kết quả hoàn tất; agent vẫn cần giữ đủ log để kiểm chứng sau cùng.
+
+**Thay đổi:** thêm mục `Long-running training` vào
+`.agents/skills/sales-project-progress/SKILL.md`. Quy tắc yêu cầu lưu đầy đủ stdout/stderr, chờ
+tiến trình kết thúc, chỉ kiểm tra liveness/exit khi công cụ bắt buộc và không đọc log epoch đang tăng.
+Sau khi kết thúc, agent đọc log một lần để lấy exit code, metric cuối, cấu hình được chọn, thời lượng,
+cảnh báo và lỗi. Cho phép đọc sớm khi tiến trình lỗi, có dấu hiệu treo, cần chẩn đoán hoặc người dùng
+yêu cầu live. Cập nhật `docs/README.md`, `docs/current-state.md` và lịch sử triển khai để phản ánh
+quy trình này.
+
+**Tệp ảnh hưởng:** `.agents/skills/sales-project-progress/SKILL.md`, `docs/README.md`,
+`docs/current-state.md`, `docs/implementation-history.md`, `docs/change-log.md`.
+
+**Kết quả:** skill dự án đã mô tả rõ cơ chế chờ yên lặng và đọc kết quả cuối, đồng thời vẫn giữ
+khả năng theo dõi trạng thái tiến trình và chẩn đoán lỗi. Không thay đổi code Java, dữ liệu,
+normalization hay split theo thời gian.
+
+**Kiểm tra:** đã gọi validator của `skill-creator` nhưng validator không khởi động do môi trường
+Python thiếu mô-đun `yaml`; kiểm tra thủ công xác nhận frontmatter có `name`, `description` và tên
+`sales-project-progress` khớp thư mục. Kiểm tra liên kết Markdown trong tài liệu và
+`git diff --check`. Không chạy Maven vì thay đổi chỉ liên quan hướng dẫn agent và tài liệu.
+
+**Giới hạn:** validator tự động chưa chạy hoàn chỉnh do thiếu PyYAML. Quy tắc phụ thuộc agent/công
+cụ thực thi tuân thủ; nếu công cụ có timeout, agent vẫn cần kiểm tra trạng thái nhưng không đọc log
+epoch. Chương trình Java vẫn ghi log như trước.
+
+**Commit đề xuất:** `docs: defer training log review until completion`
