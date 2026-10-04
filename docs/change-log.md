@@ -304,3 +304,48 @@ cụ thực thi tuân thủ; nếu công cụ có timeout, agent vẫn cần ki�
 epoch. Chương trình Java vẫn ghi log như trước.
 
 **Commit đề xuất:** `docs: defer training log review until completion`
+
+## 011 - 2026-10-04 - Khảo sát nguồn agent skill phổ biến cho dự án
+
+**Mục tiêu:** tìm các nguồn agent skill được sử dụng rộng rãi và đánh giá mức phù hợp với dự án
+Java 11, Maven, DL4J và thí nghiệm dự báo chuỗi thời gian này.
+
+**Lý do:** skill phổ biến thường hướng đến frontend hoặc quy trình phát triển tổng quát; cài toàn bộ
+có thể làm tăng context, trùng quy tắc và xung đột với workflow riêng của repository. Cần tách mức
+độ phổ biến khỏi mức độ phù hợp kỹ thuật.
+
+**Phát hiện:** tại thời điểm khảo sát, các nguồn lớn gồm `obra/superpowers` (khoảng 294,9 nghìn
+GitHub stars), `anthropics/skills` (khoảng 176 nghìn), `addyosmani/agent-skills` (khoảng 95,2 nghìn),
+`vercel-labs/skills` (khoảng 33,1 nghìn), `vercel-labs/agent-skills` (khoảng 31,9 nghìn) và
+`trailofbits/skills` (khoảng 7 nghìn). Star chỉ là tín hiệu adoption, không bảo đảm chất lượng hoặc
+độ an toàn của từng skill. Repository `openai/skills` cũ đã được đánh dấu deprecated; với Codex nên
+ưu tiên tài liệu/plugin repository hiện hành của OpenAI.
+
+Nguồn phù hợp nhất để chọn lọc cho dự án là `addyosmani/agent-skills`, đặc biệt ba workflow
+`debugging-and-error-recovery`, `test-driven-development` và `code-review-and-quality`. Chúng khớp
+với Maven tests, sửa lỗi và quality gate mà không phụ thuộc frontend. `obra/superpowers` có các ý
+tưởng tốt về systematic debugging và verification-before-completion nhưng toàn bộ pack khá áp đặt,
+có thể chồng lên `sales-project-progress`, quy tắc không tự commit và chính sách agent hiện có.
+`trailofbits/skills` hữu ích khi thực hiện security audit chuyên sâu. `arvindand/agent-skills` có
+`maven-tools` phù hợp kiểm tra dependency JVM nhưng yêu cầu Maven Tools MCP và chưa có bằng chứng
+adoption ngang các bộ lớn. `vercel-labs/agent-skills` chủ yếu phục vụ React/Next.js nên không phù hợp
+trực tiếp với pipeline DL4J hiện tại.
+
+**Khuyến nghị:** dùng `skills.sh`/`vercel-labs/skills` làm công cụ khám phá và xem source trước khi
+cài. Nếu bổ sung, nên nhập hoặc điều chỉnh từng skill theo thứ tự: debugging, TDD, code review; sau
+đó mới cân nhắc Maven dependency và security audit. Không cài toàn bộ pack, không lấy star làm tiêu
+chí duy nhất, và phải rà soát script, quyền, network, license cùng quy tắc commit trước khi đưa vào
+`.agents/skills/`.
+
+**Tệp ảnh hưởng:** chỉ `docs/change-log.md`; không thay đổi code, cấu hình, dependency hay skill đang
+hoạt động và không cài nguồn bên thứ ba.
+
+**Kiểm tra:** đối chiếu README/repository gốc, tài liệu OpenAI hiện hành và số liệu GitHub công khai;
+chạy kiểm tra liên kết Markdown cục bộ và `git diff --check`. Không chạy Maven vì đây là yêu cầu
+điều tra, không có thay đổi hành vi chương trình.
+
+**Giới hạn:** GitHub stars và lượt cài thay đổi theo thời gian; một số marketplace tổng hợp source
+từ repository bên ngoài nên cần kiểm tra lại commit/license trước mỗi lần cài. Chưa chạy benchmark
+đối chứng các skill trên repository này và chưa audit bảo mật toàn bộ script của nguồn đề xuất.
+
+**Commit đề xuất:** `docs: evaluate agent skill sources for DL4J workflow`
