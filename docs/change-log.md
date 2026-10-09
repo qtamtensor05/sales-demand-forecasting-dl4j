@@ -384,3 +384,77 @@ placeholder; kiểm tra liên kết Markdown cùng `git diff --check`. Không ch
 chỉnh do thiếu PyYAML. Các workflow cần agent tuân thủ và không thay thế review/test thực tế.
 
 **Commit đề xuất:** `feat: add project-native engineering agent skills`
+
+## 013 - 2026-10-10 - Kiểm tra trạng thái và xác định bước triển khai tiếp theo
+
+**Mục tiêu:** kiểm tra tình trạng hiện tại của repository và đề xuất bước triển khai kế tiếp dựa
+trên bằng chứng đang có, không coi số liệu lịch sử là một lượt thí nghiệm mới.
+
+**Lý do:** pipeline đã có baseline, Direct LSTM, Autoregressive LSTM và đánh giá 12 chuỗi, nhưng
+weekly naive vẫn thắng macro. Cần xác nhận code/test/artifact hiện tại và thu hẹp nguyên nhân trước
+khi tiếp tục thay đổi mô hình hoặc chạy lại 120 lượt huấn luyện.
+
+**Phát hiện:** `master` sạch và đồng bộ với `origin/master`; môi trường hiện dùng OpenJDK 11.0.32.1
+và Maven 3.9.16. Dataset `data/train.csv` cùng hai báo cáo cục bộ vẫn tồn tại. Báo cáo multi-series
+gần nhất vẫn chứa đủ 12 chuỗi và macro validation: weekly naive RMSE 11,1435, Direct 13,0076,
+Autoregressive 12,1396. Quan sát từng chuỗi cho thấy neural model còn cạnh tranh ở LOW nhưng thua
+baseline rõ hơn tại MEDIUM/HIGH. Báo cáo chưa tổng hợp theo tier, horizon 1–7 hoặc độ phân tán seed
+cho từng chuỗi, nên chưa đủ bằng chứng để chọn một thay đổi kiến trúc cụ thể.
+
+**Đề xuất triển khai:** ưu tiên bổ sung breakdown validation theo tier, horizon và seed vào
+`MultiSeriesExperimentRunner`, kèm JUnit cho phép tổng hợp/định dạng báo cáo. Giữ nguyên scaler
+fit train-only, chronological split và model selection chỉ trên validation. Sau khi xác định nhóm
+và horizon gây lỗi, mới thử một giả thuyết mô hình có kiểm soát; chưa mở rộng 500 chuỗi và không
+dùng test 2017 để chọn giải pháp ở bước chẩn đoán.
+
+**Tệp ảnh hưởng:** `docs/current-state.md` và `docs/change-log.md`; không thay đổi source Java,
+dependency, dữ liệu, normalization hay ranh giới thời gian.
+
+**Kiểm tra:** `mvn -B test` đạt 15 tests, 0 failures/errors/skips và `BUILD SUCCESS` trong 32,142
+giây ngày 2026-10-10; kiểm tra artifact/report cục bộ, liên kết Markdown và `git diff --check`.
+
+**Giới hạn:** không chạy lại thí nghiệm 120 fits; các metric mô hình là kết quả báo cáo cục bộ từ
+lượt trước, không phải metric tái tạo trong yêu cầu này. Chỉ 12/500 chuỗi được đánh giá, chưa có
+bootstrap/CI và test 2017 không còn là holdout chưa từng quan sát.
+
+**Commit đề xuất:** `docs: record project status and next implementation step`
+
+## 014 - 2026-10-10 - Triển khai hệ thống phân tích lỗi validation
+
+**Mục tiêu:** thống kê lỗi theo nhóm doanh số, horizon và seed từ kết quả validation, không đổi
+kiến trúc, không huấn luyện thêm trong yêu cầu này và không dùng test 2017 để lựa chọn.
+
+**Lý do:** báo cáo cũ chỉ có metric tổng hợp từng chuỗi đã bình quân năm seed. Nó đủ để tính macro
+theo LOW/MEDIUM/HIGH và số chuỗi thắng baseline, nhưng không đủ để tái dựng horizon hoặc phân tán
+seed một cách đúng đắn.
+
+**Thay đổi:** thêm `ErrorAnalysisRunner.java`; giữ Direct `ForecastMetrics` đầy đủ trong mỗi
+`ExperimentRunner.SeedResult`; tích hợp `Main` để ghi `output/error-analysis-validation.txt` sau
+lượt multi-series. Runner báo macro MAE/RMSE theo tier và horizon, từng seed với mean ± sample std,
+phần trăm cải thiện so với weekly naive và số chuỗi thắng baseline theo RMSE. Thêm ba JUnit dùng
+dữ liệu synthetic để kiểm tra metric, macro-average, sample std, grouping, improvement và format.
+Không sửa forecaster, preprocessing, scaler, split, causal feature, model selection hoặc dependency.
+
+**Kết quả thực sự quan sát:** artifact cũ cho thấy HIGH có RMSE lớn nhất: weekly 14,6811, Direct
+18,7081, AR 17,0007. LOW là nhóm duy nhất hai LSTM cải thiện macro RMSE (+4,25% Direct, +5,54% AR);
+MEDIUM lần lượt -17,39%/-10,10%, HIGH -27,43%/-15,80%. Direct thắng baseline ở 3/12 chuỗi và AR
+ở 4/12. Horizon và seed gây lỗi lớn nhất chưa thể xác định vì artifact cũ không lưu breakdown;
+không suy diễn từ macro. Báo cáo cục bộ hiện ghi rõ coverage này.
+
+**Tệp ảnh hưởng:** `ErrorAnalysisRunner.java`, `ExperimentRunner.java`, `Main.java`,
+`ErrorAnalysisRunnerTest.java`, `README.md`, `docs/current-state.md`,
+`docs/implementation-history.md`, `docs/change-log.md`; báo cáo local trong `output/` bị Git ignore.
+
+**Kiểm tra:** bước red `mvn -B -Dtest=ErrorAnalysisRunnerTest test` thất bại đúng vì chưa có class;
+sau triển khai focused suite đạt 3/3. `mvn -B test` đạt 18 tests, 0 failures/errors/skips và
+`BUILD SUCCESS` trong 45,003 giây. Kiểm tra liên kết Markdown và `git diff --check` sau cập nhật.
+
+**Giới hạn:** chưa chạy lại 120 fits; lượt trước mất khoảng 2 giờ 05 phút. Vì vậy report hiện tại
+chỉ có kết quả tier/win có thể tái sử dụng, còn horizon/seed được đánh dấu unavailable. Lần chạy
+mặc định tiếp theo sẽ xuất đủ các phần này. Test 2017 không được truy cập.
+
+**Giả thuyết tiếp theo:** MSE trên sales tuyệt đối có thể làm mức/đỉnh doanh số cao chi phối học,
+phù hợp với khoảng cách xấu dần từ LOW sang HIGH. Sau khi breakdown horizon xác nhận, thử target
+tương đối hoặc biến đổi ổn định phương sai fit train-only và đánh giá bằng cùng validation protocol.
+
+**Commit đề xuất:** `feat: add validation error analysis reporting`

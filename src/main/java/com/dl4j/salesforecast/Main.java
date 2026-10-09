@@ -2,6 +2,7 @@ package com.dl4j.salesforecast;
 
 import com.dl4j.salesforecast.analysis.SalesDataAnalyzer;
 import com.dl4j.salesforecast.model.MultiSeriesExperimentRunner;
+import com.dl4j.salesforecast.model.ErrorAnalysisRunner;
 import java.io.IOException;
 import java.nio.file.Path;
 
@@ -20,5 +21,10 @@ public class Main {
         MultiSeriesExperimentRunner.writeReport(experiments, experimentPath);
         System.out.println("Multi-series validation report saved to: " + experimentPath.toAbsolutePath());
         System.out.print(MultiSeriesExperimentRunner.formatReport(experiments));
+        ErrorAnalysisRunner.AnalysisResult analysis = ErrorAnalysisRunner.analyze(experiments);
+        Path analysisPath = Path.of("output", "error-analysis-validation.txt");
+        ErrorAnalysisRunner.writeReport(analysis, analysisPath);
+        System.out.println("Validation error analysis saved to: " + analysisPath.toAbsolutePath());
+        System.out.print(ErrorAnalysisRunner.formatReport(analysis));
     }
 }

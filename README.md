@@ -37,7 +37,8 @@ Chạy các lệnh từ thư mục chứa `pom.xml`.
    mvn compile exec:java
    ```
 
-3. Mở `output/sales-statistics.txt` và `output/multi-series-validation.txt`. Thư mục được tạo
+3. Mở `output/sales-statistics.txt`, `output/multi-series-validation.txt` và
+   `output/error-analysis-validation.txt`. Thư mục được tạo
    tự động; mỗi lần chạy sẽ ghi đè báo cáo. Mặc định phần thực nghiệm có 12 chuỗi × 5 seed × 2 LSTM
    (120 lượt huấn luyện), mất khoảng 2 giờ trên máy CPU đã đo; điều chỉnh `DEFAULT_SAMPLES_PER_STRATUM`
    trong `MultiSeriesExperimentRunner` nếu cần giảm số chuỗi khi thử nhanh.
@@ -133,13 +134,15 @@ train.csv -> SalesDataAnalyzer -> TimeSeriesAnalyzer
 chọn bốn chuỗi từ mỗi tertile LOW/MEDIUM/HIGH, rồi dùng cấu hình 32 units, learning rate 0,001,
 tối đa 30 epoch, patience 5 và seed 42, 123, 2026, 7, 99. Mỗi scaler chỉ fit trên train của
 chuỗi tương ứng. Với mỗi cặp, runner bình quân metric LSTM qua seed trước rồi macro-average không
-trọng số giữa chuỗi. Báo cáo được ghi vào `output/multi-series-validation.txt`; không tính test.
+trọng số giữa chuỗi. Báo cáo chính được ghi vào `output/multi-series-validation.txt`; phân tích
+lỗi theo nhóm, horizon và seed được ghi vào `output/error-analysis-validation.txt`. Không tính test.
 Xem kết quả và giới hạn trong [trạng thái hiện tại](docs/current-state.md).
 
 ## Tiền xử lý
 
 `Main` gọi `MultiSeriesExperimentRunner` để chạy đại diện LOW/MEDIUM/HIGH. Main lưu báo cáo
-validation ở `output/multi-series-validation.txt`; không đọc test hoặc in test metrics.
+validation ở `output/multi-series-validation.txt` và phân tích lỗi ở
+`output/error-analysis-validation.txt`; không đọc test hoặc in test metrics.
 Mặc định:
 
 | Tập | Thời gian | Số ngày | Cửa sổ 30 → 7 |

@@ -38,14 +38,13 @@ public final class ExperimentRunner {
                     DEFAULT_HIDDEN_UNITS, DEFAULT_LEARNING_RATE, patience, seed);
             AutoregressiveLstmForecaster.FitResult autoregressive = AutoregressiveLstmForecaster.fit(prepared,
                     epochs, DEFAULT_HIDDEN_UNITS, DEFAULT_LEARNING_RATE, patience, seed);
-            results.add(new SeedResult(seed, direct.getValidationMetrics().getMae(),
-                    direct.getValidationMetrics().getRmse(), autoregressive.getValidationMetrics(),
+            results.add(new SeedResult(seed, direct.getValidationMetrics(), autoregressive.getValidationMetrics(),
                     direct.getBestEpoch(), autoregressive.getBestEpoch(),
                     direct.getEpochsRun(), autoregressive.getEpochsRun()));
             SeedResult row = results.get(results.size() - 1);
             System.out.printf(Locale.ROOT,
                     "Seed %d | Direct MAE %.4f RMSE %.4f (epoch %d/%d) | AR MAE %.4f RMSE %.4f (epoch %d/%d)%n",
-                    seed, row.directMae, row.directRmse,
+                    seed, row.getDirectMae(), row.getDirectRmse(),
                     row.directBestEpoch, row.directEpochsRun, row.autoregressiveMetrics.getMae(),
                     row.autoregressiveMetrics.getRmse(), row.autoregressiveBestEpoch, row.autoregressiveEpochsRun);
         }
@@ -83,7 +82,7 @@ public final class ExperimentRunner {
         List<Double> values = new ArrayList<>(results.size());
         for (SeedResult result : results) {
             if (direct) {
-                values.add(mae ? result.directMae : result.directRmse);
+                values.add(mae ? result.getDirectMae() : result.getDirectRmse());
             } else {
                 values.add(mae ? result.autoregressiveMetrics.getMae() : result.autoregressiveMetrics.getRmse());
             }
@@ -128,20 +127,18 @@ public final class ExperimentRunner {
 
     public static final class SeedResult {
         private final long seed;
-        private final double directMae;
-        private final double directRmse;
+        private final SalesLstmForecaster.ForecastMetrics directMetrics;
         private final AutoregressiveLstmForecaster.ForecastMetrics autoregressiveMetrics;
         private final int directBestEpoch;
         private final int autoregressiveBestEpoch;
         private final int directEpochsRun;
         private final int autoregressiveEpochsRun;
-        private SeedResult(long seed, double directMae, double directRmse,
+        private SeedResult(long seed, SalesLstmForecaster.ForecastMetrics directMetrics,
                            AutoregressiveLstmForecaster.ForecastMetrics autoregressiveMetrics,
                            int directBestEpoch, int autoregressiveBestEpoch,
                            int directEpochsRun, int autoregressiveEpochsRun) {
             this.seed = seed;
-            this.directMae = directMae;
-            this.directRmse = directRmse;
+            this.directMetrics = directMetrics;
             this.autoregressiveMetrics = autoregressiveMetrics;
             this.directBestEpoch = directBestEpoch;
             this.autoregressiveBestEpoch = autoregressiveBestEpoch;
@@ -149,8 +146,9 @@ public final class ExperimentRunner {
             this.autoregressiveEpochsRun = autoregressiveEpochsRun;
         }
         public long getSeed() { return seed; }
-        public double getDirectMae() { return directMae; }
-        public double getDirectRmse() { return directRmse; }
+        public double getDirectMae() { return directMetrics.getMae(); }
+        public double getDirectRmse() { return directMetrics.getRmse(); }
+        public SalesLstmForecaster.ForecastMetrics getDirectMetrics() { return directMetrics; }
         public AutoregressiveLstmForecaster.ForecastMetrics getAutoregressiveMetrics() { return autoregressiveMetrics; }
         public int getDirectBestEpoch() { return directBestEpoch; }
         public int getAutoregressiveBestEpoch() { return autoregressiveBestEpoch; }

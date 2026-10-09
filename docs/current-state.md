@@ -9,7 +9,8 @@ data/train.csv
        ├─ phân tầng tertile theo mean sales giai đoạn train
        ├─ TimeSeriesAnalyzer → SalesPreprocessor riêng cho mỗi chuỗi
        └─ Weekly Naive + Direct LSTM + Autoregressive LSTM
-            └─ 5 seed; macro-average theo 12 chuỗi trên validation; không đọc test
+            ├─ 5 seed; macro-average theo 12 chuỗi trên validation; không đọc test
+            └─ ErrorAnalysisRunner → output/error-analysis-validation.txt
 ```
 
 `Main` hiện gọi `MultiSeriesExperimentRunner`. Runner xếp hạng các cặp bằng mean sales mỗi ngày
@@ -18,6 +19,13 @@ nhóm. Mỗi chuỗi dùng scaler fit riêng trên train, cấu hình 32 units /
 năm seed 42, 123, 2026, 7, 99 cho Direct lẫn Autoregressive. Không tune lại cấu hình theo chuỗi/seed;
 weekly naive tính một lần trên validation mỗi chuỗi. Macro trước hết lấy trung bình năm seed trong
 từng chuỗi, sau đó lấy trung bình không trọng số giữa 12 chuỗi. Không đọc test.
+
+`ExperimentRunner` giữ toàn bộ validation metric của Direct và Autoregressive theo từng horizon
+cho mỗi seed. `ErrorAnalysisRunner` tổng hợp MAE/RMSE theo nhóm LOW/MEDIUM/HIGH, horizon 1–7 và
+seed; báo mean ± sample standard deviation, phần trăm cải thiện so với weekly naive và số chuỗi
+thắng baseline theo RMSE. Neural metric được bình quân seed trong từng chuỗi trước khi macro-average
+không trọng số giữa chuỗi. `Main` ghi báo cáo UTF-8 vào `output/error-analysis-validation.txt` sau
+khi lượt multi-series kết thúc; hệ thống phân tích không huấn luyện thêm và không đọc test 2017.
 
 Cấu hình LSTM dùng 30 ngày đầu vào, dự báo trực tiếp
 7 ngày, Adam và seed tường minh. Mỗi ngày input có 6 kênh: sales, lag-7, rolling mean 7/14 ngày,
@@ -68,6 +76,13 @@ macro, nhưng vẫn kém weekly naive lần lượt 0,9792 MAE và 0,9961 RMSE. 
 thấp hơn Direct ở 11/12 chuỗi; điều này không làm nó trở thành mô hình tốt nhất tổng thể vì baseline
 tuần thắng cả hai neural model. Chưa đánh giá trên mọi 500 chuỗi, không có khoảng tin cậy/bootstrap,
 và test 2017 không được đọc trong lượt này.
+
+Từ 12 dòng per-series đã lưu, nhóm HIGH có sai số tuyệt đối lớn nhất: weekly/direct/AR RMSE lần
+lượt 14,6811 / 18,7081 / 17,0007. Ở LOW, Direct và AR cải thiện RMSE so với baseline khoảng
+4,25% và 5,54%; tại MEDIUM chúng kém 17,39% và 10,10%; tại HIGH kém 27,43% và 15,80%.
+Direct thắng weekly naive theo RMSE ở 3/12 chuỗi, AR thắng ở 4/12. Artifact cũ chỉ giữ metric
+per-series đã bình quân seed nên không thể xác định horizon hoặc seed nào gây lỗi lớn nhất; báo cáo
+cục bộ hiện đánh dấu rõ hai phần này là chưa có dữ liệu thay vì suy diễn.
 
 ### Kết quả single-series multi-seed trước đó
 
@@ -132,10 +147,12 @@ Thí nghiệm mới chỉ lấy 12/500 chuỗi, dùng cùng cấu hình được
 của 500 chuỗi; chưa bootstrap hoặc đánh giá theo mọi cặp. Test 2017 đã được quan sát trong các bước
 trước; lượt chạy này không đọc test.
 
-Bước kế tiếp: điều tra vì sao weekly naive tiếp tục thắng macro trên tập đại diện, tập trung phân
-tích sai số theo nhóm LOW/MEDIUM/HIGH và horizon trước khi thay đổi mô hình. Sau khi quyết định
-feature/kiến trúc dựa trên validation, có thể tăng số chuỗi; test 2017 từng được xem trước đây nên
-không dùng làm holdout mới.
+Bước kế tiếp: khi chấp nhận chi phí, chạy lại lệnh mặc định để tạo breakdown horizon/seed đầy đủ.
+Lượt tương đương trước gồm 120 fits và mất khoảng 2 giờ 05 phút; cần lưu trọn log và chờ kết thúc
+theo quiet-log workflow. Chỉ sau khi đọc breakdown mới kiểm chứng giả thuyết rằng loss MSE trên
+sales tuyệt đối khiến chuỗi MEDIUM/HIGH và các đỉnh nhu cầu chi phối gradient; một thử nghiệm phù
+hợp sau đó là loss/target theo tỷ lệ hoặc variance-stabilizing transform fit train-only, so sánh
+trên đúng validation protocol. Test 2017 không được dùng để chọn giải pháp.
 
 ## Quy trình agent cho lượt huấn luyện dài
 

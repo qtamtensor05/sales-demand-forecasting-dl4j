@@ -370,3 +370,31 @@ skill trong phiên Codex mới và chưa benchmark hiệu quả so với workflo
 trình, không tự bảo đảm agent hoặc code không có lỗi.
 
 **Commit đề xuất:** `feat: add project-native engineering agent skills`
+
+## 19. Phân tích lỗi validation theo nhóm, horizon và seed
+
+**Nhu cầu:** phân tích nơi Direct/Autoregressive LSTM thua weekly naive mà không đổi kiến trúc,
+không huấn luyện thêm trong lượt triển khai và không suy diễn breakdown từ metric macro.
+
+**Thay đổi:** thêm `ErrorAnalysisRunner` để nhận kết quả validation trong bộ nhớ và tổng hợp theo
+LOW/MEDIUM/HIGH, horizon 1–7 và seed. Báo cáo dùng macro hai tầng: bình quân seed trong từng chuỗi,
+sau đó bình quân không trọng số giữa chuỗi; kèm sample standard deviation, cải thiện phần trăm và
+số chuỗi thắng baseline theo RMSE. `ExperimentRunner.SeedResult` nay giữ toàn bộ Direct validation
+metrics thay vì chỉ MAE/RMSE tổng hợp. `Main` ghi `output/error-analysis-validation.txt` sau lượt
+multi-series. Thêm JUnit synthetic cho metric, macro, độ lệch chuẩn, phân nhóm và định dạng.
+
+**Kết quả quan sát từ artifact cũ:** chỉ breakdown theo nhóm có thể tái sử dụng hợp lệ. HIGH có
+RMSE lớn nhất (weekly 14,6811; Direct 18,7081; AR 17,0007); LOW là nhóm duy nhất hai LSTM cải thiện
+macro RMSE so với baseline. Direct thắng baseline ở 3/12 chuỗi và AR ở 4/12. Artifact không lưu
+chi tiết seed/horizon nên chưa xác định horizon gây lỗi lớn nhất; file phân tích cục bộ ghi rõ phần
+thiếu. Lần chạy sau sẽ sinh đầy đủ vì metric chi tiết nay được giữ trong `SeedResult`.
+
+**Kiểm tra:** red test đầu tiên lỗi biên dịch vì chưa có runner; sau triển khai focused test đạt
+3/3. Toàn bộ `mvn -B test` đạt 18 tests, 0 failures/errors/skips, `BUILD SUCCESS`. Không chạy lại
+120 fits và không truy cập test 2017.
+
+**Giới hạn và tiếp theo:** report đầy đủ horizon/seed cần chạy lại multi-series, ước khoảng 2 giờ
+05 phút theo lượt trước. Sau khi có breakdown, kiểm chứng giả thuyết dùng loss/target tương đối hoặc
+biến đổi ổn định phương sai fit train-only để giảm bất lợi trên chuỗi doanh số cao.
+
+**Commit đề xuất:** `feat: add validation error analysis reporting`
