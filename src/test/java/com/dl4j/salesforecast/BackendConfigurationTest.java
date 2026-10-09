@@ -9,7 +9,7 @@ class BackendConfigurationTest {
     @Test
     void loadsCudaBackendForTraining() {
         String backendClass = Nd4j.getBackend().getClass().getName();
-        assertTrue(backendClass.toLowerCase().contains("cuda"),
+        assertTrue(backendClass.toLowerCase().contains("jcublas"),
                 () -> "Expected CUDA backend but loaded " + backendClass);
     }
 }

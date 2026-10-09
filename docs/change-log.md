@@ -524,3 +524,53 @@ forecaster, preprocessing, normalization, split thời gian hoặc model-selecti
 CUDA EULA và có thể cần quyền quản trị; chưa tự thực hiện khi chưa có xác nhận của người dùng.
 
 **Commit đề xuất sau khi kiểm chứng:** `build: switch ND4J training backend to CUDA`
+
+## 018 - 2026-10-10 - Hướng dẫn cài CUDA Toolkit 11.6 thủ công
+
+**Mục tiêu:** cung cấp quy trình để người dùng tự cài runtime tương thích với
+`nd4j-cuda-11.6-platform`, sau đó xác nhận DL4J thực sự nạp GPU backend.
+
+**Hướng dẫn:** dùng CUDA Toolkit 11.6 Update 2 cho Windows x86_64 từ NVIDIA archive; chọn Custom,
+giữ CUDA Runtime/Development/Libraries và bỏ chọn NVIDIA display driver để tránh thay driver
+617.42 mới hơn đang hoạt động. Sau cài đặt, mở terminal mới, xác nhận `nvcc --version`,
+`cudart64_110.dll` và `cublas64_11.dll`, rồi chạy focused Maven test trước toàn suite.
+
+**Điều chỉnh:** assertion smoke test nhận diện tên backend thực của ND4J là `JCublasBackend`
+(`jcublas`) thay vì tìm chuỗi `cuda` trong class name. Đây là sửa điều kiện kiểm tra, chưa phải bằng
+chứng GPU đã chạy vì CUDA Toolkit vẫn chưa được cài trong môi trường hiện tại.
+
+**Tệp ảnh hưởng:** `BackendConfigurationTest.java` và `docs/change-log.md`; không cài phần mềm,
+không chạy training, không đổi pipeline dữ liệu hoặc model.
+
+**Kiểm tra:** đối chiếu backend Maven hiện tại và hướng dẫn NVIDIA CUDA 11.6 cho Windows; chạy
+kiểm tra liên kết Markdown cục bộ cùng `git diff --check`. Không chạy lại smoke test vì runtime
+11.6 vẫn đang thiếu và lỗi đã được xác định ở lượt trước.
+
+**Giới hạn:** cuDNN là tối ưu bổ sung, không cần cho bước xác nhận `JCublasBackend` ban đầu. Nếu
+installer yêu cầu khởi động lại hoặc terminal cũ chưa nhận PATH, phải hoàn tất việc đó trước khi
+chạy Maven. Trạng thái chuyển GPU chỉ hoàn tất sau khi smoke test và toàn suite đạt.
+
+**Commit đề xuất sau khi kiểm chứng:** `build: switch ND4J training backend to CUDA`
+
+## 019 - 2026-10-10 - Đánh giá kỳ vọng tăng tốc khi dùng CUDA
+
+**Mục tiêu:** làm rõ chuyển sang CUDA có chắc chắn làm lượt training nhanh hơn hay không.
+
+**Phát hiện:** GPU có khả năng tăng tốc phép toán LSTM, nhưng mức tăng của dự án chưa được đo và
+không thể bảo đảm. Mỗi model hiện nhỏ (32 hidden units, khoảng 1.046 train windows, sequence 30,
+6 features), trong khi 120 fits chạy tuần tự. Direct/AR còn chấm validation sau mỗi epoch; AR có
+rollout và tạo lại feature bằng Java, nên thời gian không nằm hoàn toàn trong kernel GPU. Với batch
+nhỏ/mô hình nhỏ, chi phí khởi tạo CUDA, truyền dữ liệu và validation có thể làm lợi ích thấp, thậm
+chí chậm hơn CPU ở smoke workload.
+
+**Khuyến nghị kiểm chứng:** sau khi CUDA smoke test đạt, đo cùng một chuỗi, seed, epoch và dữ liệu
+trên CPU/GPU; so sánh wall-clock sau warm-up, đồng thời xác nhận metric không đổi ngoài sai số số
+học hợp lý. Chỉ dùng kết quả đo đó để ước lượng thời gian 120 fits.
+
+**Tệp ảnh hưởng:** chỉ `docs/change-log.md`; không thay đổi code, dependency hoặc chạy benchmark.
+
+**Giới hạn:** CUDA backend hiện chưa chạy được vì thiếu runtime 11.6, nên chưa có số liệu speedup
+thực tế trên RTX 4050. Hiệu năng còn phụ thuộc compatibility CUDA 11.6 với GPU, batch/model size,
+VRAM và phần Java/validation không được GPU hóa.
+
+**Commit đề xuất:** `docs: clarify expected CUDA training speedup`
