@@ -22,11 +22,16 @@ kể cả bản ghi trùng; phát hiện trùng không tự loại bỏ dữ li�
 
 - JDK 11.
 - Apache Maven 3.6.3 trở lên, có lệnh `mvn` trong PATH.
+- NVIDIA GPU hỗ trợ CUDA, driver phù hợp và CUDA Toolkit 11.6; backend hiện tại là
+  `nd4j-cuda-11.6-platform`.
 - Kết nối mạng cho lần tải dependency đầu tiên. ND4J native có thể cần tải lượng dữ liệu lớn.
 
 ## Chạy dự án
 
 Chạy các lệnh từ thư mục chứa `pom.xml`.
+
+Sau khi cài CUDA Toolkit, hãy mở terminal/IDE mới để nhận `CUDA_PATH` và thư mục
+`C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.6\bin` trong `PATH`.
 
 1. Đặt dữ liệu 2013–2017 tại `data/train.csv` để chạy toàn bộ pipeline mặc định.
    File mẫu tự tạo `examples/train.csv` chỉ đủ để thử các analyzer bằng lời gọi riêng;
@@ -137,6 +142,17 @@ chuỗi tương ứng. Với mỗi cặp, runner bình quân metric LSTM qua see
 trọng số giữa chuỗi. Báo cáo chính được ghi vào `output/multi-series-validation.txt`; phân tích
 lỗi theo nhóm, horizon và seed được ghi vào `output/error-analysis-validation.txt`. Không tính test.
 Xem kết quả và giới hạn trong [trạng thái hiện tại](docs/current-state.md).
+
+Trong lượt multi-series, mỗi epoch hoàn tất được in theo dạng
+`[17/120] Direct | HIGH | store=2 item=43 | seed=42 | epoch=8/30`, kèm `trainLoss`, `valLoss` và
+`valRMSE`. Mẫu số 120 là tổng số fit (12 chuỗi × 5 seed × 2 mô hình), không phải tổng số epoch;
+early stopping có thể kết thúc một fit trước epoch 30. Khi lượt chạy hoàn tất, lịch sử từng epoch
+được ghi vào `output/training-history-validation.csv` để vẽ biểu đồ.
+
+Trong CSV, `train_loss_scaled_mse` và `val_loss_scaled_mse` là MSE cùng trên thang Min-Max fit
+train-only nên có thể đặt chung một biểu đồ. `val_rmse_sales` là RMSE rollout/direct ở đơn vị sales
+gốc và là metric dùng để chọn checkpoint. Việc chấm thêm hai loss cần hai forward pass mỗi epoch,
+do đó lượt training có thể chậm hơn trước.
 
 ## Tiền xử lý
 

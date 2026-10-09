@@ -46,13 +46,16 @@ public final class MultiSeriesExperimentRunner {
         List<SeriesProfile> profiles = readTrainingProfiles(filePath);
         List<SelectedSeries> selected = selectRepresentativeSeries(profiles, samplesPerStratum);
         List<SeriesResult> results = new ArrayList<>(selected.size());
-        for (SelectedSeries selection : selected) {
+        for (int seriesIndex = 0; seriesIndex < selected.size(); seriesIndex++) {
+            SelectedSeries selection = selected.get(seriesIndex);
             SeriesProfile profile = selection.profile;
             System.out.printf(Locale.ROOT, "%n=== %s store=%d item=%d, train mean sales=%.4f ===%n",
                     selection.stratum, profile.storeId, profile.itemId, profile.trainMeanSales);
             TimeSeriesResult series = TimeSeriesAnalyzer.analyzeQuietly(filePath, profile.storeId, profile.itemId);
             SalesPreprocessor.PreprocessingResult prepared = SalesPreprocessor.preprocess(series);
-            ExperimentRunner.ExperimentResult experiments = ExperimentRunner.run(prepared, seeds);
+            ExperimentRunner.ExperimentResult experiments = ExperimentRunner.run(prepared, seeds,
+                    seriesIndex, selected.size(), selection.stratum,
+                    profile.storeId, profile.itemId);
             results.add(new SeriesResult(selection, experiments.getWeeklyMetrics(), experiments.getSeedResults()));
         }
         return new MultiSeriesResult(seeds, results);

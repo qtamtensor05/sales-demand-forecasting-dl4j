@@ -43,6 +43,8 @@ class SalesLstmForecasterTest {
         assertTrue(trained.getBestEpoch() >= 1 && trained.getBestEpoch() <= trained.getEpochsRun());
         assertTrue(Double.isFinite(trained.getBestValidationRmse()));
         assertEquals(trained.getEpochsRun(), trained.getHistory().size());
+        assertTrue(trained.getHistory().stream().allMatch(epoch ->
+                Double.isFinite(epoch.getTrainingLoss()) && Double.isFinite(epoch.getValidationLoss())));
         assertEquals(7, trained.getTestMetrics().getHorizons().size());
         assertEquals(29L * 7, trained.getTestMetrics().getForecastCount());
 
@@ -54,6 +56,8 @@ class SalesLstmForecasterTest {
         assertEquals(8L * 7, autoregressive.getValidationMetrics().getForecastCount());
         assertTrue(Double.isFinite(autoregressive.getValidationMetrics().getMae()));
         assertTrue(Double.isFinite(autoregressive.getValidationMetrics().getRmse()));
+        assertTrue(autoregressive.getHistory().stream().allMatch(epoch ->
+                Double.isFinite(epoch.getTrainingLoss()) && Double.isFinite(epoch.getValidationLoss())));
 
         SalesPreprocessor.Window testWindow = prepared.getTest().getWindows().get(0);
         int featureCount = SalesPreprocessor.getInputFeatureNames().size();

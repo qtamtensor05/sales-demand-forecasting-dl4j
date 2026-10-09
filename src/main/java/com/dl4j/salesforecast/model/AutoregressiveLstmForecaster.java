@@ -41,6 +41,13 @@ public final class AutoregressiveLstmForecaster {
     /** Fits using the supplied seed; only train and validation are used. */
     public static FitResult fit(PreprocessingResult prepared, int maxEpochs,
                                 int hiddenUnits, double learningRate, int patience, long randomSeed) {
+        return fit(prepared, maxEpochs, hiddenUnits, learningRate, patience, randomSeed, null);
+    }
+
+    /** Fits using the supplied seed and optionally reports each completed epoch. */
+    public static FitResult fit(PreprocessingResult prepared, int maxEpochs,
+                                int hiddenUnits, double learningRate, int patience, long randomSeed,
+                                TrainingProgress progress) {
         if (prepared == null) { throw new IllegalArgumentException("Preprocessing result is required."); }
         if (maxEpochs <= 0 || hiddenUnits <= 0 || patience <= 0 || !(learningRate > 0.0)
                 || !Double.isFinite(learningRate)) {
@@ -69,6 +76,7 @@ public final class AutoregressiveLstmForecaster {
         network.init();
 
         DataSet trainingData = toOneStepDataSet(train.getWindows(), inputDays, featureCount);
+        DataSet validationData = toOneStepDataSet(validation.getWindows(), inputDays, featureCount);
         INDArray validationFeatures = toFeatureTensor(validation.getWindows(), inputDays, featureCount);
         INDArray bestParameters = null;
         double bestValidationRmse = Double.POSITIVE_INFINITY;
@@ -78,13 +86,19 @@ public final class AutoregressiveLstmForecaster {
 
         for (int epoch = 1; epoch <= maxEpochs; epoch++) {
             network.fit(trainingData);
+            double trainingLoss = network.score(trainingData);
+            double validationLoss = network.score(validationData);
             ForecastMetrics validationMetrics = evaluate(network, validation, validationFeatures,
                     inputDays, forecastDays, featureCount, prepared.getScaler());
             double rmse = validationMetrics.getRmse();
-            if (!Double.isFinite(rmse)) {
-                throw new IllegalStateException("Autoregressive validation RMSE became non-finite at epoch " + epoch);
+            if (!Double.isFinite(trainingLoss) || !Double.isFinite(validationLoss) || !Double.isFinite(rmse)) {
+                throw new IllegalStateException("Autoregressive training/validation metric became non-finite at epoch "
+                        + epoch);
             }
-            history.add(new EpochMetrics(epoch, validationMetrics));
+            history.add(new EpochMetrics(epoch, trainingLoss, validationLoss, validationMetrics));
+            if (progress != null) {
+                progress.printCompletedEpoch(epoch, trainingLoss, validationLoss, rmse);
+            }
             if (rmse < bestValidationRmse - 1e-8) {
                 bestValidationRmse = rmse;
                 bestEpoch = epoch;
@@ -323,12 +337,19 @@ public final class AutoregressiveLstmForecaster {
 
     public static final class EpochMetrics {
         private final int epoch;
+        private final double trainingLoss;
+        private final double validationLoss;
         private final ForecastMetrics validationMetrics;
-        private EpochMetrics(int epoch, ForecastMetrics validationMetrics) {
+        private EpochMetrics(int epoch, double trainingLoss, double validationLoss,
+                             ForecastMetrics validationMetrics) {
             this.epoch = epoch;
+            this.trainingLoss = trainingLoss;
+            this.validationLoss = validationLoss;
             this.validationMetrics = validationMetrics;
         }
         public int getEpoch() { return epoch; }
+        public double getTrainingLoss() { return trainingLoss; }
+        public double getValidationLoss() { return validationLoss; }
         public ForecastMetrics getValidationMetrics() { return validationMetrics; }
     }
 

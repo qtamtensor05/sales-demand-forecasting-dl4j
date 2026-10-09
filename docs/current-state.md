@@ -96,6 +96,14 @@ patience 5; cùng seed được truyền cho Direct và AR. Mỗi mô hình ch�
 của chính mô hình. Mỗi seed có 2.520 dự báo cuốn chiếu chồng lấn. Độ lệch chuẩn bên dưới là độ lệch
 chuẩn mẫu (n−1), metric sales ở đơn vị gốc.
 
+Runner hiện in một dòng sau mỗi epoch đã hoàn tất, gồm vị trí fit toàn cục trên 120, kiến trúc,
+nhóm sales, store-item, seed, epoch hiện tại/tối đa, train loss, validation loss và validation RMSE.
+`ExperimentRunner.SeedResult` giữ lịch sử của cả Direct và AR; sau khi toàn bộ lượt multi-series
+hoàn tất, `Main` ghi `output/training-history-validation.csv`. Hai cột loss là MSE trên cùng thang
+Min-Max train-only; cột RMSE ở đơn vị sales gốc là metric validation dùng để chọn checkpoint.
+Việc thu thập thêm loss không tác động scaler, split, feature nhân quả hay quy tắc chọn model chỉ
+bằng validation, nhưng thêm hai lần chấm điểm/forward pass ở mỗi epoch nên có chi phí thời gian.
+
 | Seed | Direct MAE | Direct RMSE | AR MAE | AR RMSE |
 | ---: | ---: | ---: | ---: | ---: |
 | 42 | 4,9572 | 6,2297 | 5,1797 | 6,4511 |
@@ -121,6 +129,9 @@ Do đó số dự báo đếm theo window × horizon, không phải số ngày l
 
 ## Rà soát an toàn và độ tin cậy
 
+- Backend ND4J hiện là CUDA 11.6 (`nd4j-cuda-11.6-platform`). Smoke test đã nạp
+  `JCublasBackend`, dùng CUBLAS và nhận RTX 4050 Laptop GPU compute capability 8.9 với khoảng
+  6 GB VRAM. Terminal/IDE phải được mở lại sau khi cài Toolkit để nhận CUDA `bin` trong PATH.
 - Đọc CSV dùng UTF-8; analyzer từ chối ID cửa hàng/sản phẩm không dương và sales âm.
 - Baseline kiểm tra độ dài ngày/giá trị, thứ tự ngày mục tiêu và forecast horizon 1–7; forecaster
   kiểm tra tham số hữu hạn, shape tensor và dự báo hữu hạn.

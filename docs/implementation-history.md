@@ -398,3 +398,64 @@ thiếu. Lần chạy sau sẽ sinh đầy đủ vì metric chi tiết nay đư�
 biến đổi ổn định phương sai fit train-only để giảm bất lợi trên chuỗi doanh số cao.
 
 **Commit đề xuất:** `feat: add validation error analysis reporting`
+
+## 20. Chuyển ND4J từ CPU sang CUDA backend
+
+**Nhu cầu:** sử dụng RTX 4050 để chạy các phép toán DL4J thay cho backend CPU trước khi benchmark
+lại workload multi-series.
+
+**Thay đổi:** thay `nd4j-native-platform` bằng `nd4j-cuda-11.6-platform` cùng version
+`1.0.0-M2.1`; thêm `BackendConfigurationTest` yêu cầu `JCublasBackend`. Không đổi model,
+preprocessing, train-only scaling, chronological split hoặc validation-only selection.
+
+**Kiểm chứng:** sau khi CUDA Toolkit 11.6 được cài, terminal cũ chưa nhận PATH nhưng các file
+`nvcc.exe`, `cudart64_110.dll` và `cublas64_11.dll` đã tồn tại. Với CUDA `bin` thêm tạm vào PATH,
+focused test nạp `JCublasBackend`, CUBLAS, CUDA build 11.6.55 và nhận RTX 4050 compute capability
+8.9/6 GB; 1 test đạt. Toàn bộ suite GPU đạt 19 tests, 0 lỗi, `BUILD SUCCESS` trong 50,912 giây.
+
+**Giới hạn:** chưa benchmark CPU/GPU trên cùng training workload và chưa chạy lại 120 fits. CUDA
+chỉ được nhận trong tiến trình kiểm tra sau khi thêm PATH tạm; người dùng cần mở terminal/IDE mới
+hoặc thêm CUDA `bin` cho terminal hiện tại.
+
+**Commit đề xuất:** `build: switch ND4J training backend to CUDA`
+
+## 21. Hiển thị tiến trình theo từng epoch của 120 lượt fit
+
+**Nhu cầu:** trong lượt multi-series chạy lâu, hiển thị chính xác lượt fit và epoch đã hoàn tất theo
+dạng `[17/120] Direct | HIGH | store=2 item=43 | seed=42 | epoch=8/30`.
+
+**Thay đổi:** thêm `TrainingProgress` để tính số fit toàn cục theo thứ tự chuỗi, seed và hai mô hình.
+`MultiSeriesExperimentRunner` truyền ngữ cảnh chuỗi vào `ExperimentRunner`; Direct và AR nhận ngữ
+cảnh tùy chọn và in một dòng ngay sau khi đánh giá validation của mỗi epoch. Các overload cũ vẫn
+hoạt động và không in progress khi chạy độc lập.
+
+**Kết quả:** phép tính đầu/cuối cho 12 chuỗi, 5 seed và 2 mô hình cho ra 1/120 và 120/120; mẫu định
+dạng yêu cầu được kiểm thử chính xác. Toàn bộ 21 test chạy bằng CUDA đạt, không có lỗi. Không chạy
+lại thí nghiệm 120 fits.
+
+**Giới hạn:** validation RMSE được tính mỗi epoch nhưng chưa xuất thành chuỗi thời gian; training
+loss chưa được lưu. Do đó chưa thể vẽ biểu đồ train-loss/validation-loss từ log hiện tại. Lượt JVM
+đã khởi động trước thay đổi phải được chạy lại mới có dòng progress mới.
+
+**Commit đề xuất:** `feat: report multi-series epoch progress`
+
+## 22. Thu thập train loss và validation loss theo epoch
+
+**Nhu cầu:** lưu đủ dữ liệu để vẽ learning curve và quan sát overfitting trong lượt multi-series.
+
+**Thay đổi:** sau mỗi lần `fit`, cả Direct và AR chấm `network.score` trên train và validation để
+thu MSE trong không gian Min-Max. Epoch history giữ `trainingLoss`, `validationLoss` và validation
+RMSE ở đơn vị sales. History được chuyển vào kết quả từng seed rồi xuất CSV tại
+`output/training-history-validation.csv`, gồm định danh nhóm, store-item, model, seed, epoch, hai
+loss, RMSE và cờ checkpoint tốt nhất. Dòng progress trực tiếp cũng in ba metric này.
+
+**Kết quả:** regression test xác nhận hai forecaster expose loss hữu hạn và CSV dùng schema ổn định,
+dấu thập phân độc lập locale. Focused tests đạt 5/5; toàn bộ suite CUDA đạt 23/23. Không chạy lại
+120 fits và chưa tạo CSV dữ liệu thật trong lượt triển khai này.
+
+**Giới hạn:** file CSV chỉ được ghi sau khi multi-series hoàn tất, nên JVM đang chạy hoặc lượt bị
+ngắt giữa chừng không tạo artifact đầy đủ. Hai lần chấm loss thêm mỗi epoch làm tăng thời gian chạy.
+AR validation loss là objective one-step/teacher-forced trên cùng thang với train; `val_rmse_sales`
+mới là rollout 7 ngày dùng cho early stopping và lựa chọn model.
+
+**Commit đề xuất:** `feat: export per-epoch training history`

@@ -22,6 +22,12 @@ public final class ExperimentRunner {
 
     /** Exposed for reproducible experiments and fast synthetic smoke tests. */
     public static ExperimentResult run(PreprocessingResult prepared, List<Long> seeds) {
+        return run(prepared, seeds, -1, -1, null, -1, -1);
+    }
+
+    static ExperimentResult run(PreprocessingResult prepared, List<Long> seeds,
+                                int seriesIndex, int totalSeries, String stratum,
+                                int storeId, int itemId) {
         if (prepared == null) { throw new IllegalArgumentException("Preprocessing result is required."); }
         if (seeds == null || seeds.isEmpty()) { throw new IllegalArgumentException("At least one seed is required."); }
         if (seeds.stream().anyMatch(seed -> seed == null) || seeds.stream().distinct().count() != seeds.size()) {
@@ -32,15 +38,24 @@ public final class ExperimentRunner {
         List<SeedResult> results = new ArrayList<>(seeds.size());
         int epochs = SalesLstmForecaster.DEFAULT_SEARCH_EPOCHS;
         int patience = SalesLstmForecaster.DEFAULT_EARLY_STOPPING_PATIENCE;
-        for (long seed : seeds) {
+        for (int seedIndex = 0; seedIndex < seeds.size(); seedIndex++) {
+            long seed = seeds.get(seedIndex);
             System.out.printf("%n=== Validation experiment: seed %d ===%n", seed);
+            TrainingProgress directProgress = seriesIndex < 0 ? null : TrainingProgress.forFit(
+                    seriesIndex, totalSeries, seedIndex, seeds.size(), true,
+                    stratum, storeId, itemId, seed, epochs);
+            TrainingProgress autoregressiveProgress = seriesIndex < 0 ? null : TrainingProgress.forFit(
+                    seriesIndex, totalSeries, seedIndex, seeds.size(), false,
+                    stratum, storeId, itemId, seed, epochs);
             SalesLstmForecaster.FitResult direct = SalesLstmForecaster.fit(prepared, epochs,
-                    DEFAULT_HIDDEN_UNITS, DEFAULT_LEARNING_RATE, patience, seed);
+                    DEFAULT_HIDDEN_UNITS, DEFAULT_LEARNING_RATE, patience, seed, directProgress);
             AutoregressiveLstmForecaster.FitResult autoregressive = AutoregressiveLstmForecaster.fit(prepared,
-                    epochs, DEFAULT_HIDDEN_UNITS, DEFAULT_LEARNING_RATE, patience, seed);
+                    epochs, DEFAULT_HIDDEN_UNITS, DEFAULT_LEARNING_RATE, patience, seed,
+                    autoregressiveProgress);
             results.add(new SeedResult(seed, direct.getValidationMetrics(), autoregressive.getValidationMetrics(),
                     direct.getBestEpoch(), autoregressive.getBestEpoch(),
-                    direct.getEpochsRun(), autoregressive.getEpochsRun()));
+                    direct.getEpochsRun(), autoregressive.getEpochsRun(),
+                    direct.getHistory(), autoregressive.getHistory()));
             SeedResult row = results.get(results.size() - 1);
             System.out.printf(Locale.ROOT,
                     "Seed %d | Direct MAE %.4f RMSE %.4f (epoch %d/%d) | AR MAE %.4f RMSE %.4f (epoch %d/%d)%n",
@@ -133,10 +148,14 @@ public final class ExperimentRunner {
         private final int autoregressiveBestEpoch;
         private final int directEpochsRun;
         private final int autoregressiveEpochsRun;
+        private final List<SalesLstmForecaster.EpochMetrics> directHistory;
+        private final List<AutoregressiveLstmForecaster.EpochMetrics> autoregressiveHistory;
         private SeedResult(long seed, SalesLstmForecaster.ForecastMetrics directMetrics,
                            AutoregressiveLstmForecaster.ForecastMetrics autoregressiveMetrics,
                            int directBestEpoch, int autoregressiveBestEpoch,
-                           int directEpochsRun, int autoregressiveEpochsRun) {
+                           int directEpochsRun, int autoregressiveEpochsRun,
+                           List<SalesLstmForecaster.EpochMetrics> directHistory,
+                           List<AutoregressiveLstmForecaster.EpochMetrics> autoregressiveHistory) {
             this.seed = seed;
             this.directMetrics = directMetrics;
             this.autoregressiveMetrics = autoregressiveMetrics;
@@ -144,6 +163,8 @@ public final class ExperimentRunner {
             this.autoregressiveBestEpoch = autoregressiveBestEpoch;
             this.directEpochsRun = directEpochsRun;
             this.autoregressiveEpochsRun = autoregressiveEpochsRun;
+            this.directHistory = List.copyOf(directHistory);
+            this.autoregressiveHistory = List.copyOf(autoregressiveHistory);
         }
         public long getSeed() { return seed; }
         public double getDirectMae() { return directMetrics.getMae(); }
@@ -154,6 +175,10 @@ public final class ExperimentRunner {
         public int getAutoregressiveBestEpoch() { return autoregressiveBestEpoch; }
         public int getDirectEpochsRun() { return directEpochsRun; }
         public int getAutoregressiveEpochsRun() { return autoregressiveEpochsRun; }
+        public List<SalesLstmForecaster.EpochMetrics> getDirectHistory() { return directHistory; }
+        public List<AutoregressiveLstmForecaster.EpochMetrics> getAutoregressiveHistory() {
+            return autoregressiveHistory;
+        }
     }
 
     public static final class Stats {

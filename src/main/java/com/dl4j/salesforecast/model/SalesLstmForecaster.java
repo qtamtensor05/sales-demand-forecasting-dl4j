@@ -54,6 +54,13 @@ public final class SalesLstmForecaster {
     /** Fits using the supplied seed; only train and validation are used. */
     public static FitResult fit(PreprocessingResult prepared, int maxEpochs,
                                 int hiddenUnits, double learningRate, int patience, long randomSeed) {
+        return fit(prepared, maxEpochs, hiddenUnits, learningRate, patience, randomSeed, null);
+    }
+
+    /** Fits using the supplied seed and optionally reports each completed epoch. */
+    public static FitResult fit(PreprocessingResult prepared, int maxEpochs,
+                                int hiddenUnits, double learningRate, int patience, long randomSeed,
+                                TrainingProgress progress) {
         if (prepared == null) { throw new IllegalArgumentException("Preprocessing result is required."); }
         if (maxEpochs <= 0 || hiddenUnits <= 0 || patience <= 0 || !(learningRate > 0.0)
                 || !Double.isFinite(learningRate)) {
@@ -82,6 +89,7 @@ public final class SalesLstmForecaster {
         network.init();
 
         DataSet trainingData = toDataSet(train.getWindows(), inputDays, forecastDays);
+        DataSet validationData = toDataSet(validation.getWindows(), inputDays, forecastDays);
         INDArray validationFeatures = toFeatures(validation.getWindows(), inputDays);
         INDArray bestParameters = null;
         double bestValidationRmse = Double.POSITIVE_INFINITY;
@@ -91,13 +99,20 @@ public final class SalesLstmForecaster {
 
         for (int epoch = 1; epoch <= maxEpochs; epoch++) {
             network.fit(trainingData);
+            double trainingLoss = network.score(trainingData);
+            double validationLoss = network.score(validationData);
             ForecastMetrics validationMetrics = evaluate(network, validation, validationFeatures, inputDays,
                     forecastDays, prepared.getScaler());
             double validationRmse = validationMetrics.rmse;
-            if (!Double.isFinite(validationRmse)) {
-                throw new IllegalStateException("Validation RMSE became non-finite at epoch " + epoch);
+            if (!Double.isFinite(trainingLoss) || !Double.isFinite(validationLoss)
+                    || !Double.isFinite(validationRmse)) {
+                throw new IllegalStateException("Training/validation metric became non-finite at epoch " + epoch);
             }
-            history.add(new EpochMetrics(epoch, validationRmse, validationMetrics));
+            history.add(new EpochMetrics(epoch, trainingLoss, validationLoss,
+                    validationRmse, validationMetrics));
+            if (progress != null) {
+                progress.printCompletedEpoch(epoch, trainingLoss, validationLoss, validationRmse);
+            }
             if (validationRmse < bestValidationRmse - 1e-8) {
                 bestValidationRmse = validationRmse;
                 bestEpoch = epoch;
@@ -375,14 +390,21 @@ public final class SalesLstmForecaster {
 
     public static final class EpochMetrics {
         private final int epoch;
+        private final double trainingLoss;
+        private final double validationLoss;
         private final double validationRmse;
         private final ForecastMetrics validationMetrics;
-        private EpochMetrics(int epoch, double validationRmse, ForecastMetrics validationMetrics) {
+        private EpochMetrics(int epoch, double trainingLoss, double validationLoss,
+                             double validationRmse, ForecastMetrics validationMetrics) {
             this.epoch = epoch;
+            this.trainingLoss = trainingLoss;
+            this.validationLoss = validationLoss;
             this.validationRmse = validationRmse;
             this.validationMetrics = validationMetrics;
         }
         public int getEpoch() { return epoch; }
+        public double getTrainingLoss() { return trainingLoss; }
+        public double getValidationLoss() { return validationLoss; }
         public double getValidationRmse() { return validationRmse; }
         public ForecastMetrics getValidationMetrics() { return validationMetrics; }
     }

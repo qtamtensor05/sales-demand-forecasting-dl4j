@@ -574,3 +574,111 @@ thực tế trên RTX 4050. Hiệu năng còn phụ thuộc compatibility CUDA 1
 VRAM và phần Java/validation không được GPU hóa.
 
 **Commit đề xuất:** `docs: clarify expected CUDA training speedup`
+
+## 020 - 2026-10-10 - Xác nhận CUDA Toolkit và hoàn tất GPU backend
+
+**Mục tiêu:** chẩn đoán vì sao terminal không nhận `nvcc`/CUDA DLL sau cài đặt và xác nhận backend
+GPU hoạt động thực sự.
+
+**Nguyên nhân:** CUDA Toolkit 11.6 đã được cài đầy đủ và Machine PATH đã có thư mục `v11.6\bin`,
+nhưng terminal/VS Code hiện tại được mở trước khi installer cập nhật biến môi trường nên process
+PATH chưa có CUDA. `CUDA UMD Version: 13.4` từ `nvidia-smi` chỉ phản ánh khả năng của driver,
+không phải phiên bản Toolkit đang có trong PATH.
+
+**Kiểm chứng:** tìm thấy `nvcc.exe`, `cudart64_110.dll`, `cublas64_11.dll` tại CUDA 11.6. Sau khi
+thêm CUDA `bin` vào PATH của tiến trình kiểm tra, `nvcc` báo 11.6.124; focused test nạp
+`JCublasBackend`, `Backend used: [CUDA]`, CUBLAS, nhận RTX 4050 Laptop GPU cc 8.9 và đạt 1/1.
+Toàn bộ `mvn -B test` trên CUDA đạt 19 tests, 0 failures/errors/skips, `BUILD SUCCESS` trong
+50,912 giây.
+
+**Tệp ảnh hưởng:** `pom.xml`, `BackendConfigurationTest.java`, `README.md`,
+`docs/current-state.md`, `docs/implementation-history.md`, `docs/change-log.md`. Không đổi model,
+dữ liệu, normalization, split hoặc model selection.
+
+**Giới hạn:** chưa chạy benchmark training CPU/GPU hoặc lượt 120 fits. Terminal/IDE cũ vẫn cần
+đóng và mở lại; nếu không, phải thêm CUDA `bin` tạm vào `$env:Path` trước khi chạy Maven.
+
+**Commit đề xuất:** `build: switch ND4J training backend to CUDA`
+
+## 021 - 2026-10-10 - Hướng dẫn xem tiến trình training và đồng thời lưu log
+
+**Mục tiêu:** giải thích vì sao terminal không hiển thị tiến trình khi chạy lệnh redirect và cung
+cấp lệnh vừa xem output trực tiếp vừa giữ log đầy đủ.
+
+**Phát hiện:** toán tử PowerShell `*> file` chuyển cả stdout/stderr khỏi terminal nên màn hình im
+lặng. Chương trình hiện in mốc bắt đầu từng chuỗi, từng seed và kết quả seed sau khi Direct/AR hoàn
+tất; nó chưa in phần trăm tổng hay từng epoch trong vòng fit. Dùng `Tee-Object` sẽ hiện các mốc sẵn
+có trên terminal đồng thời ghi cùng nội dung vào file.
+
+**Tệp ảnh hưởng:** chỉ `docs/change-log.md`; không thay đổi code hoặc chạy training.
+
+**Kiểm tra:** đối chiếu các lệnh `System.out` trong multi-series/experiment runner và chạy
+`git diff --check`. Không chạy Maven vì đây là hướng dẫn thao tác.
+
+**Giới hạn:** giữa hai mốc seed, terminal vẫn có thể im lặng khá lâu vì forecaster chưa log từng
+epoch. Muốn progress chính xác dạng `fit x/120` hoặc `epoch y/30` cần thay đổi code riêng; việc đọc
+log liên tục không làm training nhanh hơn và không nên coi metric giữa chừng là kết quả cuối.
+
+**Commit đề xuất:** `docs: explain live training progress logging`
+
+## 022 - 2026-10-10 - Bổ sung tiến trình từng epoch cho multi-series training
+
+**Mục tiêu:** cho biết chính xác lượt fit trong tổng 120 và epoch đã hoàn tất khi chạy Direct/AR
+trên các chuỗi LOW/MEDIUM/HIGH, thay vì chờ đến cuối từng seed mới thấy kết quả.
+
+**Lý do:** redirect stdout làm terminal im lặng; kể cả dùng `Tee-Object`, code cũ không phát sự kiện
+trong vòng lặp epoch nên người dùng không thể phân biệt đang chạy bình thường hay bị treo.
+
+**Thay đổi:** thêm `TrainingProgress` với công thức `series × seeds × 2 models`, định dạng gồm
+fit/tổng fit, model, stratum, store-item, seed và epoch/tối đa. Truyền ngữ cảnh này từ
+`MultiSeriesExperimentRunner` qua `ExperimentRunner` vào cả hai forecaster và in sau khi validation
+epoch hoàn tất. Giữ nguyên các API fit/run cũ bằng overload không progress. Thêm hai JUnit test cho
+mẫu định dạng yêu cầu và biên 1/120–120/120.
+
+**Tệp ảnh hưởng:** `TrainingProgress.java`, `MultiSeriesExperimentRunner.java`,
+`ExperimentRunner.java`, `SalesLstmForecaster.java`, `AutoregressiveLstmForecaster.java`,
+`TrainingProgressTest.java`, `README.md`, `docs/current-state.md`,
+`docs/implementation-history.md` và `docs/change-log.md`.
+
+**Kết quả kiểm chứng:** bước red thất bại biên dịch đúng do chưa có `TrainingProgress`; focused test
+sau triển khai đạt 2/2. Toàn bộ `mvn -B test` dùng `JCublasBackend`/RTX 4050 đạt 21 test, 0 lỗi,
+`BUILD SUCCESS` trong 30,755 giây. Không chạy lại 120 fits và không đọc test 2017.
+
+**Giới hạn:** con số `[x/120]` là vị trí fit, không phải phần trăm epoch toàn cục; early stopping có
+thể làm mỗi fit ít hơn 30 epoch. Validation RMSE có trong history nội bộ của mỗi fit nhưng chưa được
+xuất để vẽ; training loss chưa được thu thập. Lượt training đang chạy bằng JVM cũ không nhận thay
+đổi, cần bắt đầu lượt mới. Không thay đổi kiến trúc, scaler train-only, chronological split, causal
+features hoặc validation-only selection.
+
+**Commit đề xuất:** `feat: report multi-series epoch progress`
+
+## 023 - 2026-10-10 - Xuất learning curve train/validation theo epoch
+
+**Mục tiêu:** thu thập train loss và validation loss của từng epoch để có thể vẽ learning curve,
+quan sát hội tụ và dấu hiệu overfitting theo model, chuỗi và seed.
+
+**Lý do:** code trước chỉ tính validation RMSE phục vụ early stopping; history không đi qua
+`ExperimentRunner.SeedResult` và không có artifact dạng bảng để công cụ vẽ biểu đồ đọc trực tiếp.
+
+**Thay đổi:** Direct và AR nay chấm MSE trên train/validation đã scale sau mỗi epoch, lưu cùng
+validation RMSE sales trong `EpochMetrics`, giữ history qua kết quả từng seed và xuất
+`output/training-history-validation.csv` sau khi multi-series hoàn tất. CSV có các cột `stratum`,
+`store`, `item`, `model`, `seed`, `epoch`, `train_loss_scaled_mse`, `val_loss_scaled_mse`,
+`val_rmse_sales`, `is_best_epoch`. Dòng progress cũng bổ sung ba metric. Thêm test cho getter loss,
+tính hữu hạn qua synthetic training, schema/định dạng CSV và dấu thập phân `Locale.ROOT`.
+
+**Tệp ảnh hưởng:** `Main.java`, `TrainingHistoryExporter.java`, `TrainingProgress.java`, hai
+forecaster, `ExperimentRunner.java`, `TrainingHistoryTest.java`, `SalesLstmForecasterTest.java`,
+`README.md`, `docs/current-state.md`, `docs/implementation-history.md`, `docs/change-log.md`.
+
+**Kết quả kiểm chứng:** test đỏ ban đầu thất bại đúng vì chưa có getter loss. Một lỗi định dạng CRLF
+Windows trong CSV được phát hiện và sửa thành newline ổn định. Focused tests đạt 5/5; toàn bộ
+`mvn -B test` trên `JCublasBackend`/RTX 4050 đạt 23 test, 0 lỗi, `BUILD SUCCESS` trong 19,931 giây.
+Không chạy lại 120 fits và không đọc test 2017.
+
+**Giới hạn:** CSV được ghi cuối lượt nên không phục hồi history nếu tiến trình bị dừng giữa chừng;
+lượt JVM đã chạy trước thay đổi không có dữ liệu mới. Hai forward pass chấm train/validation mỗi
+epoch làm tăng runtime. Với AR, hai loss scaled là objective one-step/teacher-forced để so learning
+curve; quyết định checkpoint vẫn dựa trên RMSE rollout 7 ngày ở đơn vị sales, không dùng test.
+
+**Commit đề xuất:** `feat: export per-epoch training history`
