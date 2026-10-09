@@ -458,3 +458,69 @@ phù hợp với khoảng cách xấu dần từ LOW sang HIGH. Sau khi breakdow
 tương đối hoặc biến đổi ổn định phương sai fit train-only và đánh giá bằng cùng validation protocol.
 
 **Commit đề xuất:** `feat: add validation error analysis reporting`
+
+## 015 - 2026-10-10 - Xác nhận lệnh chạy lại multi-series fit
+
+**Mục tiêu:** cung cấp lệnh PowerShell chính xác để chạy lại fit trên train và sinh báo cáo
+validation/error-analysis theo entry point hiện tại.
+
+**Phát hiện:** `Main` đọc `data/train.csv`, chạy `MultiSeriesExperimentRunner` với 12 chuỗi × 5
+seed × 2 LSTM, chọn checkpoint chỉ bằng validation rồi ghi `output/multi-series-validation.txt`
+và `output/error-analysis-validation.txt`. Lệnh Maven hiện hành là `mvn -B compile exec:java`.
+Vì đây là 120 fits và lượt tương đương trước mất khoảng 2 giờ 05 phút, stdout/stderr nên được lưu
+trọn vào một log ổn định và chỉ đọc sau khi tiến trình kết thúc.
+
+**Tệp ảnh hưởng:** chỉ `docs/change-log.md`; không thay đổi code, cấu hình, dữ liệu hoặc kết quả.
+
+**Kiểm tra:** đối chiếu `Main.java`, README và cấu hình Maven hiện tại; kiểm tra liên kết Markdown
+cục bộ cùng `git diff --check`. Không chạy Maven/training vì người dùng chỉ hỏi câu lệnh.
+
+**Giới hạn:** lệnh sẽ ghi đè các báo cáo hiện có khi hoàn tất. Nó cần `data/train.csv`, Java 11,
+Maven và khoảng thời gian/tài nguyên tương ứng; không nên đóng terminal giữa chừng.
+
+**Commit đề xuất:** `docs: record full validation rerun command`
+
+## 016 - 2026-10-10 - Xác nhận backend huấn luyện hiện tại
+
+**Mục tiêu:** xác định lượt multi-series fit hiện chạy trên CPU hay GPU.
+
+**Phát hiện:** `pom.xml` khai báo `org.nd4j:nd4j-native-platform:1.0.0-M2.1`, là backend native
+CPU. Log kiểm thử gần nhất cũng ghi `Loaded [CpuBackend] backend`, `Backend used: [CPU]` và BLAS
+vendor `OPENBLAS`. Vì vậy lệnh `mvn -B compile exec:java` hiện không dùng GPU, kể cả khi máy có
+GPU NVIDIA.
+
+**Tệp ảnh hưởng:** chỉ `docs/change-log.md`; không thay đổi dependency, code hoặc cấu hình runtime.
+
+**Kiểm tra:** đối chiếu trực tiếp `pom.xml` và report Surefire hiện có; chạy kiểm tra liên kết
+Markdown cục bộ và `git diff --check`. Không chạy lại training hoặc Maven.
+
+**Giới hạn:** chưa khảo sát driver/CUDA/GPU của máy vì backend hiện tại đã quyết định chạy CPU.
+Muốn chuyển sang GPU cần thay backend ND4J bằng artifact CUDA tương thích, kiểm tra driver/CUDA và
+chạy smoke test trước; đây là thay đổi cấu hình riêng, chưa được thực hiện.
+
+**Commit đề xuất:** `docs: clarify current CPU training backend`
+
+## 017 - 2026-10-10 - Chuyển backend GPU, đang thiếu CUDA runtime 11.6
+
+**Mục tiêu:** chuyển ND4J từ CPU sang GPU NVIDIA cho các lượt fit DL4J.
+
+**Lý do:** máy có NVIDIA GeForce RTX 4050 6 GB; backend cũ `nd4j-native-platform` chỉ sử dụng CPU.
+
+**Thay đổi đang thực hiện:** thay dependency bằng `nd4j-cuda-11.6-platform` cùng phiên bản
+DL4J/ND4J `1.0.0-M2.1`; thêm `BackendConfigurationTest` yêu cầu backend được nạp có tên CUDA.
+
+**Kết quả kiểm tra:** bước red trên cấu hình cũ thất bại đúng với `CpuBackend`. Sau khi đổi
+dependency, Maven phân giải được CUDA 11.6 artifacts nhưng smoke test dừng ở `jnicudart.dll: Can't
+find dependent libraries`; `JCublasBackend` bị đánh dấu unavailable và không có backend thay thế.
+`nvidia-smi` nhận RTX 4050 và driver 617.42/CUDA UMD 13.4, nhưng `nvcc`, `cudart64_110.dll`,
+`cublas64_11.dll` và thư mục CUDA Toolkit không tồn tại. Do đó cấu hình repository đã chuyển sang
+GPU nhưng môi trường chưa thể chạy.
+
+**Tệp ảnh hưởng:** `pom.xml`, `BackendConfigurationTest.java`, `docs/change-log.md`. Không thay đổi
+forecaster, preprocessing, normalization, split thời gian hoặc model-selection protocol.
+
+**Giới hạn và trạng thái:** yêu cầu chưa hoàn tất. Cần cài CUDA Toolkit/runtime 11.6 tương thích
+ở cấp hệ thống rồi chạy lại smoke test và toàn bộ suite. Cài đặt này tải dung lượng lớn, chấp nhận
+CUDA EULA và có thể cần quyền quản trị; chưa tự thực hiện khi chưa có xác nhận của người dùng.
+
+**Commit đề xuất sau khi kiểm chứng:** `build: switch ND4J training backend to CUDA`
