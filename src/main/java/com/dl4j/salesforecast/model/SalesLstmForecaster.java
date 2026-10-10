@@ -261,6 +261,7 @@ public final class SalesLstmForecaster {
                     + java.util.Arrays.toString(sequencePredictions.shape()));
         }
         List<Accumulator> byHorizon = new ArrayList<>();
+        List<ValidationPrediction> predictions = new ArrayList<>();
         for (int horizon = 0; horizon < forecastDays; horizon++) { byHorizon.add(new Accumulator()); }
         for (int row = 0; row < split.getWindows().size(); row++) {
             Window window = split.getWindows().get(row);
@@ -272,6 +273,11 @@ public final class SalesLstmForecaster {
                     throw new IllegalStateException("LSTM produced a non-finite forecast.");
                 }
                 byHorizon.get(horizon).add(window.getRawTarget().get(horizon), prediction);
+                int historyLength = window.getRawInput().size();
+                predictions.add(new ValidationPrediction(
+                        window.getInputDates().get(historyLength - 1), window.getTargetDates().get(horizon),
+                        horizon + 1, window.getRawTarget().get(horizon), prediction,
+                        window.getRawInput().get(historyLength - 7 + horizon)));
             }
         }
         List<HorizonMetrics> horizonMetrics = new ArrayList<>();
@@ -283,7 +289,7 @@ public final class SalesLstmForecaster {
                     accumulator.predictionMean(), accumulator.predictionMin, accumulator.predictionMax));
             overall.combine(accumulator);
         }
-        return new ForecastMetrics(horizonMetrics, overall.count, overall.mae(), overall.rmse());
+        return new ForecastMetrics(horizonMetrics, overall.count, overall.mae(), overall.rmse(), predictions);
     }
 
     public static void printSummary(TrainingResult result) {
@@ -376,16 +382,20 @@ public final class SalesLstmForecaster {
         private final long forecastCount;
         private final double mae;
         private final double rmse;
-        private ForecastMetrics(List<HorizonMetrics> horizons, long forecastCount, double mae, double rmse) {
+        private final List<ValidationPrediction> predictions;
+        private ForecastMetrics(List<HorizonMetrics> horizons, long forecastCount, double mae, double rmse,
+                                List<ValidationPrediction> predictions) {
             this.horizons = List.copyOf(horizons);
             this.forecastCount = forecastCount;
             this.mae = mae;
             this.rmse = rmse;
+            this.predictions = List.copyOf(predictions);
         }
         public List<HorizonMetrics> getHorizons() { return horizons; }
         public long getForecastCount() { return forecastCount; }
         public double getMae() { return mae; }
         public double getRmse() { return rmse; }
+        public List<ValidationPrediction> getPredictions() { return predictions; }
     }
 
     public static final class EpochMetrics {

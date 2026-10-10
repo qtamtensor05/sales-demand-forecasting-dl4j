@@ -143,6 +143,12 @@ trọng số giữa chuỗi. Báo cáo chính được ghi vào `output/multi-se
 lỗi theo nhóm, horizon và seed được ghi vào `output/error-analysis-validation.txt`. Không tính test.
 Xem kết quả và giới hạn trong [trạng thái hiện tại](docs/current-state.md).
 
+Mỗi lượt chạy mới tạo thư mục riêng `output/runs/<yyyy-MM-dd_HHmmss_SSS>_<gpu|cpu>/`. Khi thành công,
+thư mục chứa `run.json`, `console.log`, `dataset-statistics.txt`, `epoch-history.csv`,
+`seed-metrics.csv`, `validation-predictions.csv`, `summary.txt` và `report.html`; `latest.txt` trỏ
+tới run gần nhất. `run.json` ghi `RUNNING`, `SUCCESS` hoặc `FAILED`, backend và SHA-256 dataset.
+Không chạy Maven compile/test khác hoặc bật IDE auto-build vào `target/classes` trong lúc training.
+
 Trong lượt multi-series, mỗi epoch hoàn tất được in theo dạng
 `[17/120] Direct | HIGH | store=2 item=43 | seed=42 | epoch=8/30`, kèm `trainLoss`, `valLoss` và
 `valRMSE`. Mẫu số 120 là tổng số fit (12 chuỗi × 5 seed × 2 mô hình), không phải tổng số epoch;

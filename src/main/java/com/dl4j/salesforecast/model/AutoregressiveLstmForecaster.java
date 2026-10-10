@@ -139,6 +139,7 @@ public final class AutoregressiveLstmForecaster {
         List<List<List<Double>>> rollingFeatures = new ArrayList<>(windows.size());
         List<List<Double>> rawHistory = new ArrayList<>(windows.size());
         List<Accumulator> byHorizon = new ArrayList<>(forecastDays);
+        List<ValidationPrediction> predictions = new ArrayList<>();
         for (int h = 0; h < forecastDays; h++) { byHorizon.add(new Accumulator()); }
         for (Window window : windows) {
             requireWindow(window, inputDays, forecastDays, featureCount);
@@ -163,6 +164,11 @@ public final class AutoregressiveLstmForecaster {
                     throw new IllegalStateException("Autoregressive model produced a non-finite forecast.");
                 }
                 byHorizon.get(horizon).add(actualSales, predictedSales);
+                int historyLength = window.getRawInput().size();
+                predictions.add(new ValidationPrediction(
+                        window.getInputDates().get(historyLength - 1), window.getTargetDates().get(horizon),
+                        horizon + 1, actualSales, predictedSales,
+                        window.getRawInput().get(historyLength - 7 + horizon)));
 
                 LocalDate targetDate = window.getTargetDates().get(horizon);
                 List<Double> history = rawHistory.get(row);
@@ -181,7 +187,7 @@ public final class AutoregressiveLstmForecaster {
             horizonMetrics.add(new HorizonMetrics(h + 1, values.count, values.mae(), values.rmse()));
             overall.combine(values);
         }
-        return new ForecastMetrics(horizonMetrics, overall.count, overall.mae(), overall.rmse());
+        return new ForecastMetrics(horizonMetrics, overall.count, overall.mae(), overall.rmse(), predictions);
     }
 
     private static List<Double> createFeatureVector(LocalDate date, double currentSales,
@@ -375,16 +381,20 @@ public final class AutoregressiveLstmForecaster {
         private final long forecastCount;
         private final double mae;
         private final double rmse;
-        private ForecastMetrics(List<HorizonMetrics> horizons, long forecastCount, double mae, double rmse) {
+        private final List<ValidationPrediction> predictions;
+        private ForecastMetrics(List<HorizonMetrics> horizons, long forecastCount, double mae, double rmse,
+                                List<ValidationPrediction> predictions) {
             this.horizons = List.copyOf(horizons);
             this.forecastCount = forecastCount;
             this.mae = mae;
             this.rmse = rmse;
+            this.predictions = List.copyOf(predictions);
         }
         public List<HorizonMetrics> getHorizons() { return horizons; }
         public long getForecastCount() { return forecastCount; }
         public double getMae() { return mae; }
         public double getRmse() { return rmse; }
+        public List<ValidationPrediction> getPredictions() { return predictions; }
     }
 
     private static final class Accumulator {

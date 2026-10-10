@@ -459,3 +459,24 @@ AR validation loss là objective one-step/teacher-forced trên cùng thang với
 mới là rollout 7 ngày dùng cho early stopping và lựa chọn model.
 
 **Commit đề xuất:** `feat: export per-epoch training history`
+
+## 23. Chuẩn hóa artifact theo từng lượt chạy
+
+**Nhu cầu:** tách file cũ/mới theo run, lưu provenance và giữ prediction validation đủ để tái tạo
+error analysis sau khi training thành công mà không cần model trong RAM.
+
+**Thay đổi:** thêm `RunArtifactSession` tạo `output/runs/<timestamp>_<backend>/`, manifest trạng thái
+ghi nguyên tử, SHA-256 dataset, application console log và con trỏ `latest.txt`. Hai forecaster giữ
+prediction từng origin, target, horizon, actual, model prediction và Weekly Naive. Thêm exporter cho
+seed metrics và validation predictions; khi thành công tạo epoch history, seed metrics, predictions,
+summary TXT và report HTML. `Main` không còn ghi đè các file báo cáo tên cố định ở root output.
+
+**Kiểm chứng:** red test thất bại vì chưa có session; focused tests sau triển khai đạt 4/4. Toàn bộ
+suite CUDA đạt 24/24, 0 lỗi, `BUILD SUCCESS` trong 39,835 giây. Synthetic forecaster xác nhận số
+prediction bằng forecast count, horizon/date hợp lệ và Weekly Naive hữu hạn. Không chạy 120 fits.
+
+**Giới hạn:** CSV/report hoàn chỉnh được xuất sau khi training thành công, chưa append từng epoch/seed
+ra đĩa; lỗi giữa lượt chỉ giữ manifest và application log. HTML hiện là báo cáo đọc nhanh, còn CSV
+là nguồn cho biểu đồ chuyên sâu. Không lưu model checkpoint và không dùng test 2017 để selection.
+
+**Commit đề xuất:** `feat: organize validation artifacts by run`

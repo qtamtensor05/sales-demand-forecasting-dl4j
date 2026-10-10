@@ -682,3 +682,237 @@ epoch làm tăng runtime. Với AR, hai loss scaled là objective one-step/teach
 curve; quyết định checkpoint vẫn dựa trên RMSE rollout 7 ngày ở đơn vị sales, không dùng test.
 
 **Commit đề xuất:** `feat: export per-epoch training history`
+
+## 024 - 2026-10-10 - Xác nhận lệnh chạy lại multi-series training
+
+**Mục tiêu:** cung cấp lệnh PowerShell chạy đầy đủ 120 fits trên backend CUDA, đồng thời hiển thị
+tiến trình trực tiếp và lưu stdout/stderr vào log ổn định.
+
+**Phát hiện:** `exec-maven-plugin` vẫn cấu hình `com.dl4j.salesforecast.Main`; lệnh chạy hiện hành
+là `mvn -B compile exec:java`. Dùng `2>&1 | Tee-Object` cho phép xem các dòng tiến trình epoch mới
+trên terminal và lưu cùng nội dung tại `output/multi-series-run-2026-10-10.log`.
+
+**Tệp ảnh hưởng:** chỉ `docs/change-log.md`; không thay đổi code, model, dữ liệu hoặc cấu hình.
+
+**Kiểm tra:** đối chiếu `pom.xml`, README và các lệnh chạy multi-series đã ghi trong tài liệu.
+Không chạy training hoặc Maven test vì yêu cầu chỉ hỏi lệnh vận hành. Terminal phải nhận CUDA 11.6
+trong PATH; nếu là terminal cũ, cần thêm `v11.6\bin` tạm thời hoặc mở terminal/IDE mới.
+
+**Giới hạn:** lệnh này khởi động lại toàn bộ 120 fits và ghi CSV history sau khi chương trình hoàn
+tất; không tiếp tục được lượt JVM cũ từ checkpoint. Pipeline PowerShell hiển thị exit code của
+pipeline, nên cần đọc dòng `BUILD SUCCESS`/`BUILD FAILURE` cuối log để xác nhận kết quả Maven.
+
+**Commit đề xuất:** `docs: record GPU training command`
+
+## 025 - 2026-10-10 - Làm rõ tổng số fit theo nhóm doanh số
+
+**Mục tiêu:** phân biệt 120 lượt fit toàn thí nghiệm với số lượt của từng nhóm LOW/MEDIUM/HIGH và
+số epoch bên trong mỗi fit.
+
+**Phát hiện:** runner chọn tổng cộng 12 chuỗi, gồm 4 LOW, 4 MEDIUM và 4 HIGH. Mỗi chuỗi chạy 5 seed
+cho 2 mô hình Direct/AR, vì vậy mỗi nhóm có `4 × 5 × 2 = 40` fits và cả ba nhóm có
+`3 × 40 = 120` fits. Mỗi fit chạy tối đa 30 epoch nhưng có thể dừng sớm với patience 5; do đó tổng
+trần là 3.600 epoch, không phải luôn luôn thực hiện đủ 3.600.
+
+**Tệp ảnh hưởng:** chỉ `docs/change-log.md`; không thay đổi code hoặc chạy training.
+
+**Kiểm tra:** đối chiếu `DEFAULT_SAMPLES_PER_STRATUM = 4`, năm default seed và hai forecaster trong
+runner. Không chạy Maven vì đây là giải thích cấu hình hiện có.
+
+**Giới hạn:** `[x/120]` biểu diễn vị trí fit, còn `epoch=y/30` biểu diễn tiến trình bên trong fit đó.
+
+**Commit đề xuất:** `docs: clarify multi-series fit count`
+
+## 026 - 2026-10-10 - Chẩn đoán lỗi class tổng hợp sau khi hoàn tất 120 fits
+
+**Mục tiêu:** xác định nguyên nhân `NoClassDefFoundError: MultiSeriesExperimentRunner$1` ở cuối lượt
+GPU training và phạm vi kết quả bị ảnh hưởng.
+
+**Phát hiện:** log kết thúc lúc 14:46:55 có đủ vị trí fit 1–120, 2.693 dòng epoch và 60 dòng tổng
+kết seed, nên phần train/validation của 12 chuỗi × 5 seed × 2 model đã hoàn tất. Lỗi xuất hiện sau
+đó tại `MultiSeriesExperimentRunner.formatReport`, trước khi ghi các báo cáo mới. Class ngoài trong
+`target/classes` vẫn tham chiếu class `$1` do Java compiler sinh cho enum switch, nhưng file
+`MultiSeriesExperimentRunner$1.class` không tồn tại. Các class runner có timestamp 13:38:54, nằm
+giữa lượt chạy 1 giờ 32 phút, cho thấy output biên dịch đã bị thay đổi bởi một lần compile/IDE
+auto-build khác trong khi JVM Maven dài hạn vẫn đang chạy; class loader chỉ phát hiện thiếu class
+khi nhánh tổng hợp được gọi cuối chương trình.
+
+**Tệp ảnh hưởng:** chỉ cập nhật `docs/change-log.md`; không sửa code và không chạy lại training.
+
+**Kiểm tra:** đối chiếu stack trace, liệt kê class runner trong `target/classes`, kiểm tra timestamp,
+đếm progress/seed trong log và kiểm tra artifact output. `training-history-validation.csv` không
+được tạo; `multi-series-validation.txt` có timestamp 2026-09-28 và
+`error-analysis-validation.txt` có timestamp 13:28:23, nên cả hai không phải báo cáo hoàn chỉnh của
+lượt vừa kết thúc.
+
+**Giới hạn và phục hồi:** đối tượng kết quả trong bộ nhớ đã mất khi JVM thoát, nhưng log đầy đủ còn
+giữ loss/RMSE từng epoch và metric tổng hợp từng seed, đủ để phục hồi CSV learning curve và phần lớn
+kết quả mà không train lại. Baseline và breakdown chi tiết cần tái tính từ dữ liệu validation hoặc
+runner phục hồi riêng. Không chạy `clean` hay ghi đè log trước khi phục hồi. Một build sạch trước
+lượt sau sẽ sửa classpath, nhưng không tự tái tạo báo cáo của lượt đã kết thúc.
+
+**Commit đề xuất:** `docs: diagnose post-training classpath failure`
+
+## 027 - 2026-10-10 - Xác nhận nơi lưu kết quả của lượt training bị lỗi khi export
+
+**Mục tiêu:** xác định dữ liệu của lượt 120 fits vừa hoàn tất còn được lưu ở đâu và artifact nào
+chưa được tạo.
+
+**Kết quả:** toàn bộ stdout/stderr của lượt chạy nằm trong
+`output/multi-series-run-2026-10-10.log`. Log có các dòng progress chứa stratum, store-item, model,
+seed, epoch, train loss, validation loss, validation RMSE và 60 dòng tổng kết seed. Vì exception xảy
+ra tại lần gọi `MultiSeriesExperimentRunner.writeReport`, `output/training-history-validation.csv`
+chưa được tạo và các TXT báo cáo hiện có mang timestamp cũ, không đại diện lượt vừa chạy. Kết quả
+trong RAM không còn sau khi Maven JVM thoát.
+
+**Tệp ảnh hưởng:** chỉ `docs/change-log.md`; không sửa code, không ghi đè log và không chạy lại train.
+
+**Kiểm tra:** dùng bằng chứng đã đếm từ log ở chẩn đoán liền trước: 120 fit IDs, 2.693 dòng epoch và
+60 dòng kết quả seed. `git diff --check` đạt.
+
+**Giới hạn và tiếp theo:** log đủ để phục hồi CSV learning curve và metric từng seed mà không train
+lại. Báo cáo baseline/macro/horizon đầy đủ cần parser phục hồi kết hợp tính lại phần validation từ
+dataset; không được xóa hoặc ghi đè log trước khi phục hồi.
+
+**Commit đề xuất:** `docs: record recoverable failed-run artifacts`
+
+## 028 - 2026-10-10 - Phục hồi learning curve và metric seed từ log
+
+**Mục tiêu:** tạo lại CSV learning curve và metric từng seed từ lượt GPU đã hoàn tất, không chạy lại
+120 fits; sau đó xóa các file parser tạm nhưng giữ log nguồn và artifact phục hồi.
+
+**Thực hiện:** tạo parser PowerShell tạm đọc định dạng progress/seed summary trong
+`output/multi-series-run-2026-10-10.log`. Parser dùng `InvariantCulture`, ánh xạ best epoch theo dòng
+tổng kết seed, kiểm tra RMSE tại checkpoint và xuất UTF-8 không BOM thành
+`output/training-history-validation.csv` cùng `output/seed-metrics-validation.csv`. Sau khi kiểm tra
+artifact, file `tools/recover-training-log.ps1` đã được xóa theo yêu cầu.
+
+**Kết quả kiểm chứng:** phục hồi 2.693 dòng epoch, 60 dòng seed và 120 fit duy nhất; không có khóa
+`stratum/store/item/model/seed/epoch` trùng, mỗi fit có đúng một `is_best_epoch=true`, mỗi nhóm
+LOW/MEDIUM/HIGH có 20 dòng seed. CSV history có kích thước 158.286 byte và CSV seed 3.498 byte tại
+thời điểm tạo. Đối chiếu dòng cuối store 10/item 28/seed 99 cho Direct 16,9311/21,2860 epoch 28 và
+AR 16,8598/20,7802 epoch 14, khớp log. Không chạy training hoặc đọc test 2017.
+
+**Tệp ảnh hưởng:** hai CSV trong `output` (artifact thường bị Git ignore), `docs/current-state.md`
+và `docs/change-log.md`. Parser tạm không còn tồn tại; log nguồn không bị sửa hoặc xóa.
+
+**Giới hạn:** số phục hồi có độ chính xác đúng bằng stdout: loss 8 chữ số thập phân, MAE/RMSE 4 chữ
+số. CSV seed không chứa baseline hoặc metric theo horizon vì các giá trị này không được in trước khi
+exception; muốn tái tạo chúng cần chấm lại validation/baseline nhưng không cần train model chỉ khi
+còn prediction/checkpoint phù hợp. Hai CSV hiện chỉ phục vụ learning curve và metric từng seed.
+
+**Commit đề xuất:** `docs: record recovered training artifacts`
+
+## 029 - 2026-10-10 - Tạo báo cáo TXT dễ đọc từ metric phục hồi
+
+**Mục tiêu:** cung cấp báo cáo tương tự `multi-series-validation.txt` từ lượt GPU mới mà không train
+lại và không ghi đè artifact cũ.
+
+**Thực hiện:** dùng parser PowerShell tạm đọc `output/seed-metrics-validation.csv`, tính trung bình
+năm seed trong từng chuỗi, macro không trọng số theo nhóm và toàn bộ 12 chuỗi, sample standard
+deviation giữa các series mean, số chuỗi Direct/AR có RMSE thấp hơn, rồi thêm bảng chi tiết 60 seed.
+Kết quả được ghi UTF-8 vào `output/multi-series-validation-recovered.txt`. Parser tạm đã được xóa
+sau khi kiểm tra.
+
+**Kết quả kiểm chứng:** báo cáo có 101 dòng, 12 dòng series và đủ 60 dòng seed. Macro phục hồi:
+Direct MAE/RMSE `10,3217/13,0076`, AR `9,7157/12,1396`; AR có mean RMSE thấp hơn ở 11/12 chuỗi.
+Theo stratum, HIGH có RMSE lớn nhất: Direct `18,7081`, AR `17,0007`. Các số khớp phép tổng hợp từ
+CSV seed; `git diff --check` và kiểm tra link Markdown đạt.
+
+**Tệp ảnh hưởng:** `output/multi-series-validation-recovered.txt` (artifact thường bị Git ignore),
+`docs/current-state.md` và `docs/change-log.md`. Không sửa code Java, không chạy training và không
+đọc test 2017.
+
+**Giới hạn:** báo cáo không có Weekly Naive, cải thiện so baseline hoặc breakdown horizon vì log
+không chứa các giá trị đó. Metric dùng độ chính xác stdout bốn chữ số; macro có thể lệch rất nhỏ so
+với tính trực tiếp từ giá trị double trong RAM. File `multi-series-validation.txt` cũ được giữ nguyên.
+
+**Commit đề xuất:** `docs: add recovered validation report`
+
+## 030 - 2026-10-10 - Xác định điều kiện tái tạo error analysis mới
+
+**Mục tiêu:** làm rõ có cần train lại để tạo `output/error-analysis-validation.txt` từ lượt GPU vừa
+hoàn tất hay không.
+
+**Phát hiện:** log và hai CSV phục hồi đủ metric tổng hợp theo epoch, seed, series và stratum nên có
+thể tạo báo cáo lỗi một phần mà không train lại. Weekly Naive cũng có thể tính lại từ validation gốc
+mà không huấn luyện. Tuy nhiên log không lưu dự báo từng mẫu/horizon hoặc MAE/RMSE Direct/AR theo
+horizon 1–7; model checkpoint cũng không được lưu. Vì vậy không thể tái tạo trung thực phần horizon
+và mọi phép tổng hợp phụ thuộc prediction chi tiết từ artifact hiện có.
+
+**Tệp ảnh hưởng:** chỉ `docs/change-log.md`; không sửa code, không chạy training và không thay đổi
+artifact output.
+
+**Kiểm tra:** đối chiếu schema `training-history-validation.csv`, `seed-metrics-validation.csv`,
+progress/seed summary trong log và yêu cầu đầu vào của `ErrorAnalysisRunner`. `git diff --check` đạt.
+
+**Giới hạn và lựa chọn:** muốn file error analysis đầy đủ như thiết kế hiện tại phải chạy lại model
+hoặc có checkpoint/prediction chi tiết tương đương. Có thể tạo ngay bản partial ghi rõ thiếu horizon;
+không được suy diễn horizon từ macro RMSE. Lần chạy sau nên xuất prediction/history theo từng fit
+trước khi bước tổng hợp cuối để lỗi report không làm mất artifact.
+
+**Commit đề xuất:** `docs: clarify error analysis recovery limits`
+
+## 031 - 2026-10-10 - Đề xuất chuẩn hóa artifact cho mỗi lượt training
+
+**Mục tiêu:** giảm tình trạng nhiều file cùng tên/timestamp khác nhau, tránh ghi đè báo cáo cũ và
+đảm bảo vừa dễ lưu trữ, dễ truy vết, vừa có dữ liệu đủ để quan sát hoặc tái tạo phân tích mà không
+train lại.
+
+**Hiện trạng:** `Main` ghi bốn file tên cố định trực tiếp dưới `output`: thống kê dataset, báo cáo
+multi-series, history epoch và error analysis; log lại được tạo ngoài chương trình bằng PowerShell.
+Các artifact phục hồi bổ sung thêm seed CSV và report recovered, khiến file cũ/mới nằm chung thư mục
+và khó xác định cùng một run. Quan trọng hơn, prediction theo mẫu/horizon và trạng thái run không
+được ghi độc lập trước bước tổng hợp cuối.
+
+**Đề xuất:** mỗi lần chạy tạo `output/runs/<run-id>/`, trong đó `run.json` ghi cấu hình, backend,
+dataset fingerprint và trạng thái; `console.log` giữ stdout/stderr; `epoch-history.csv` ghi streaming
+loss theo epoch; `seed-metrics.csv` ghi ngay sau mỗi seed; `validation-predictions.csv` giữ actual,
+prediction, horizon và baseline theo từng mẫu; `summary.txt` là báo cáo đọc nhanh; `report.html` là
+dashboard dẫn xuất chứa learning curve, lỗi theo stratum/horizon và so sánh baseline. Ghi CSV theo
+kiểu append/flush hoặc file tạm rồi atomic rename, cập nhật manifest `RUNNING/SUCCESS/FAILED` để lỗi
+tổng hợp cuối không làm mất dữ liệu đã chạy.
+
+**Quản lý vòng đời:** coi ba CSV và `run.json` là nguồn dữ liệu chuẩn cần lưu; TXT/HTML có thể tái
+tạo. `sales-statistics.txt` nên chuyển thành artifact theo dataset fingerprint, không sinh lặp cho
+mỗi run. Không lưu 120 checkpoint mặc định; chỉ lưu checkpoint khi có nhu cầu inference hoặc debug,
+và phải có retention policy. Có thể có `output/latest.txt` trỏ run gần nhất thay vì ghi đè file.
+
+**Tệp ảnh hưởng:** chỉ `docs/change-log.md`; chưa thay đổi code hoặc cấu trúc output, chưa tạo/xóa
+artifact và chưa chạy test/training.
+
+**Kiểm tra:** kiểm kê file hiện có trong `output` và đối chiếu tất cả điểm ghi file ở `Main`,
+`MultiSeriesExperimentRunner`, `TrainingHistoryExporter`, `ErrorAnalysisRunner` và
+`SalesDataAnalyzer`. `git diff --check` đạt.
+
+**Giới hạn:** đây là thiết kế đề xuất. Cần triển khai writer theo run-id, export prediction từng
+horizon, manifest trạng thái, báo cáo HTML và migration/retention riêng; không tự động coi artifact
+cũ là cùng provenance. Test 2017 vẫn không được dùng cho model selection.
+
+**Commit đề xuất:** `docs: propose per-run artifact layout`
+
+## 032 - 2026-10-10 - Triển khai artifact validation theo run-id
+
+**Mục tiêu:** triển khai cấu trúc output đã thống nhất để lượt training thành công dễ quản lý, lưu
+trữ, quan sát và đủ dữ liệu tái tạo error analysis mà không train lại.
+
+**Thay đổi:** thêm `RunArtifactSession`, `SeedMetricsExporter`, `ValidationPredictionExporter` và
+`ValidationPrediction`. Mỗi run tạo manifest `RUNNING/SUCCESS/FAILED`, dataset hash, backend, log
+ứng dụng và thư mục riêng. Direct/AR giữ prediction validation chi tiết cùng Weekly Naive. Khi thành
+công xuất `epoch-history.csv`, `seed-metrics.csv`, `validation-predictions.csv`, `summary.txt`,
+`report.html` và `dataset-statistics.txt`; `output/runs/latest.txt` trỏ run mới nhất. Main không còn
+ghi đè bốn artifact tên cố định ở root output.
+
+**Kiểm tra:** test đỏ ban đầu thất bại đúng vì thiếu `RunArtifactSession`; focused tests đạt 4/4.
+Toàn bộ `mvn -B test` trên JCublasBackend/RTX 4050 đạt 24 test, 0 lỗi, `BUILD SUCCESS` trong
+39,835 giây. Test synthetic kiểm tra manifest RUNNING/FAILED, console log, prediction count,
+horizon/date và baseline hữu hạn. `git diff --check` cùng liên kết Markdown đạt. Không chạy lại
+120 fits và không đọc test 2017.
+
+**Giới hạn:** chưa forward-test một run 120 fits thực tế. Các CSV/report thành công vẫn được ghi ở
+cuối lượt thay vì streaming; nếu JVM chết giữa training chỉ manifest/log còn. `console.log` không
+bao gồm Maven output trước khi `Main` khởi tạo session. `report.html` hiện trình bày summary và link
+nguồn, chưa render chart tương tác; `epoch-history.csv` và `validation-predictions.csv` đã đủ nguồn
+để bổ sung chart sau. Không lưu checkpoint để tránh chi phí lưu 120 model.
+
+**Commit đề xuất:** `feat: organize validation artifacts by run`

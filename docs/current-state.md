@@ -104,6 +104,24 @@ Min-Max train-only; cột RMSE ở đơn vị sales gốc là metric validation 
 Việc thu thập thêm loss không tác động scaler, split, feature nhân quả hay quy tắc chọn model chỉ
 bằng validation, nhưng thêm hai lần chấm điểm/forward pass ở mỗi epoch nên có chi phí thời gian.
 
+Lượt GPU ngày 2026-10-10 hoàn tất 120 fits nhưng lỗi classpath tại bước export cuối. Dữ liệu đã
+được phục hồi từ log bất biến sang `output/training-history-validation.csv` với 2.693 epoch và
+`output/seed-metrics-validation.csv` với 60 dòng seed. Kiểm tra phục hồi xác nhận đủ 120 fit, không
+trùng khóa, mỗi fit đúng một best epoch và mỗi nhóm LOW/MEDIUM/HIGH có 20 dòng seed. Đây là dữ liệu
+phục hồi từ stdout đã làm tròn (loss 8 chữ số, RMSE/MAE 4 chữ số), không phải export trực tiếp từ
+đối tượng Java trong bộ nhớ. Parser tạm đã được xóa sau khi kiểm tra; log nguồn được giữ nguyên.
+Báo cáo đọc nhanh từ các metric phục hồi nằm tại `output/multi-series-validation-recovered.txt`,
+gồm bảng trung bình 12 chuỗi, macro theo LOW/MEDIUM/HIGH, macro toàn bộ và 60 dòng seed. Báo cáo
+không có Weekly Naive hoặc horizon vì hai phần đó không xuất hiện trong log trước exception.
+
+Các lượt chạy mới dùng `RunArtifactSession` và thư mục bất biến `output/runs/<run-id>/`. Manifest
+`run.json` được tạo trước training với trạng thái `RUNNING`, dataset SHA-256, backend, seeds và quy
+tắc validation-only; khi kết thúc chuyển nguyên tử sang `SUCCESS` hoặc `FAILED`. Thành công sẽ xuất
+history epoch, metric seed, prediction validation từng origin/target/horizon kèm Weekly Naive,
+summary TXT và report HTML. `console.log` tee stdout/stderr của ứng dụng từ sau khi session khởi tạo;
+log Maven trước `Main` vẫn cần giữ bằng `Tee-Object` nếu cần. Prediction và bảng thành công hiện ghi
+sau khi đủ 120 fits; nếu JVM lỗi giữa training, manifest/log còn nhưng CSV hoàn chỉnh chưa công bố.
+
 | Seed | Direct MAE | Direct RMSE | AR MAE | AR RMSE |
 | ---: | ---: | ---: | ---: | ---: |
 | 42 | 4,9572 | 6,2297 | 5,1797 | 6,4511 |

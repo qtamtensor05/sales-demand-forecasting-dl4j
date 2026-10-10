@@ -47,6 +47,8 @@ class SalesLstmForecasterTest {
                 Double.isFinite(epoch.getTrainingLoss()) && Double.isFinite(epoch.getValidationLoss())));
         assertEquals(7, trained.getTestMetrics().getHorizons().size());
         assertEquals(29L * 7, trained.getTestMetrics().getForecastCount());
+        assertEquals(trained.getTestMetrics().getForecastCount(),
+                trained.getTestMetrics().getPredictions().size());
 
         AutoregressiveLstmForecaster.FitResult autoregressive = AutoregressiveLstmForecaster.fit(
                 prepared, 2, tuning.getBest().getHiddenUnits(), tuning.getBest().getLearningRate(), 1, 42L);
@@ -54,6 +56,12 @@ class SalesLstmForecasterTest {
         assertEquals(42L, autoregressive.getRandomSeed());
         assertEquals(7, autoregressive.getValidationMetrics().getHorizons().size());
         assertEquals(8L * 7, autoregressive.getValidationMetrics().getForecastCount());
+        assertEquals(autoregressive.getValidationMetrics().getForecastCount(),
+                autoregressive.getValidationMetrics().getPredictions().size());
+        ValidationPrediction firstPrediction = autoregressive.getValidationMetrics().getPredictions().get(0);
+        assertEquals(1, firstPrediction.getHorizon());
+        assertTrue(firstPrediction.getTargetDate().isAfter(firstPrediction.getOriginDate()));
+        assertTrue(Double.isFinite(firstPrediction.getWeeklyNaive()));
         assertTrue(Double.isFinite(autoregressive.getValidationMetrics().getMae()));
         assertTrue(Double.isFinite(autoregressive.getValidationMetrics().getRmse()));
         assertTrue(autoregressive.getHistory().stream().allMatch(epoch ->
