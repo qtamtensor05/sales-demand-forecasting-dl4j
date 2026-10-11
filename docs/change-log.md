@@ -916,3 +916,105 @@ nguồn, chưa render chart tương tác; `epoch-history.csv` và `validation-pr
 để bổ sung chart sau. Không lưu checkpoint để tránh chi phí lưu 120 model.
 
 **Commit đề xuất:** `feat: organize validation artifacts by run`
+
+## 033 - 2026-10-10 - Xác nhận lệnh chạy với cấu trúc artifact theo run-id
+
+**Mục tiêu:** cung cấp lệnh PowerShell khởi động lượt training mới sau khi triển khai per-run output,
+đồng thời tránh tái diễn classpath không đồng bộ trong `target/classes`.
+
+**Kết quả:** dùng `mvn -B clean compile exec:java` để làm sạch và biên dịch một lần trước training;
+pipe qua `Tee-Object` giữ log Maven bên ngoài. Ứng dụng tự tạo thư mục
+`output/runs/<timestamp>_<backend>/` và `latest.txt`; không cần truyền output path thủ công.
+
+**Tệp ảnh hưởng:** chỉ `docs/change-log.md`; không sửa code và không chạy training.
+
+**Điều kiện vận hành:** không chạy Maven compile/test khác và không để IDE auto-build
+`target/classes` trong khi 120 fits đang chạy. Xác nhận cuối lượt bằng cả `BUILD SUCCESS` và
+`run.json` có trạng thái `SUCCESS`; `latest.txt` cho biết run-id mới nhất.
+
+**Kiểm tra:** đối chiếu cấu hình `exec-maven-plugin`, `Main` và `RunArtifactSession` hiện tại;
+`git diff --check` đạt.
+
+**Giới hạn:** `clean` xóa build output cũ trước khi bắt đầu nhưng không xóa `output/runs` hoặc các
+báo cáo đã lưu. Lệnh vẫn chạy lại toàn bộ 120 fits từ đầu và không resume checkpoint.
+
+**Commit đề xuất:** `docs: record per-run training command`
+
+## 034 - 2026-10-10 - Chẩn đoán lỗi đường dẫn khi khởi động training
+
+**Mục tiêu:** giải thích lỗi `Could not find a part of the path ... emedic-dental\output\...` khi
+chạy lệnh Maven training.
+
+**Nguyên nhân:** terminal đang đứng tại repository `C:\Users\quangTam\Documents\GitHub\emedic-dental`
+thay vì `C:\Users\quangTam\Documents\DL4j\sales-demand-forecasting-dl4j`. Vì vậy đường dẫn log
+tương đối `output/...` được giải quyết dưới dự án Emedic, nơi không có thư mục output; đồng thời nếu
+qua được bước ghi log thì Maven cũng không chạy đúng `pom.xml` của dự án DL4J.
+
+**Khắc phục:** chuyển thư mục bằng `Set-Location` tới repository DL4J, bảo đảm `output` tồn tại rồi
+mới tạo tên log và chạy `mvn -B clean compile exec:java | Tee-Object`.
+
+**Tệp ảnh hưởng:** chỉ `docs/change-log.md`; không sửa code, không chạy Maven hoặc training.
+
+**Kiểm tra:** đối chiếu prompt PowerShell do người dùng cung cấp với workspace root hiện tại;
+`git diff --check` đạt.
+
+**Giới hạn:** lệnh đúng vẫn chạy lại 120 fits từ đầu. Không chạy compile/test hoặc IDE auto-build
+khác trong khi JVM training hoạt động.
+
+**Commit đề xuất:** `docs: clarify training working directory`
+
+## 035 - 2026-10-11 - Phân tích run GPU thành công và cập nhật trạng thái
+
+**Mục tiêu:** xác minh artifact của run `2026-10-10_184201_989_gpu`, phân tích validation theo
+model, stratum, horizon, seed và learning curve, rồi cập nhật current state và implementation history.
+
+**Nguồn:** `run.json`, `summary.txt`, `seed-metrics.csv`, `epoch-history.csv` và
+`validation-predictions.csv` trong thư mục run. Manifest ghi `SUCCESS`, `JCublasBackend`, Java
+11.0.32.1, dataset SHA-256 cố định, validation 2016 và `testUsedForSelection=false`; thời lượng
+1:34:52. Không đọc hoặc tính metric test 2017.
+
+**Kết quả:** Weekly Naive macro MAE/RMSE 8,7365/11,1435; Direct 10,3217/13,0076; AR
+9,7157/12,1396. AR giảm khoảng 6,67% RMSE so Direct nhưng vẫn kém baseline 8,94%. Direct/AR thắng
+baseline lần lượt 3/12 và 4/12 chuỗi, đều thuộc LOW. LOW cải thiện RMSE +4,25%/+5,54%; MEDIUM kém
+17,39%/10,10%; HIGH kém 27,43%/15,80%. HIGH có lỗi tuyệt đối lớn nhất; horizon 6 lớn nhất cho
+Direct và horizon 7 lớn nhất cho AR.
+
+**Learning curve và seed:** Direct best epoch trung bình 27,62, chạy 29,70, dừng sớm 12/60;
+AR best 10,18, chạy 15,18 và dừng sớm 60/60. Macro RMSE theo seed có sample std 0,9213 Direct và
+0,9244 AR. Chỉ AR seed 2026 đạt 11,1105, nhỉnh hơn baseline macro; các seed khác không xác nhận lợi
+thế ổn định.
+
+**Kiểm tra dữ liệu:** seed CSV có 60 dòng, history có 2.693 dòng, đủ 120 fit và 120 best flags.
+Prediction CSV có 302.400 dòng, chia đều 151.200/model và 43.200/horizon; mỗi fit có 2.520 dự báo.
+Tái tính MAE/RMSE từ prediction khớp seed metrics với sai lệch tối đa khoảng `5,1e-11`.
+`git diff --check` và kiểm tra liên kết Markdown đạt. Không chạy training/test mới.
+
+**Tệp ảnh hưởng:** `docs/current-state.md`, `docs/implementation-history.md` và
+`docs/change-log.md`; không sửa code hoặc artifact run.
+
+**Giới hạn:** 12/500 chuỗi, cửa sổ dự báo chồng lấn, validation dùng chọn epoch, không có confidence
+interval hoặc kiểm định thống kê. Kết quả chưa phải đánh giá test cuối. Giả thuyết tiếp theo là LSTM
+dự báo residual quanh Weekly Naive với biến đổi/loss ổn định phương sai fit train-only.
+
+**Commit đề xuất:** `docs: record completed GPU validation run`
+
+## 036 - 2026-10-11 - Tổng hợp báo cáo triển khai dự án, luồng xử lý và kết quả
+
+**Mục tiêu:** lập báo cáo tổng hợp chi tiết về hiện trạng triển khai dự án, luồng xử lý (pipeline) dữ liệu/huấn luyện và các kết quả thực nghiệm đạt được từ run GPU chuẩn hóa gần nhất.
+
+**Lý do:** người dùng yêu cầu báo cáo toàn diện về kiến trúc hệ thống, quy trình tiền xử lý, cấu hình mô hình và phân tích sâu kết quả validation để nắm bắt bức tranh toàn cảnh và định hướng các bước cải tiến kế tiếp.
+
+**Nội dung tổng hợp:**
+- Tổng quan bài toán: Dự báo chuỗi thời gian bán hàng 7 ngày cho các cặp cửa hàng - mặt hàng (500 cặp store-item, 2013–2017) trên nền tảng DeepLearning4J và backend CUDA 11.6 (NVIDIA RTX 4050).
+- Luồng xử lý dữ liệu: Ingestion (`SalesDataAnalyzer`) -> Chronological split (Train 2013–2015, Validation 2016, Test 2017 holdout) -> Phân tầng tertile theo doanh số trung bình train (LOW, MEDIUM, HIGH) chọn 12 chuỗi đại diện -> Chuẩn hóa Min-Max train-only -> Cửa sổ 30 ngày lookback, horizon 7 ngày, 14 ngày warm-up, 6 causal features -> Input tensor `[batch, 6, 30]`.
+- Kiến trúc & Mô hình: Baseline Weekly Naive, Direct Multi-Horizon LSTM và Autoregressive LSTM (rollout 1-step kèm tái tạo feature nhân quả). Chạy 5 seeds (42, 123, 2026, 7, 99), 120 fits tổng cộng, checkpoint chọn nghiêm ngặt theo validation RMSE. Quản lý artifact theo run-id (`output/runs/<run-id>/`).
+- Kết quả đạt được (Run `2026-10-10_184201_989_gpu`): Weekly Naive macro MAE/RMSE `8,7365 / 11,1435`; AR LSTM `9,7157 / 12,1396`; Direct LSTM `10,3217 / 13,0076`. AR tốt hơn Direct 6,67% RMSE ở 11/12 chuỗi, nhưng Weekly Naive thắng tổng thể. Nhóm LOW là nhóm duy nhất hai LSTM thắng baseline (+4,25% Direct, +5,54% AR). MEDIUM và HIGH lỗi tăng mạnh (HIGH RMSE Direct 18,7081, AR 17,0007). Horizon breakdown cho thấy Weekly Naive ổn định ~11,14 trên cả 7 ngày, trong khi Direct lỗi nhất ở H6 và AR tăng dần khi rollout đến H7.
+- Định hướng kế tiếp: Huấn luyện LSTM dự báo phần dư quanh Weekly Naive kết hợp biến đổi ổn định phương sai (`log1p` hoặc Huber loss) fit train-only.
+
+**Tệp ảnh hưởng:** `docs/change-log.md`; không thay đổi code, cấu hình, dữ liệu hay kết quả mô hình.
+
+**Kiểm tra:** đối chiếu số liệu từ `output/runs/2026-10-10_184201_989_gpu/summary.txt`, `run.json` và `docs/current-state.md`; chạy kiểm tra Markdown và `git diff --check`. Không chạy lại training hoặc Maven.
+
+**Giới hạn:** số liệu dựa trên 12 chuỗi đại diện trong tập validation 2016, chưa đánh giá test 2017. Báo cáo phản ánh hiện trạng triển khai, chưa thực hiện code thay đổi mô hình mới.
+
+**Commit đề xuất:** `docs: report project pipeline and empirical results`

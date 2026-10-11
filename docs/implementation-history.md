@@ -480,3 +480,31 @@ ra đĩa; lỗi giữa lượt chỉ giữ manifest và application log. HTML hi
 là nguồn cho biểu đồ chuyên sâu. Không lưu model checkpoint và không dùng test 2017 để selection.
 
 **Commit đề xuất:** `feat: organize validation artifacts by run`
+
+## 24. Xác nhận run GPU hoàn chỉnh và phân tích validation chi tiết
+
+**Nhu cầu:** kiểm tra run đầu tiên dùng cấu trúc artifact theo run-id, phân tích kết quả thực tế và
+cập nhật trạng thái dự án mà không sử dụng test 2017.
+
+**Kết quả vận hành:** run `2026-10-10_184201_989_gpu` kết thúc `SUCCESS` trên `JCublasBackend` sau
+1 giờ 34 phút 52 giây. Manifest lưu dataset hash, Java/backend, năm seed, 12 chuỗi, 30 epoch tối đa,
+validation-only selection và xác nhận test không tham gia selection. Bộ artifact gồm console log,
+dataset statistics, 2.693 epoch history, 60 seed metrics, 302.400 validation predictions, summary
+TXT, report HTML và manifest.
+
+**Kết quả mô hình:** Weekly Naive đạt macro RMSE 11,1435; Direct 13,0076 (-16,73% so baseline) và
+AR 12,1396 (-8,94%). AR tốt hơn Direct khoảng 6,67% RMSE nhưng chỉ thắng baseline tại 4/12 chuỗi;
+Direct thắng 3/12. LOW cải thiện baseline, còn MEDIUM/HIGH suy giảm; HIGH lớn nhất với RMSE
+18,7081/17,0007 cho Direct/AR. Direct tệ nhất horizon 6, AR tệ nhất horizon 7.
+
+**Kiểm chứng artifact:** đủ 120 fits và 120 best flags; prediction chia đều 151.200/model,
+43.200/horizon và 2.520/fit. Tính lại metric từ prediction khớp seed CSV với sai lệch tối đa
+`5,1e-11`. AR dừng sớm 60/60 fits, best epoch trung bình 10,18; Direct dừng sớm 12/60, best epoch
+trung bình 27,62. Không chạy lại training hoặc Maven test trong bước phân tích tài liệu.
+
+**Giả thuyết tiếp theo:** dự báo residual quanh Weekly Naive, kết hợp target/loss ổn định phương sai
+fit train-only, có khả năng giữ seasonality tuần và giảm gradient bị chi phối bởi chuỗi doanh số cao.
+Mọi so sánh tiếp theo tiếp tục chọn bằng validation; test 2017 chỉ được đánh giá một lần sau khi cố
+định quyết định.
+
+**Commit đề xuất:** `docs: record completed GPU validation run`

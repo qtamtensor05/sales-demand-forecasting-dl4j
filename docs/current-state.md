@@ -208,3 +208,52 @@ mặc định không sửa code.
 Ba skill dùng lại quy tắc log huấn luyện dài của `sales-project-progress`, không tự chạy thí nghiệm
 120 fits, nâng dependency, commit hay push. Đây là thay đổi workflow agent; code Java, pipeline dữ
 liệu, normalization và split hiện tại không đổi.
+
+## Run GPU hoàn chỉnh mới nhất: 2026-10-10_184201_989_gpu
+
+Manifest xác nhận trạng thái `SUCCESS`, backend `JCublasBackend`, Java 11.0.32.1, dataset SHA-256
+`038f25690a65149c94f86ddd3deceda20c037a5cfd754cafdfc539a72992f2ed`, validation 2016 và
+`testUsedForSelection=false`. Run bắt đầu 18:42:02 và hoàn tất 20:16:55 giờ Việt Nam, thời lượng
+1 giờ 34 phút 52 giây. Artifact chuẩn nằm trong
+`output/runs/2026-10-10_184201_989_gpu/`.
+
+Kiểm tra tính đầy đủ ghi nhận 60 dòng seed, 2.693 dòng epoch, 120 fits, 120 cờ best epoch và
+302.400 prediction validation. Mỗi model có 151.200 prediction; mỗi horizon 1-7 có 43.200.
+Tính lại MAE/RMSE từ prediction cho từng bộ stratum/store/item/model/seed khớp seed metrics với
+sai lệch lớn nhất khoảng `5,1e-11`; mọi fit có đúng 2.520 dự báo cuốn chiếu.
+
+Macro validation mới nhất, sau khi bình quân năm seed trong từng chuỗi rồi bình quân không trọng số
+qua 12 chuỗi:
+
+| Phương pháp | MAE mean ± sample std | RMSE mean ± sample std | Cải thiện RMSE so Weekly Naive |
+| --- | ---: | ---: | ---: |
+| Weekly Naive | 8,7365 ± 2,4252 | 11,1435 ± 3,1713 | mốc so sánh |
+| Direct LSTM | 10,3217 ± 4,1082 | 13,0076 ± 5,1836 | -16,73% |
+| AR LSTM | 9,7157 ± 3,5308 | 12,1396 ± 4,4385 | -8,94% |
+
+AR giảm RMSE 0,8680, tương đương khoảng 6,67%, so với Direct nhưng vẫn thua Weekly Naive 0,9961.
+Direct thắng baseline tại 3/12 chuỗi và AR tại 4/12; toàn bộ các chuỗi thắng đều thuộc LOW. LOW là
+nhóm duy nhất cải thiện baseline: Direct +4,25% RMSE và AR +5,54%. MEDIUM kém baseline 17,39% và
+10,10%; HIGH kém 27,43% và 15,80% tương ứng. HIGH gây sai số tuyệt đối lớn nhất với RMSE Direct
+18,7081 và AR 17,0007.
+
+Theo horizon, Direct tệ nhất ở horizon 6 (RMSE 14,0661; -26,24% so baseline), trong khi AR tệ nhất
+ở horizon 7 (12,3193; -10,58%). Direct gần baseline nhất ở horizon 4 (11,5853; -3,97%); AR gần nhất
+ở horizon 1 (11,9795; -7,49%). Weekly Naive gần như ổn định quanh RMSE 11,14 trên cả bảy horizon,
+cho thấy seasonality tuần là tín hiệu mạnh mà hai LSTM chưa khai thác ổn định.
+
+Độ nhạy seed vẫn đáng kể. Macro RMSE Direct theo seed có sample std 0,9213, khoảng 12,0513-14,2827;
+AR có sample std 0,9244, khoảng 11,1105-13,4595. Chỉ AR seed 2026 (RMSE 11,1105) nhỉnh hơn macro
+Weekly Naive 11,1435; đây không phải bằng chứng lợi thế ổn định. Direct chọn best epoch trung bình
+27,62 và chạy trung bình 29,70 epoch; 12/60 fit dừng sớm và 17/60 đạt best tại epoch 30. AR chọn
+best trung bình 10,18, chạy trung bình 15,18 và cả 60/60 fit đều dừng sớm, phù hợp với dấu hiệu
+validation rollout suy giảm sớm hơn dù train loss tiếp tục giảm.
+
+Giả thuyết cải thiện ưu tiên là huấn luyện LSTM dự báo phần dư quanh Weekly Naive thay vì sales tuyệt
+đối, có thể kết hợp `log1p` hoặc Huber loss fit train-only. Cách này giữ trực tiếp tín hiệu chu kỳ
+bảy ngày đã mạnh, giảm ảnh hưởng biên độ của MEDIUM/HIGH và để LSTM học phần điều chỉnh. Giả thuyết
+phải được so sánh trên cùng validation protocol; test 2017 không được dùng để chọn biến thể.
+
+Giới hạn: chỉ 12/500 chuỗi được chọn đại diện; validation vừa chọn epoch vừa đánh giá cấu hình cố
+định; forecast windows chồng lấn; sample std phản ánh phân tán giữa chuỗi, không phải confidence
+interval. Run không đánh giá test 2017 và chưa chứng minh khả năng tổng quát ngoài validation.
