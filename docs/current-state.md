@@ -1,16 +1,44 @@
 # Trạng thái hiện tại
 
+## Residual AR — cập nhật 2026-10-12
+
+Đã triển khai Residual Autoregressive LSTM dưới chế độ riêng `--residual`; lệnh mặc định vẫn
+chạy 120 fits của Direct/AR. Full residual chạy 12 chuỗi × 5 seed × 3 neural model = 180 fits,
+cộng Weekly Naive không huấn luyện. Giữ nguyên split, danh sách đại diện, feature, MSE và cấu hình.
+
+Target là `(sales(t)−observedSales(t−7))/trainSalesScale`; prediction bằng baseline cộng output
+nhân scale. Không fit scaler residual mới; chỉ tái sử dụng scale sales train, offset triệt tiêu.
+Rollout feed sales đã tái dựng và dùng anchor quan sát trước origin cho cả H1–H7. Chọn epoch bằng
+RMSE finalPrediction ở sales gốc trên validation, không dùng test 2017 để chọn.
+
+Báo cáo mới có đủ bốn model, macro hai tầng, stratum, horizon, seed và win rate so ba đối chứng.
+Schema residual v2 thêm cột ở cuối CSV, lưu config thật và min/max/scale từng chuỗi; giữ nguyên run
+cũ. Chi tiết thiết kế, tệp thay đổi, kiểm thử, lệnh và giới hạn tại
+[thí nghiệm residual](residual-experiment.md).
+
+**IMPLEMENTED / TESTED:** `mvn -B test` đạt 33/33, 0 failures/errors/skips, BUILD SUCCESS trong
+1 phút 12 giây trên CUDA ở lượt này. Các mục kết quả cũ bên dưới giữ ý nghĩa lịch sử, không phải
+kết quả residual. **FULL EXPERIMENT NOT YET RUN**; chưa có bằng chứng residual vượt Weekly Naive
+RMSE 11,1435 hoặc cải thiện MEDIUM/HIGH. Không kết hợp Huber/log1p trong thí nghiệm đầu.
+
+**SMOKE TESTED:** `mvn -B compile exec:java '-Dexec.args=--residual-smoke'` kết thúc exit 0,
+BUILD SUCCESS trong 38,900 giây, run `2026-10-12_002237_861_gpu` có manifest SUCCESS, Java
+11.0.32.1 và JCublasBackend. Chuỗi LOW store 7/item 34, seed 42, ba model × 2 epoch; đủ 6 dòng
+history, 3 best flags, 1 dòng seed, 7.560 prediction (2.520/model) và 10 artifact. Tái tính metric
+từ CSV khớp seed CSV trong dung sai `2e-9`; residual reconstruction khớp trong `2e-10`.
+Đây là smoke pipeline, không phải kết quả so sánh mô hình đầy đủ. Full 180 fits chưa chạy.
+
 ## Pipeline
 
 ```text
 data/train.csv
-  ├─ SalesDataAnalyzer → output/sales-statistics.txt
+  ├─ SalesDataAnalyzer → output/runs/<run-id>/dataset-statistics.txt
   └─ MultiSeriesExperimentRunner
        ├─ phân tầng tertile theo mean sales giai đoạn train
        ├─ TimeSeriesAnalyzer → SalesPreprocessor riêng cho mỗi chuỗi
-       └─ Weekly Naive + Direct LSTM + Autoregressive LSTM
+       └─ Weekly Naive + Direct LSTM + Autoregressive LSTM (+ ResidualAR khi --residual)
             ├─ 5 seed; macro-average theo 12 chuỗi trên validation; không đọc test
-            └─ ErrorAnalysisRunner → output/error-analysis-validation.txt
+            └─ Error analysis → output/runs/<run-id>/error-analysis.txt
 ```
 
 `Main` hiện gọi `MultiSeriesExperimentRunner`. Runner xếp hạng các cặp bằng mean sales mỗi ngày

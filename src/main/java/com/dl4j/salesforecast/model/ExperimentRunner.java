@@ -28,6 +28,12 @@ public final class ExperimentRunner {
     static ExperimentResult run(PreprocessingResult prepared, List<Long> seeds,
                                 int seriesIndex, int totalSeries, String stratum,
                                 int storeId, int itemId) {
+        return run(prepared, seeds, seriesIndex, totalSeries, stratum, storeId, itemId, ExperimentConfiguration.legacy());
+    }
+
+    static ExperimentResult run(PreprocessingResult prepared, List<Long> seeds,
+                                int seriesIndex, int totalSeries, String stratum,
+                                int storeId, int itemId, ExperimentConfiguration configuration) {
         if (prepared == null) { throw new IllegalArgumentException("Preprocessing result is required."); }
         if (seeds == null || seeds.isEmpty()) { throw new IllegalArgumentException("At least one seed is required."); }
         if (seeds.stream().anyMatch(seed -> seed == null) || seeds.stream().distinct().count() != seeds.size()) {
@@ -36,26 +42,31 @@ public final class ExperimentRunner {
 
         WeeklyNaiveBaseline.BaselineResult weekly = WeeklyNaiveBaseline.evaluate(prepared.getValidation());
         List<SeedResult> results = new ArrayList<>(seeds.size());
-        int epochs = SalesLstmForecaster.DEFAULT_SEARCH_EPOCHS;
-        int patience = SalesLstmForecaster.DEFAULT_EARLY_STOPPING_PATIENCE;
+        int epochs = configuration.getMaxEpochs();
+        int patience = configuration.getPatience();
         for (int seedIndex = 0; seedIndex < seeds.size(); seedIndex++) {
             long seed = seeds.get(seedIndex);
             System.out.printf("%n=== Validation experiment: seed %d ===%n", seed);
             TrainingProgress directProgress = seriesIndex < 0 ? null : TrainingProgress.forFit(
-                    seriesIndex, totalSeries, seedIndex, seeds.size(), true,
+                    seriesIndex, totalSeries, seedIndex, seeds.size(), 0, configuration.getModels(),
                     stratum, storeId, itemId, seed, epochs);
             TrainingProgress autoregressiveProgress = seriesIndex < 0 ? null : TrainingProgress.forFit(
-                    seriesIndex, totalSeries, seedIndex, seeds.size(), false,
+                    seriesIndex, totalSeries, seedIndex, seeds.size(), 1, configuration.getModels(),
                     stratum, storeId, itemId, seed, epochs);
             SalesLstmForecaster.FitResult direct = SalesLstmForecaster.fit(prepared, epochs,
                     DEFAULT_HIDDEN_UNITS, DEFAULT_LEARNING_RATE, patience, seed, directProgress);
             AutoregressiveLstmForecaster.FitResult autoregressive = AutoregressiveLstmForecaster.fit(prepared,
                     epochs, DEFAULT_HIDDEN_UNITS, DEFAULT_LEARNING_RATE, patience, seed,
                     autoregressiveProgress);
+            AutoregressiveLstmForecaster.FitResult residual = configuration.includesResidual()
+                    ? ResidualLstmForecaster.fit(prepared, epochs, DEFAULT_HIDDEN_UNITS, DEFAULT_LEARNING_RATE,
+                            patience, seed, seriesIndex < 0 ? null : TrainingProgress.forFit(
+                                    seriesIndex, totalSeries, seedIndex, seeds.size(), 2, configuration.getModels(),
+                                    stratum, storeId, itemId, seed, epochs)) : null;
             results.add(new SeedResult(seed, direct.getValidationMetrics(), autoregressive.getValidationMetrics(),
                     direct.getBestEpoch(), autoregressive.getBestEpoch(),
                     direct.getEpochsRun(), autoregressive.getEpochsRun(),
-                    direct.getHistory(), autoregressive.getHistory()));
+                    direct.getHistory(), autoregressive.getHistory(), residual));
             SeedResult row = results.get(results.size() - 1);
             System.out.printf(Locale.ROOT,
                     "Seed %d | Direct MAE %.4f RMSE %.4f (epoch %d/%d) | AR MAE %.4f RMSE %.4f (epoch %d/%d)%n",
@@ -142,6 +153,7 @@ public final class ExperimentRunner {
 
     public static final class SeedResult {
         private final long seed;
+        private final ResidualResult residual;
         private final SalesLstmForecaster.ForecastMetrics directMetrics;
         private final AutoregressiveLstmForecaster.ForecastMetrics autoregressiveMetrics;
         private final int directBestEpoch;
@@ -155,8 +167,10 @@ public final class ExperimentRunner {
                            int directBestEpoch, int autoregressiveBestEpoch,
                            int directEpochsRun, int autoregressiveEpochsRun,
                            List<SalesLstmForecaster.EpochMetrics> directHistory,
-                           List<AutoregressiveLstmForecaster.EpochMetrics> autoregressiveHistory) {
+                           List<AutoregressiveLstmForecaster.EpochMetrics> autoregressiveHistory,
+                           AutoregressiveLstmForecaster.FitResult residual) {
             this.seed = seed;
+            this.residual = residual == null ? null : new ResidualResult(residual);
             this.directMetrics = directMetrics;
             this.autoregressiveMetrics = autoregressiveMetrics;
             this.directBestEpoch = directBestEpoch;
@@ -167,6 +181,7 @@ public final class ExperimentRunner {
             this.autoregressiveHistory = List.copyOf(autoregressiveHistory);
         }
         public long getSeed() { return seed; }
+        public ResidualResult getResidual() { return residual; }
         public double getDirectMae() { return directMetrics.getMae(); }
         public double getDirectRmse() { return directMetrics.getRmse(); }
         public SalesLstmForecaster.ForecastMetrics getDirectMetrics() { return directMetrics; }
@@ -179,6 +194,22 @@ public final class ExperimentRunner {
         public List<AutoregressiveLstmForecaster.EpochMetrics> getAutoregressiveHistory() {
             return autoregressiveHistory;
         }
+    }
+
+    /** Retains evaluation evidence without keeping every trained network resident. */
+    public static final class ResidualResult {
+        private final AutoregressiveLstmForecaster.ForecastMetrics metrics;
+        private final List<AutoregressiveLstmForecaster.EpochMetrics> history;
+        private final int bestEpoch;
+        private final int epochsRun;
+        private ResidualResult(AutoregressiveLstmForecaster.FitResult fit) {
+            metrics = fit.getValidationMetrics(); history = fit.getHistory();
+            bestEpoch = fit.getBestEpoch(); epochsRun = fit.getEpochsRun();
+        }
+        public AutoregressiveLstmForecaster.ForecastMetrics getValidationMetrics() { return metrics; }
+        public List<AutoregressiveLstmForecaster.EpochMetrics> getHistory() { return history; }
+        public int getBestEpoch() { return bestEpoch; }
+        public int getEpochsRun() { return epochsRun; }
     }
 
     public static final class Stats {

@@ -1,6 +1,9 @@
 package com.dl4j.salesforecast.output;
 
 import com.dl4j.salesforecast.model.ErrorAnalysisRunner;
+import com.dl4j.salesforecast.model.ExperimentConfiguration;
+import com.dl4j.salesforecast.model.ExperimentRunner;
+import com.dl4j.salesforecast.model.ResidualComparisonReport;
 import com.dl4j.salesforecast.model.MultiSeriesExperimentRunner;
 import com.dl4j.salesforecast.model.SeedMetricsExporter;
 import com.dl4j.salesforecast.model.TrainingHistoryExporter;
@@ -27,6 +30,8 @@ public final class RunArtifactSession implements AutoCloseable {
     private final String datasetPath;
     private final String datasetSha256;
     private final Instant startedAt;
+    private ExperimentConfiguration configuration;
+    private boolean terminal;
     private PrintStream originalOut;
     private PrintStream originalErr;
     private PrintStream logStream;
@@ -42,6 +47,11 @@ public final class RunArtifactSession implements AutoCloseable {
     }
 
     public static RunArtifactSession start(Path runsRoot, Path dataset) throws IOException {
+        return start(runsRoot, dataset, ExperimentConfiguration.legacy());
+    }
+
+    public static RunArtifactSession start(Path runsRoot, Path dataset, ExperimentConfiguration configuration) throws IOException {
+        if (configuration == null) { throw new IllegalArgumentException("Experiment configuration is required."); }
         if (runsRoot == null || dataset == null || !Files.isRegularFile(dataset)) {
             throw new IllegalArgumentException("Runs root and an existing dataset are required.");
         }
@@ -49,30 +59,68 @@ public final class RunArtifactSession implements AutoCloseable {
         String suffix = backend.contains("cuda") || backend.contains("cublas") ? "gpu" : "cpu";
         String runId = ID_FORMAT.format(LocalDateTime.now()) + "_" + suffix;
         Path directory = runsRoot.resolve(runId);
-        Files.createDirectories(directory);
+        Files.createDirectories(runsRoot);
+        try { Files.createDirectory(directory); }
+        catch (java.nio.file.FileAlreadyExistsException collision) {
+            runId = runId + "_" + java.util.UUID.randomUUID();
+            directory = runsRoot.resolve(runId);
+            Files.createDirectory(directory);
+        }
         RunArtifactSession session = new RunArtifactSession(directory, runId,
                 dataset.toAbsolutePath().normalize().toString(), sha256(dataset), Instant.now());
+        session.configuration = configuration;
         session.writeManifest("RUNNING", null);
-        Files.writeString(runsRoot.resolve("latest.txt"), runId + "\n", StandardCharsets.UTF_8);
-        session.installConsoleCapture();
+        try {
+            Files.writeString(runsRoot.resolve("latest.txt"), runId + "\n", StandardCharsets.UTF_8);
+            session.installConsoleCapture();
+        } catch (IOException failure) {
+            session.fail(failure);
+            session.close();
+            throw failure;
+        }
         return session;
     }
 
     public void complete(MultiSeriesExperimentRunner.MultiSeriesResult result,
                          ErrorAnalysisRunner.AnalysisResult analysis) throws IOException {
+        if (result.getSeriesResults().size() != configuration.getSeriesCount()
+                || !result.getSeeds().equals(configuration.getSeeds())
+                || result.getSeriesResults().stream().anyMatch(r -> !r.getSeedResults().stream()
+                    .map(ExperimentRunner.SeedResult::getSeed).collect(java.util.stream.Collectors.toList())
+                    .equals(configuration.getSeeds()))
+                || result.getSeriesResults().stream().flatMap(r -> r.getSeedResults().stream())
+                    .anyMatch(r -> (r.getResidual() != null) != configuration.includesResidual())) {
+            throw new IllegalArgumentException("Result coverage does not match run configuration.");
+        }
         TrainingHistoryExporter.writeCsv(result, directory.resolve("epoch-history.csv"));
         SeedMetricsExporter.writeCsv(result, directory.resolve("seed-metrics.csv"));
         ValidationPredictionExporter.writeCsv(result, directory.resolve("validation-predictions.csv"));
-        String summary = MultiSeriesExperimentRunner.formatReport(result) + "\n"
-                + ErrorAnalysisRunner.formatReport(analysis);
+        String errorAnalysis = configuration.includesResidual() ? ResidualComparisonReport.format(result)
+                : ErrorAnalysisRunner.formatReport(analysis);
+        String warning = configuration.isSmoke() ? "SMOKE ONLY: pipeline verification, not model-quality evidence.\n\n" : "";
+        String summary = warning + MultiSeriesExperimentRunner.formatReport(result) + "\n" + errorAnalysis;
+        Files.writeString(directory.resolve("error-analysis.txt"), warning + errorAnalysis, StandardCharsets.UTF_8);
+        StringBuilder scales = new StringBuilder("stratum,store,item,train_mean_sales,sales_min,sales_max,sales_scale,residual_scale\n");
+        for (var series : result.getSeriesResults()) {
+            var scaler = series.getScaler();
+            scales.append(String.format(java.util.Locale.ROOT, "%s,%d,%d,%.10f,%.10f,%.10f,%.10f,%.10f%n",
+                    series.getStratum(), series.getStoreId(), series.getItemId(), series.getTrainMeanSales(),
+                    scaler.getMin(), scaler.getMax(), scaler.getScale(), scaler.getScale()));
+        }
+        Files.writeString(directory.resolve("series-scaling.csv"), scales, StandardCharsets.UTF_8);
         Files.writeString(directory.resolve("summary.txt"), summary, StandardCharsets.UTF_8);
         Files.writeString(directory.resolve("report.html"), html(summary), StandardCharsets.UTF_8);
         writeManifest("SUCCESS", null);
+        terminal = true;
     }
 
     public void fail(Throwable failure) {
-        try { writeManifest("FAILED", failure == null ? "Unknown failure" : failure.toString()); }
-        catch (IOException ignored) { }
+        try {
+            writeManifest("FAILED", failure == null ? "Unknown failure" : failure.toString());
+            terminal = true;
+        } catch (IOException manifestFailure) {
+            System.err.println("Cannot mark run FAILED: " + manifestFailure);
+        }
     }
 
     public Path getDirectory() { return directory; }
@@ -90,6 +138,7 @@ public final class RunArtifactSession implements AutoCloseable {
 
     @Override
     public void close() {
+        if (!terminal) { fail(new IllegalStateException("Session closed before completion")); }
         if (originalOut != null) { System.setOut(originalOut); }
         if (originalErr != null) { System.setErr(originalErr); }
         if (logStream != null) { logStream.close(); }
@@ -100,21 +149,42 @@ public final class RunArtifactSession implements AutoCloseable {
 
     private void writeManifest(String status, String error) throws IOException {
         String backend = Nd4j.getBackend().getClass().getName();
-        String json = "{\n"
-                + "  \"runId\": \"" + escape(runId) + "\",\n"
-                + "  \"status\": \"" + status + "\",\n"
-                + "  \"startedAt\": \"" + startedAt + "\",\n"
-                + "  \"updatedAt\": \"" + Instant.now() + "\",\n"
-                + "  \"javaVersion\": \"" + escape(System.getProperty("java.version")) + "\",\n"
-                + "  \"backend\": \"" + escape(backend) + "\",\n"
-                + "  \"datasetPath\": \"" + escape(datasetPath) + "\",\n"
-                + "  \"datasetSha256\": \"" + datasetSha256 + "\",\n"
-                + "  \"series\": 12,\n  \"seeds\": [42, 123, 2026, 7, 99],\n"
-                + "  \"models\": [\"Direct\", \"AR\"],\n  \"maxEpochs\": 30,\n"
-                + "  \"selectionSplit\": \"validation-2016\",\n"
-                + "  \"testUsedForSelection\": false"
-                + (error == null ? "\n" : ",\n  \"error\": \"" + escape(error) + "\"\n")
-                + "}\n";
+        java.util.Map<String, Object> values = new java.util.LinkedHashMap<>();
+        values.put("schemaVersion", configuration.includesResidual() ? 2 : 1);
+        values.put("runId", runId);
+        values.put("status", status);
+        values.put("startedAt", startedAt.toString());
+        values.put("updatedAt", Instant.now().toString());
+        values.put("javaVersion", System.getProperty("java.version"));
+        values.put("backend", backend);
+        values.put("datasetPath", datasetPath);
+        values.put("datasetSha256", datasetSha256);
+        values.put("smoke", configuration.isSmoke());
+        values.put("series", configuration.getSeriesCount());
+        values.put("seeds", configuration.getSeeds());
+        values.put("models", configuration.getModels());
+        values.put("baseline", "Weekly Naive");
+        values.put("fits", configuration.getFitCount());
+        values.put("maxEpochs", configuration.getMaxEpochs());
+        values.put("patience", configuration.getPatience());
+        values.put("hiddenUnits", ExperimentRunner.DEFAULT_HIDDEN_UNITS);
+        values.put("learningRate", ExperimentRunner.DEFAULT_LEARNING_RATE);
+        values.put("optimizer", "Adam");
+        values.put("loss", "MSE");
+        values.put("inputDays", 30);
+        values.put("forecastDays", 7);
+        values.put("features", com.dl4j.salesforecast.preprocessing.SalesPreprocessor.getInputFeatureNames());
+        values.put("trainPeriod", "2013-01-01..2015-12-31");
+        values.put("selectionSplit", "validation-2016");
+        values.put("testUsedForSelection", false);
+        values.put("seriesSelection", "4 quantiles per train-only tertile; smoke uses first of same 12");
+        values.put("scaling", "Per-series train-only sales MinMax; constant train scale=1; no clipping");
+        values.put("residualTarget", configuration.includesResidual()
+                ? "(sales(t)-observedSales(t-7))/salesScale; inverse: baseline + output*salesScale" : "disabled");
+        values.put("residualScalerFit", false);
+        values.put("scalerArtifact", "series-scaling.csv");
+        if (error != null) { values.put("error", error); }
+        String json = new com.google.gson.GsonBuilder().setPrettyPrinting().create().toJson(values) + "\n";
         Path temporary = manifest.resolveSibling("run.json.tmp");
         Files.writeString(temporary, json, StandardCharsets.UTF_8);
         try {
@@ -148,9 +218,6 @@ public final class RunArtifactSession implements AutoCloseable {
         }
     }
 
-    private static String escape(String value) {
-        return value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n");
-    }
     private static String escapeHtml(String value) {
         return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }

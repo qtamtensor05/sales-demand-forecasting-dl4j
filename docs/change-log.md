@@ -1018,3 +1018,46 @@ dự báo residual quanh Weekly Naive với biến đổi/loss ổn định phư
 **Giới hạn:** số liệu dựa trên 12 chuỗi đại diện trong tập validation 2016, chưa đánh giá test 2017. Báo cáo phản ánh hiện trạng triển khai, chưa thực hiện code thay đổi mô hình mới.
 
 **Commit đề xuất:** `docs: report project pipeline and empirical results`
+
+## 037 - 2026-10-12 - Triển khai thí nghiệm Residual Autoregressive LSTM
+
+**Mục tiêu:** học residual quanh Weekly Naive, giữ so sánh có kiểm soát với Weekly/Direct/AR;
+hoàn tất code, JUnit, smoke và review trước khi cân nhắc full 12×5.
+
+**Lý do:** run cũ cho thấy Weekly vẫn thắng macro; MEDIUM/HIGH là điểm yếu của LSTM tuyệt đối.
+Thí nghiệm đầu chỉ đổi target formulation, không thêm Huber/log1p hoặc feature/kiến trúc mới.
+
+**Thay đổi:** thêm `ResidualLstmForecaster`, `ExperimentConfiguration`, `ResidualComparisonReport`;
+mở rộng AR dùng chung vòng fit/rollout với label residual chia sales scale train và reconstruction
+cộng baseline. Giữ input, split, 12 đại diện, năm seed, MSE, Adam, cấu hình và validation-only
+selection. Runner có `--residual` (180 fits) và `--residual-smoke` (1 chuỗi/1 seed/2 epoch mỗi
+model), còn lệnh cũ giữ 120 fits. Artifact v2 thêm residual ở cuối CSV, ghi min/max/scale train,
+config thật, báo cáo overall/stratum/horizon/seed/consistency/win rate; không ghi đè run cũ.
+
+**Tệp ảnh hưởng:** Main, AR forecaster, ExperimentRunner, MultiSeriesExperimentRunner,
+TrainingProgress, ba exporter CSV, RunArtifactSession; ba class mới nêu trên; hai test residual
+mới và RunArtifactSessionTest; README, current-state, implementation-history, change-log và
+[residual-experiment.md](residual-experiment.md) (có liên kết từng tệp cụ thể). Không sửa
+SalesPreprocessor, Direct model, Weekly Naive hoặc dependency.
+
+**Kiểm tra:** red test chạy và thất bại đúng tại assertion vì thiếu class residual (1 failure).
+Focused model 4/4 đạt; suite tích hợp 31/31 đạt; suite cuối `mvn -B test` **33/33**, 0 failures,
+errors, skips, exit 0, BUILD SUCCESS trong 1:12 phút. Test bảo vệ target +7/−10/0, reconstruction,
+constant scale, train-only scaling, target containment, tensor/mask, finite H1–H7, future mutation,
+test-independent selection, metric sales, macro/win và artifact lifecycle. Review không còn lỗi
+chặn trong phạm vi kiểm tra. `git diff --check` và kiểm tra liên kết Markdown hoàn tất.
+
+**Smoke:** `mvn -B compile exec:java '-Dexec.args=--residual-smoke'`, exit 0/BUILD SUCCESS,
+38,900 giây; run `2026-10-12_002237_861_gpu` có SUCCESS, JCublasBackend, Java 11.0.32.1.
+LOW store 7/item 34, seed 42, ba fit × 2 epoch; đủ 10 artifact, 6 epoch, 3 best flags, 1 seed row,
+7.560 prediction (2.520/model), H1–H7 đầy đủ, không trùng khóa. Dataset hash khớp; reconstruction
+trong `2e-10`; MAE/RMSE tính lại khớp seed CSV trong `2e-9`. Residual smoke RMSE 7,1030,
+Weekly 6,8709; không dùng kết quả nhỏ này kết luận model tốt hơn.
+
+**Giới hạn:** IMPLEMENTED / TESTED / SMOKE TESTED / FULL EXPERIMENT NOT YET RUN. Chưa có kết luận
+MEDIUM/HIGH hoặc vượt baseline macro 11,1435. Full 180 fits ước khoảng 2:22 giờ dựa trên run
+120 fits 1:34:52; README có lệnh lưu log. CSV đầy đủ xuất cuối lượt, chưa checkpoint/resume;
+Java error ghi FAILED nhưng kill cưỡng bức/mất điện có thể để RUNNING. Không tính metric test 2017,
+không sửa kết quả cũ, không commit/push.
+
+**Commit đề xuất:** `feat: add residual LSTM forecasting experiment`

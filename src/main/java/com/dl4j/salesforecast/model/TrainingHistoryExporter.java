@@ -26,6 +26,14 @@ public final class TrainingHistoryExporter {
                             epoch.getValidationLoss(), epoch.getValidationRmse(),
                             epoch.getEpoch() == seed.getDirectBestEpoch()));
                 }
+                if (seed.getResidual() != null) {
+                    for (AutoregressiveLstmForecaster.EpochMetrics epoch : seed.getResidual().getHistory()) {
+                        rows.add(new Row(series.getStratum(), series.getStoreId(), series.getItemId(),
+                                "ResidualAR", seed.getSeed(), epoch.getEpoch(), epoch.getTrainingLoss(),
+                                epoch.getValidationLoss(), epoch.getValidationMetrics().getRmse(),
+                                epoch.getEpoch() == seed.getResidual().getBestEpoch()));
+                    }
+                }
                 for (AutoregressiveLstmForecaster.EpochMetrics epoch : seed.getAutoregressiveHistory()) {
                     rows.add(new Row(series.getStratum(), series.getStoreId(), series.getItemId(),
                             "AR", seed.getSeed(), epoch.getEpoch(), epoch.getTrainingLoss(),

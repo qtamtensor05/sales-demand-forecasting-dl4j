@@ -38,6 +38,15 @@ public final class MultiSeriesExperimentRunner {
     }
 
     public static MultiSeriesResult run(String filePath, List<Long> seeds, int samplesPerStratum) {
+        return run(filePath, seeds, samplesPerStratum, ExperimentConfiguration.legacy());
+    }
+
+    public static MultiSeriesResult run(String filePath, ExperimentConfiguration configuration) {
+        return run(filePath, configuration.getSeeds(), DEFAULT_SAMPLES_PER_STRATUM, configuration);
+    }
+
+    private static MultiSeriesResult run(String filePath, List<Long> seeds, int samplesPerStratum,
+                                          ExperimentConfiguration configuration) {
         if (filePath == null || filePath.isBlank()) { throw new IllegalArgumentException("Dataset path is required."); }
         if (seeds == null || seeds.isEmpty() || seeds.stream().anyMatch(seed -> seed == null)
                 || seeds.stream().distinct().count() != seeds.size()) {
@@ -45,6 +54,7 @@ public final class MultiSeriesExperimentRunner {
         }
         List<SeriesProfile> profiles = readTrainingProfiles(filePath);
         List<SelectedSeries> selected = selectRepresentativeSeries(profiles, samplesPerStratum);
+        if (configuration.isSmoke()) { selected = selected.subList(0, 1); }
         List<SeriesResult> results = new ArrayList<>(selected.size());
         for (int seriesIndex = 0; seriesIndex < selected.size(); seriesIndex++) {
             SelectedSeries selection = selected.get(seriesIndex);
@@ -55,8 +65,8 @@ public final class MultiSeriesExperimentRunner {
             SalesPreprocessor.PreprocessingResult prepared = SalesPreprocessor.preprocess(series);
             ExperimentRunner.ExperimentResult experiments = ExperimentRunner.run(prepared, seeds,
                     seriesIndex, selected.size(), selection.stratum,
-                    profile.storeId, profile.itemId);
-            results.add(new SeriesResult(selection, experiments.getWeeklyMetrics(), experiments.getSeedResults()));
+                    profile.storeId, profile.itemId, configuration);
+            results.add(new SeriesResult(selection, experiments.getWeeklyMetrics(), experiments.getSeedResults(), prepared.getScaler()));
         }
         return new MultiSeriesResult(seeds, results);
     }
@@ -255,7 +265,7 @@ public final class MultiSeriesExperimentRunner {
     public static final class MultiSeriesResult {
         private final List<Long> seeds;
         private final List<SeriesResult> seriesResults;
-        private MultiSeriesResult(List<Long> seeds, List<SeriesResult> seriesResults) {
+        MultiSeriesResult(List<Long> seeds, List<SeriesResult> seriesResults) {
             this.seeds = List.copyOf(seeds);
             this.seriesResults = List.copyOf(seriesResults);
         }
@@ -265,14 +275,17 @@ public final class MultiSeriesExperimentRunner {
 
     public static final class SeriesResult {
         private final SelectedSeries selection;
+        private final SalesPreprocessor.MinMaxScaler scaler;
         private final WeeklyNaiveBaseline.BaselineResult weeklyMetrics;
         private final List<ExperimentRunner.SeedResult> seedResults;
-        private SeriesResult(SelectedSeries selection, WeeklyNaiveBaseline.BaselineResult weeklyMetrics,
-                             List<ExperimentRunner.SeedResult> seedResults) {
+        SeriesResult(SelectedSeries selection, WeeklyNaiveBaseline.BaselineResult weeklyMetrics,
+                             List<ExperimentRunner.SeedResult> seedResults, SalesPreprocessor.MinMaxScaler scaler) {
             this.selection = selection;
+            this.scaler = scaler;
             this.weeklyMetrics = weeklyMetrics;
             this.seedResults = List.copyOf(seedResults);
         }
+        public SalesPreprocessor.MinMaxScaler getScaler() { return scaler; }
         public String getStratum() { return selection.stratum; }
         public int getStoreId() { return selection.profile.storeId; }
         public int getItemId() { return selection.profile.itemId; }

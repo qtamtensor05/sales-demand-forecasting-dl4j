@@ -28,6 +28,58 @@ kể cả bản ghi trùng; phát hiện trùng không tự loại bỏ dữ li�
 
 ## Chạy dự án
 
+### Thí nghiệm Residual AR (chế độ riêng)
+
+Lệnh không có tham số vẫn chạy Weekly Naive + Direct + AR (120 fits). Chế độ mới giữ nguyên
+12 chuỗi đại diện, năm seed, split, sáu feature, MSE, Adam và cấu hình 32 units / 0,001 / patience 5.
+Chỉ đổi target của model bổ sung thành residual quanh Weekly Naive:
+
+```text
+baseline(t) = observedSales(t - 7)
+scaledResidual(t) = (actualSales(t) - baseline(t)) / trainSalesScale
+prediction(t) = baseline(t) + networkOutput(t) * trainSalesScale
+```
+
+`trainSalesScale = trainMax - trainMin`, hoặc 1 nếu train không đổi. Không fit scaler residual
+riêng; offset của sales scaler triệt tiêu khi lấy hiệu. Feature normalization không đổi, residual
+có thể âm và không bị clip. AR feed **sales đã tái dựng** vào bước tiếp; H1–H7 đều lấy anchor
+từ lịch sử đã quan sát tại origin. Checkpoint vẫn chọn theo RMSE rollout ở đơn vị sales gốc.
+
+Smoke (chuỗi đầu trong cùng danh sách 12 đại diện, seed 42, ba model × tối đa 2 epoch):
+
+```powershell
+mvn -B compile exec:java '-Dexec.args=--residual-smoke'
+```
+
+Full comparison (12 × 5 × 3 = **180 fits**, tối đa 5.400 epoch):
+
+```powershell
+New-Item -ItemType Directory -Force output | Out-Null
+$runLog = 'output/residual-full-' + (Get-Date -Format 'yyyy-MM-dd_HHmmss') + '.log'
+mvn -B clean compile exec:java '-Dexec.args=--residual' 2>&1 | Tee-Object -FilePath $runLog
+$runExitCode = $LASTEXITCODE
+```
+
+Chạy từ thư mục chứa `pom.xml`, không compile/test hoặc IDE auto-build vào `target/classes`
+trong lúc training. Run GPU cũ 120 fits mất 1 giờ 34 phút 52 giây; ngoại suy theo số fit cho
+180 fits khoảng 2 giờ 22 phút, nên dự trù 2–3 giờ hoặc hơn tùy early stopping và tải máy.
+Đây là ước tính, chưa phải benchmark residual full.
+
+Mỗi lượt tạo `output/runs/<run-id>/`. Ngoài artifact trước đây, có `series-scaling.csv` lưu min/max,
+scale train của từng chuỗi và `error-analysis.txt` so sánh bốn model theo macro, stratum, H1–H7,
+seed, độ phân tán giữa seed và win rate từng chuỗi. `run.json` ghi `schemaVersion=2`, cấu hình,
+dataset hash, Java/backend và `smoke`. `validation-predictions.csv` giữ nguyên các cột cũ và thêm
+`predicted_residual` (sales gốc, chỉ có giá trị cho ResidualAR); `seed-metrics.csv` thêm bốn cột
+residual cuối dòng; epoch history giữ schema và thêm model `ResidualAR`. Run cũ không bị sửa.
+
+Chỉ công nhận hoàn tất khi Maven exit code 0, `BUILD SUCCESS` và manifest `SUCCESS`.
+Artifact smoke ghi rõ `SMOKE ONLY`, không chứng minh model vượt baseline. Full experiment residual
+chưa chạy; các metric nghiên cứu trước đây vẫn là kết quả của run cũ. CSV hoàn chỉnh vẫn xuất cuối
+run, không resume checkpoint. Lỗi Java được ghi `FAILED`; nếu hệ điều hành cưỡng bức dừng JVM hoặc
+mất điện, manifest có thể còn `RUNNING`, tuyệt đối không coi đó là kết quả thành công.
+
+### Chạy pipeline gốc
+
 Chạy các lệnh từ thư mục chứa `pom.xml`.
 
 Sau khi cài CUDA Toolkit, hãy mở terminal/IDE mới để nhận `CUDA_PATH` và thư mục
@@ -42,9 +94,9 @@ Sau khi cài CUDA Toolkit, hãy mở terminal/IDE mới để nhận `CUDA_PATH`
    mvn compile exec:java
    ```
 
-3. Mở `output/sales-statistics.txt`, `output/multi-series-validation.txt` và
-   `output/error-analysis-validation.txt`. Thư mục được tạo
-   tự động; mỗi lần chạy sẽ ghi đè báo cáo. Mặc định phần thực nghiệm có 12 chuỗi × 5 seed × 2 LSTM
+3. Mở `dataset-statistics.txt`, `summary.txt` và `error-analysis.txt` trong
+   `output/runs/<run-id>/`; `output/runs/latest.txt` cho biết run gần nhất. Thư mục được tạo
+   tự động cho từng lượt, không ghi đè run cũ. Mặc định phần thực nghiệm có 12 chuỗi × 5 seed × 2 LSTM
    (120 lượt huấn luyện), mất khoảng 2 giờ trên máy CPU đã đo; điều chỉnh `DEFAULT_SAMPLES_PER_STRATUM`
    trong `MultiSeriesExperimentRunner` nếu cần giảm số chuỗi khi thử nhanh.
 

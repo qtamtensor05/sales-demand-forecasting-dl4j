@@ -10,6 +10,31 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class RunArtifactSessionTest {
     @Test
+    void recordsActualSmokeConfigurationAndMarksUncompletedSessionFailed(@TempDir Path directory) throws Exception {
+        Path dataset = directory.resolve("train.csv");
+        Files.writeString(dataset, "date,store,item,sales\n2020-01-01,1,1,1\n");
+        Path run;
+        try (RunArtifactSession session = RunArtifactSession.start(directory.resolve("runs"), dataset,
+                com.dl4j.salesforecast.model.ExperimentConfiguration.smoke())) {
+            run = session.getDirectory();
+            var json = com.google.gson.JsonParser.parseString(Files.readString(run.resolve("run.json"))).getAsJsonObject();
+            assertEquals(2, json.get("schemaVersion").getAsInt());
+            assertEquals(1, json.get("series").getAsInt());
+            assertEquals(3, json.get("fits").getAsInt());
+            assertEquals(2, json.get("maxEpochs").getAsInt());
+            assertTrue(json.get("smoke").getAsBoolean());
+            assertFalse(json.get("testUsedForSelection").getAsBoolean());
+            assertEquals("ResidualAR", json.getAsJsonArray("models").get(2).getAsString());
+            assertEquals(64, json.get("datasetSha256").getAsString().length());
+        }
+        assertTrue(Files.readString(run.resolve("run.json")).contains("\"FAILED\""));
+        try (RunArtifactSession next = RunArtifactSession.start(directory.resolve("runs"), dataset)) {
+            assertNotEquals(run, next.getDirectory());
+            assertTrue(Files.readString(run.resolve("run.json")).contains("\"FAILED\""));
+        }
+    }
+
+    @Test
     void createsIsolatedRunAndRecordsFailureStatus(@TempDir Path directory) throws Exception {
         Path dataset = directory.resolve("train.csv");
         Files.writeString(dataset, "date,store,item,sales\n2020-01-01,1,1,1\n");

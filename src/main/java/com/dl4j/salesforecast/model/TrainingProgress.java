@@ -29,16 +29,26 @@ public final class TrainingProgress {
                                           int seedIndex, int seedsPerSeries,
                                           boolean direct, String stratum,
                                           int storeId, int itemId, long seed, int maxEpochs) {
+        return forFit(seriesIndex, totalSeries, seedIndex, seedsPerSeries, direct ? 0 : 1,
+                java.util.List.of("Direct", "AR"), stratum, storeId, itemId, seed, maxEpochs);
+    }
+
+    public static TrainingProgress forFit(int seriesIndex, int totalSeries, int seedIndex,
+            int seedsPerSeries, int modelIndex, java.util.List<String> models, String stratum,
+            int storeId, int itemId, long seed, int maxEpochs) {
+        if (models == null || modelIndex < 0 || modelIndex >= models.size()) {
+            throw new IllegalArgumentException("Valid model index is required.");
+        }
         if (seriesIndex < 0 || seriesIndex >= totalSeries || totalSeries <= 0
                 || seedIndex < 0 || seedIndex >= seedsPerSeries || seedsPerSeries <= 0
                 || stratum == null || stratum.isBlank() || storeId <= 0 || itemId <= 0
                 || maxEpochs <= 0) {
             throw new IllegalArgumentException("Valid series, seed, model and epoch context is required.");
         }
-        int fitsPerSeries = seedsPerSeries * 2;
-        int fitNumber = seriesIndex * fitsPerSeries + seedIndex * 2 + (direct ? 1 : 2);
+        int fitsPerSeries = seedsPerSeries * models.size();
+        int fitNumber = seriesIndex * fitsPerSeries + seedIndex * models.size() + modelIndex + 1;
         return new TrainingProgress(fitNumber, totalSeries * fitsPerSeries,
-                direct ? "Direct" : "AR", stratum, storeId, itemId, seed, maxEpochs);
+                models.get(modelIndex), stratum, storeId, itemId, seed, maxEpochs);
     }
 
     public String formatCompletedEpoch(int epoch) {

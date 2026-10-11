@@ -48,6 +48,12 @@ public final class AutoregressiveLstmForecaster {
     public static FitResult fit(PreprocessingResult prepared, int maxEpochs,
                                 int hiddenUnits, double learningRate, int patience, long randomSeed,
                                 TrainingProgress progress) {
+        return fit(prepared, maxEpochs, hiddenUnits, learningRate, patience, randomSeed, progress, false);
+    }
+
+    static FitResult fit(PreprocessingResult prepared, int maxEpochs, int hiddenUnits,
+                         double learningRate, int patience, long randomSeed,
+                         TrainingProgress progress, boolean residual) {
         if (prepared == null) { throw new IllegalArgumentException("Preprocessing result is required."); }
         if (maxEpochs <= 0 || hiddenUnits <= 0 || patience <= 0 || !(learningRate > 0.0)
                 || !Double.isFinite(learningRate)) {
@@ -57,7 +63,7 @@ public final class AutoregressiveLstmForecaster {
         int forecastDays = prepared.getForecastDays();
         Split train = prepared.getTrain();
         Split validation = prepared.getValidation();
-        if (inputDays < ROLLING_LONG_DAYS || forecastDays <= 0
+        if (inputDays < ROLLING_LONG_DAYS || forecastDays <= 0 || forecastDays > 7
                 || train.getWindows().isEmpty() || validation.getWindows().isEmpty()) {
             throw new IllegalArgumentException("Autoregressive LSTM needs windows and at least 14 input days.");
         }
@@ -75,8 +81,8 @@ public final class AutoregressiveLstmForecaster {
         MultiLayerNetwork network = new MultiLayerNetwork(configuration);
         network.init();
 
-        DataSet trainingData = toOneStepDataSet(train.getWindows(), inputDays, featureCount);
-        DataSet validationData = toOneStepDataSet(validation.getWindows(), inputDays, featureCount);
+        DataSet trainingData = toOneStepDataSet(train.getWindows(), inputDays, featureCount, prepared.getScaler(), residual);
+        DataSet validationData = toOneStepDataSet(validation.getWindows(), inputDays, featureCount, prepared.getScaler(), residual);
         INDArray validationFeatures = toFeatureTensor(validation.getWindows(), inputDays, featureCount);
         INDArray bestParameters = null;
         double bestValidationRmse = Double.POSITIVE_INFINITY;
@@ -89,7 +95,7 @@ public final class AutoregressiveLstmForecaster {
             double trainingLoss = network.score(trainingData);
             double validationLoss = network.score(validationData);
             ForecastMetrics validationMetrics = evaluate(network, validation, validationFeatures,
-                    inputDays, forecastDays, featureCount, prepared.getScaler());
+                    inputDays, forecastDays, featureCount, prepared.getScaler(), residual);
             double rmse = validationMetrics.getRmse();
             if (!Double.isFinite(trainingLoss) || !Double.isFinite(validationLoss) || !Double.isFinite(rmse)) {
                 throw new IllegalStateException("Autoregressive training/validation metric became non-finite at epoch "
@@ -114,7 +120,7 @@ public final class AutoregressiveLstmForecaster {
         }
         network.setParams(bestParameters);
         ForecastMetrics bestValidationMetrics = evaluate(network, validation, validationFeatures,
-                inputDays, forecastDays, featureCount, prepared.getScaler());
+                inputDays, forecastDays, featureCount, prepared.getScaler(), residual);
         return new FitResult(network, maxEpochs, history.size(), bestEpoch, bestValidationMetrics,
                 history, hiddenUnits, learningRate, patience, randomSeed);
     }
@@ -123,18 +129,23 @@ public final class AutoregressiveLstmForecaster {
     public static ForecastMetrics evaluate(MultiLayerNetwork network, Split split,
                                            int inputDays, int forecastDays,
                                            MinMaxScaler scaler) {
+        return evaluate(network, split, inputDays, forecastDays, scaler, false);
+    }
+
+    static ForecastMetrics evaluate(MultiLayerNetwork network, Split split,
+                                    int inputDays, int forecastDays, MinMaxScaler scaler, boolean residual) {
         if (network == null || split == null || scaler == null || split.getWindows().isEmpty()
-                || inputDays <= 0 || forecastDays <= 0) {
+                || inputDays < 14 || forecastDays <= 0 || forecastDays > 7) {
             throw new IllegalArgumentException("Model, scaler, positive dimensions and forecast windows are required.");
         }
         return evaluate(network, split, toFeatureTensor(split.getWindows(), inputDays,
                 SalesPreprocessor.getInputFeatureNames().size()), inputDays, forecastDays,
-                SalesPreprocessor.getInputFeatureNames().size(), scaler);
+                SalesPreprocessor.getInputFeatureNames().size(), scaler, residual);
     }
 
     private static ForecastMetrics evaluate(MultiLayerNetwork network, Split split, INDArray initialFeatures,
                                             int inputDays, int forecastDays, int featureCount,
-                                            MinMaxScaler scaler) {
+                                            MinMaxScaler scaler, boolean residual) {
         List<Window> windows = split.getWindows();
         List<List<List<Double>>> rollingFeatures = new ArrayList<>(windows.size());
         List<List<Double>> rawHistory = new ArrayList<>(windows.size());
@@ -158,7 +169,10 @@ public final class AutoregressiveLstmForecaster {
             for (int row = 0; row < windows.size(); row++) {
                 Window window = windows.get(row);
                 double normalizedPrediction = output.getDouble(row, 0, inputDays - 1);
-                double predictedSales = scaler.inverseTransform(normalizedPrediction);
+                double predictedSales = residual
+                        ? ResidualLstmForecaster.reconstruct(ResidualLstmForecaster.baseline(window, horizon),
+                                normalizedPrediction, scaler)
+                        : scaler.inverseTransform(normalizedPrediction);
                 double actualSales = window.getRawTarget().get(horizon);
                 if (!Double.isFinite(normalizedPrediction) || !Double.isFinite(predictedSales)) {
                     throw new IllegalStateException("Autoregressive model produced a non-finite forecast.");
@@ -212,7 +226,8 @@ public final class AutoregressiveLstmForecaster {
         return sum / (previousCount + 1);
     }
 
-    private static DataSet toOneStepDataSet(List<Window> windows, int inputDays, int featureCount) {
+    static DataSet toOneStepDataSet(List<Window> windows, int inputDays, int featureCount,
+                                    MinMaxScaler scaler, boolean residual) {
         INDArray features = toFeatureTensor(windows, inputDays, featureCount);
         INDArray labels = Nd4j.zeros(DataType.FLOAT, windows.size(), 1, inputDays);
         INDArray labelMask = Nd4j.zeros(DataType.FLOAT, windows.size(), inputDays);
@@ -220,7 +235,8 @@ public final class AutoregressiveLstmForecaster {
         for (int row = 0; row < windows.size(); row++) {
             Window window = windows.get(row);
             requireWindow(window, inputDays, window.getTarget().size(), featureCount);
-            labels.putScalar(new long[]{row, 0, last}, window.getTarget().get(0));
+            labels.putScalar(new long[]{row, 0, last}, residual
+                    ? ResidualLstmForecaster.scaledTarget(window, 0, scaler) : window.getTarget().get(0));
             labelMask.putScalar(new long[]{row, last}, 1.0);
         }
         return new DataSet(features, labels, null, labelMask);

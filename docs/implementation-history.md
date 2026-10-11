@@ -508,3 +508,31 @@ Mọi so sánh tiếp theo tiếp tục chọn bằng validation; test 2017 ch�
 định quyết định.
 
 **Commit đề xuất:** `docs: record completed GPU validation run`
+
+## 25. Thí nghiệm Residual AR có đối chứng, chưa chạy full
+
+**Nhu cầu và lý do:** kiểm chứng giả thuyết LSTM học phần điều chỉnh quanh seasonal Weekly Naive
+có cải thiện MEDIUM/HIGH mà không trộn thay đổi target với Huber, log1p, feature hay kiến trúc mới.
+
+**Thay đổi:** thêm facade `ResidualLstmForecaster`, dùng chung train/rollout của AR; label bằng
+`(actual−observedSales(t−7))/trainSalesScale`, prediction bằng baseline cộng output nhân scale.
+Không fit scaler residual riêng; giữ scaler train-only, MSE, Adam, 32 units, learning rate 0,001,
+patience 5, cùng cửa sổ và checkpoint validation RMSE. Sales đã tái dựng được feed vào rollout.
+Thêm config opt-in `--residual` (180 fits) và `--residual-smoke` (3 fits × tối đa 2 epoch);
+lệnh cũ vẫn 120 fits. Export schema v2 giữ cột cũ và bổ sung residual; manifest ghi config thật,
+scaling từng chuỗi, báo cáo bốn model theo overall/stratum/horizon/seed/win rate. Không sửa run cũ.
+
+**Kiểm chứng:** red JUnit thất bại do chưa có chức năng; sau triển khai/review `mvn -B test` đạt
+33/33, exit 0, BUILD SUCCESS trong 1:12 phút. Có synthetic tests cho arithmetic, scaling không
+leakage, future mutation, mask/shape, finite rollout, checkpoint, metric, runner/export và manifest.
+Smoke thực tế hoàn tất exit 0/BUILD SUCCESS trong 38,900 giây; run `2026-10-12_002237_861_gpu`
+ghi SUCCESS với 1 LOW (7/34), seed 42, 6 epoch, 3 best flags và 7.560 prediction. Recompute metric
+khớp CSV trong `2e-9`, reconstruction trong `2e-10`; Java 11.0.32.1/CUDA. Chi tiết và tệp thay đổi
+trong [hồ sơ residual](residual-experiment.md).
+
+**Trạng thái và giới hạn:** IMPLEMENTED / TESTED / SMOKE TESTED / FULL EXPERIMENT NOT YET RUN.
+Chưa kết luận residual vượt Weekly macro RMSE 11,1435 hoặc cải thiện MEDIUM/HIGH. Full 180 fits
+ước khoảng 2:22 giờ từ run GPU cũ, thực tế tùy early stopping. CSV đầy đủ vẫn xuất cuối run;
+không checkpoint/resume, kill cưỡng bức có thể để RUNNING. Không commit/push.
+
+**Commit đề xuất:** `feat: add residual LSTM forecasting experiment`
