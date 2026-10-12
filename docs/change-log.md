@@ -1448,3 +1448,30 @@ Invoke-GlobalTraining và selector. Không chạy model fit, Full, Calibration h
 Full chỉ được chạy khi người dùng chủ động thực thi command riêng.
 
 **Commit đề xuất:** `feat: extend global full training cap to 20 epochs`
+
+## 049 - 2026-10-13 - Xác định vị trí và kết quả Full run mới nhất
+
+**Mục tiêu và lý do:** trả lời kết quả chạy mới nhất được lưu ở đâu, kiểm tra pointer, manifest,
+log, deployment và metric chính; không chạy lại training, không sửa artifact/code.
+
+**Phát hiện:** `output/runs/latest.txt` trỏ `2026-10-13_025422_624_gpu`. `run.json` ghi SUCCESS,
+JCublasBackend, Full cap 20/patience 3, batch 256/1024, seeds 42/123/2026, testUsedForSelection=false.
+Log `output/global-full-2026-10-13_025416_144-b2eebcf3.log` BUILD SUCCESS trong 54:08 và file
+`.log.exit` ghi 0. Không còn Java/Maven training process hoạt động.
+
+**Kết quả:** validation Macro RMSE Weekly/Global = 10,380499/8,655242 ± 0,127693; cải thiện
+16,6202%, thắng 50/50 items. Seed 42 best epoch 11/run 14/RMSE 8,793860; seed 123 epoch 20/20/
+8,542409; seed 2026 epoch 13/16/8,629457. Deployment chọn seed 123 epoch 20; model thật ở
+`output/runs/2026-10-13_025422_624_gpu/deployment/model.zip`, metadata usable=true.
+
+**Artifact:** summary/report/CSV/profile/run manifest nằm trong run directory; checkpoint từng seed
+ở `models/seed-*/model.zip`; deployment package gồm model, metadata, item scalers/mapping,
+feature schema và selection JSON. Prediction CSV khoảng 40,3 MB. Code và artifact không đổi;
+chỉ cập nhật README/tài liệu. Không chạy Maven tests vì đây là điều tra artifact read-only.
+
+**Giới hạn:** chưa chạy `Audit-GlobalRun.ps1`; validation targets chồng lấn. Test 2017 không được
+evaluate/selection trong run nhưng đã từng được quan sát lịch sử, nên không phải pristine holdout.
+Run trước `2026-10-13_024351_527_gpu` vẫn ghi RUNNING dù không còn process và không có exit file;
+không coi đó là kết quả hoàn tất.
+
+**Commit đề xuất:** `docs: record completed RTX 3090 global run`

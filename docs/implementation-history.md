@@ -807,3 +807,19 @@ testUsedForSelection false. Ba PowerShell scripts parse PASS. Chỉ chạy tests
 metadata; không model fit, Full, Calibration hoặc Smoke.
 
 **Commit đề xuất:** `feat: extend global full training cap to 20 epochs`.
+
+## 36. Ghi nhận Full Global RTX 3090 đã hoàn tất
+
+**Mục tiêu:** xác định nơi lưu kết quả chạy mới nhất và kiểm tra trạng thái/manifest/artifact mà
+không chạy lại training hoặc sửa artifact.
+
+**Kết quả:** `output/runs/latest.txt` trỏ `2026-10-13_025422_624_gpu`. Manifest SUCCESS,
+Maven exit 0/BUILD SUCCESS 54:08; Full 3 seed dùng 20/3 và batch 256/1024. Global validation Macro
+RMSE 8,655242 ± 0,127693 so Weekly 10,380499, cải thiện 16,6202% và thắng 50/50 items.
+Deployment chọn seed 123 epoch 20/RMSE 8,542409; model/scaler/mapping/schema nằm trong
+`deployment/`. Test 2017 không selection/evaluate. Code không đổi; chỉ cập nhật tài liệu.
+
+**Giới hạn:** chưa chạy audit độc lập; validation targets chồng lấn và test 2017 không còn là
+pristine holdout do quan sát lịch sử. Run cũ 024351 còn trạng thái RUNNING nhưng không có process.
+
+**Commit đề xuất:** `docs: record completed RTX 3090 global run`.

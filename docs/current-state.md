@@ -3,7 +3,17 @@
 ## Pipeline ứng dụng: Store 1, global model cho 50 items
 
 **GLOBAL IMPLEMENTED / TESTED / SMOKE TESTED / RUNTIME PROFILED / RUNTIME OPTIMIZED /
-NUMERICAL EQUIVALENCE VERIFIED: YES. FULL GLOBAL EXPERIMENT: NOT RUN.**
+NUMERICAL EQUIVALENCE VERIFIED / FULL GLOBAL EXPERIMENT COMPLETED: YES.**
+Run mới nhất `2026-10-13_025422_624_gpu` kết thúc SUCCESS/exit 0 lúc 03:48:25 ngày 2026-10-13,
+Maven BUILD SUCCESS sau 54:08. Full dùng RTX 3090/JCublasBackend, batch 256/1024, cap 20,
+patience 3 và ba seed. Seed 42/123/2026 chạy lần lượt 14/20/16 epoch; best epoch 11/20/13.
+Validation Macro RMSE Global trung bình 8,655242 ± 0,127693, Weekly 10,380499, cải thiện 16,6202%;
+Global thắng Weekly 50/50 items. Deployment chọn seed 123 epoch 20, Macro RMSE 8,542409.
+Kết quả nằm trong `output/runs/2026-10-13_025422_624_gpu/`; model dùng được nằm tại
+`deployment/model.zip`, log Maven tại `output/global-full-2026-10-13_025416_144-b2eebcf3.log`.
+Đây là validation 2016 với target chồng lấn; test 2017 không được evaluate/selection và không phải
+holdout pristine vì đã từng được quan sát lịch sử. Run cũ `2026-10-13_024351_527_gpu` còn manifest
+RUNNING nhưng không có process hoạt động và đã bị run SUCCESS mới thay thế; không dùng làm kết quả.
 Ba calibration artifact RTX 3090 hoàn thành ngày 2026-10-13 đã được đọc lại mà không training:
 64/256 có RMSE 10,2836966038 và 245,840646 giây/epoch; 128/512 có RMSE 10,2957852301
 và 135,626906 giây/epoch; 256/1024 có RMSE 10,3434761594 và 68,818477 giây/epoch.

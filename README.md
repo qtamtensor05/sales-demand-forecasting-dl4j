@@ -53,7 +53,8 @@ có thể chỉ định CLI `--seeds=42` để retry một seed. Workflow RTX 30
 train/validation batch `64/256`, `128/512`, `256/1024`; chọn candidate nhanh nhất trong ngưỡng
 RMSE baseline +1%, sau đó full cố định `42,123,2026`, tối đa 20 epoch/seed với early stopping
 patience 3. Mốc 20 là hard cap; mỗi seed có thể dừng sớm hơn. Không tự đổi batch
-khi OOM. Full 3 seed chưa chạy. Benchmark50items/seed42/2epochs đã kiểm chứng tối ưu runtime:
+khi OOM. Full 3 seed đã hoàn tất thành công trong run `2026-10-13_025422_624_gpu`; model deployment
+chọn seed 123/epoch 20 bằng validation Macro RMSE. Benchmark50items/seed42/2epochs đã kiểm chứng tối ưu runtime:
 20:03→17:41 trong ứng dụng,51/51tests PASS,126.000predictions khớp tại precisionCSV.
 Giữ kết quả validation best epoch để xuất, vẫn chấm đủ từng epoch. Dùng script tạo build snapshot
 riêng để tránh IDE ghi đè runtime classes; lệnh sau chạy benchmark, chỉ khi chủ động chạy full

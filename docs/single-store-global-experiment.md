@@ -449,3 +449,21 @@ calibration một epoch không phải bằng chứng chất lượng cuối ho�
 Mỗi epoch Full vẫn đánh giá validation H1–H7 sales gốc; Macro RMSE cải thiện sẽ reset stale counter
 và lưu best checkpoint. Ba epoch liên tiếp không cải thiện sẽ dừng trước cap; test 2017 không dùng
 cho dừng sớm, chọn epoch, batch hoặc checkpoint.
+
+## Full Global RTX 3090 hoàn tất ngày 2026-10-13
+
+Run `2026-10-13_025422_624_gpu` SUCCESS, Maven exit 0/BUILD SUCCESS trong 54:08, backend
+`org.nd4j.linalg.jcublas.JCublasBackend`. Protocol thực tế: Store 1, 50 items, batch 256/1024,
+seeds 42/123/2026, max 20, patience 3, 52.300 train windows và 18.000 validation origins.
+
+Weekly validation Macro RMSE 10,380499; GlobalResidualAR 8,655242 ± 0,127693, cải thiện 16,6202%.
+Global thắng Weekly 50/50 items. LOW/MEDIUM/HIGH cải thiện RMSE lần lượt 18,7271%/17,0180%/
+15,1899%; H1–H7 đều cải thiện 14,6558%–18,1477%. Seed 42 best 11/run 14/RMSE 8,793860;
+seed 123 best 20/run 20/RMSE 8,542409; seed 2026 best 13/run 16/RMSE 8,629457.
+Deployment chọn seed 123 epoch 20 và copy checkpoint vào `deployment/model.zip` với
+`usable=true`; selection dùng validation Macro RMSE, không dùng test 2017.
+
+Thư mục artifact là `output/runs/2026-10-13_025422_624_gpu/`; log Maven đầy đủ là
+`output/global-full-2026-10-13_025416_144-b2eebcf3.log`, exit file có 0. Validation origins có
+target chồng lấn; test 2017 không evaluate trong run nhưng đã từng được quan sát lịch sử nên không
+coi là pristine holdout. Chưa chạy audit script độc lập trong lượt kiểm tra vị trí kết quả này.
