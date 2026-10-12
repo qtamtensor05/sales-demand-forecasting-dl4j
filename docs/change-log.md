@@ -1259,3 +1259,38 @@ Không commit/push.
 **Kiểm tra bàn giao:** smoke qua script `2026-10-13_005123_869_gpu` SUCCESS, Maven exit 0,
 BUILD SUCCESS 59,509s. SHA256 file predictions khớp smoke lịch sử cùng config.
 47 liên kết Markdown local hợp lệ; `git diff --check` đạt. Lịch kiểm tra mỗi 10 phút đã PAUSED.
+
+## 044 - 2026-10-13 - Chuẩn bị global 3 seed, checkpoint và deployment package
+
+**Mục tiêu:** hoàn thiện source để copy sang máy GPU mạnh, chạy một command cho Store 1/50 items
+với seeds 42, 123, 2026, lưu best checkpoint từng seed và tự chọn model deployment; không chạy
+full training, benchmark dài hoặc smoke dataset thật trong lượt này.
+
+**Lý do:** global runner trước dùng chung danh sách 5 seed nghiên cứu, best params chỉ ở RAM và
+chưa persist model/scaler/mapping/schema đủ cho inference hoặc audit sau training.
+
+**Đã thay đổi:** `ExperimentConfiguration` quản lý seed global/CLI; checkpoint DL4J ghi temp,
+restore, so params/prediction rồi atomic move; metadata chỉ usable sau verify. Mỗi seed giữ model;
+selector dùng validation Macro RMSE, tie-break Macro MAE rồi seed nhỏ. Deployment copy checkpoint
+thắng và persist scaler, deterministic mapping, feature schema, selection và dataset hash.
+Manifest dùng dataset path tương đối. Thêm preflight không fit network, script training một lệnh,
+script audit và hướng dẫn GPU. Giữ nguyên protocol/model/hyperparameter/split/scaler train-only;
+legacy research vẫn 5 seed. Không đổi `pom.xml`, dependency, commit hoặc push.
+
+**Tệp chính:** `ExperimentConfiguration`, `Main`, `GlobalExperimentRunner`,
+`GlobalResidualLstmForecaster`, `SingleStoreGlobalDataset`, `GlobalExperimentReport`,
+`RunArtifactSession`, `GlobalModelArtifacts`, `GlobalPreflight`; global tests; ba PowerShell scripts;
+README và năm tài liệu trong `docs/`.
+
+**Kiểm tra:** RED ban đầu xác nhận global còn 5 fits; vòng đầu còn bắt lỗi Java API close và fixture
+horizon. Focused selector/corrupt checkpoint 2/2 PASS; regression legacy 10/10 PASS. Cuối cùng
+`mvn -B -Dmaven.repo.local=C:\Users\quangTam\.m2\repository test`: **53/53 PASS**, 0 failures,
+0 errors, 0 skipped, BUILD SUCCESS, 2:46. Test synthetic xác nhận checkpoint best không phải epoch
+cuối, restore model tái tạo validation Macro RMSE, corrupt/missing checkpoint bị từ chối và package
+trỏ đúng model. Không chạy full/smoke/benchmark dataset thật.
+
+**Giới hạn:** full global 3 seed và preflight trên máy GPU đích chưa chạy; chưa có model deployment
+thật hoặc runtime mới; audit 150/378.000 chỉ có thể chạy sau full. Chưa hỗ trợ aggregate các run
+độc lập từ nhiều máy.
+
+**Commit đề xuất:** `feat: prepare portable global DL4J training and model selection`

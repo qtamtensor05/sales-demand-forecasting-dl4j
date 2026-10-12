@@ -67,7 +67,7 @@ public final class RunArtifactSession implements AutoCloseable {
             Files.createDirectory(directory);
         }
         RunArtifactSession session = new RunArtifactSession(directory, runId,
-                dataset.toAbsolutePath().normalize().toString(), sha256(dataset), Instant.now());
+                portablePath(dataset), sha256(dataset), Instant.now());
         session.configuration = configuration;
         session.writeManifest("RUNNING", null);
         try {
@@ -130,6 +130,7 @@ public final class RunArtifactSession implements AutoCloseable {
         if (!configuration.isGlobalStore() || terminal) { throw new IllegalStateException("Active global session required"); }
         long artifactStart=System.nanoTime();
         String summary = GlobalArtifactExporter.write(result, configuration, directory);
+        GlobalModelArtifacts.finalizeArtifacts(result,configuration,directory,runId,datasetSha256);
         long reportStart=System.nanoTime();
         Files.writeString(directory.resolve("summary.txt"), summary, StandardCharsets.UTF_8);
         Files.writeString(directory.resolve("error-analysis.txt"), summary, StandardCharsets.UTF_8);
@@ -278,6 +279,11 @@ public final class RunArtifactSession implements AutoCloseable {
         } catch (java.security.NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 is unavailable.", e);
         }
+    }
+
+    private static String portablePath(Path path) {
+        Path normalized=path.toAbsolutePath().normalize(),root=Path.of("").toAbsolutePath().normalize();
+        return (normalized.startsWith(root)?root.relativize(normalized):normalized.getFileName()).toString().replace('\\','/');
     }
 
     private static String escapeHtml(String value) {

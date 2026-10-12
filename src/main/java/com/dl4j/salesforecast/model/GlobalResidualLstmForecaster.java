@@ -9,6 +9,7 @@ import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.factory.Nd4j;
 import org.nd4j.linalg.learning.config.Adam;
 import java.util.*;
+import java.nio.file.Path;
 import com.dl4j.salesforecast.performance.GlobalPerformanceProfile;
 
 /** One set of weights per seed; both training and seven-step inference are bounded by batch size. */
@@ -18,6 +19,9 @@ public final class GlobalResidualLstmForecaster {
         return fit(data, config, seed, new GlobalPerformanceProfile());
     }
     static Fit fit(SingleStoreGlobalDataset data, ExperimentConfiguration config, long seed, GlobalPerformanceProfile profile) {
+        return fit(data,config,seed,profile,null);
+    }
+    static Fit fit(SingleStoreGlobalDataset data, ExperimentConfiguration config, long seed, GlobalPerformanceProfile profile, Path checkpointDirectory) {
         long initStart=System.nanoTime();
         var network = new MultiLayerNetwork(new NeuralNetConfiguration.Builder().seed(seed)
                 .updater(new Adam(ExperimentRunner.DEFAULT_LEARNING_RATE)).list()
@@ -29,6 +33,7 @@ public final class GlobalResidualLstmForecaster {
         profile.record("network.init",initStart);
         INDArray best = null;
         GlobalMetrics bestValidation = null;
+        Path checkpoint = null;
         try {
             double bestRmse=Double.POSITIVE_INFINITY;int bestEpoch=0,stale=0;
             List<Epoch> history=new ArrayList<>();
@@ -62,6 +67,10 @@ public final class GlobalResidualLstmForecaster {
                     bestRmse=evaluation.macroRmse;bestEpoch=epoch;stale=0;
                     if(best!=null) { best.close(); }
                     best=network.params().dup();
+                    if(checkpointDirectory!=null) {
+                        try { checkpoint=com.dl4j.salesforecast.output.GlobalModelArtifacts.saveCheckpoint(network,checkpointDirectory); }
+                        catch(java.io.IOException failure) { throw new IllegalStateException("Cannot persist seed "+seed+" checkpoint",failure); }
+                    }
                     // Immutable predictions already computed at these exact weights. Retain only
                     // the selected epoch, not every epoch, and keep all per-epoch validation calls.
                     bestValidation=evaluation;
@@ -73,7 +82,7 @@ public final class GlobalResidualLstmForecaster {
             if(bestValidation==null) { throw new IllegalStateException("Missing selected validation snapshot"); }
             profile.count("validation.cachedCheckpointResults",1);
             profile.record("validation.finalCheckpoint",finalStart);
-            return new Fit(seed,bestEpoch,history,bestValidation);
+            return new Fit(seed,bestEpoch,history,bestValidation,checkpoint);
         } finally {
             // Fit snapshots retain metrics, never a resident model per item or seed.
             network.close(); if(best!=null && !best.wasClosed()) { best.close(); }
@@ -151,8 +160,9 @@ public final class GlobalResidualLstmForecaster {
         public final int bestEpoch;
         public final List<Epoch> history;
         public final GlobalMetrics validation;
-        private Fit(long seed,int bestEpoch,List<Epoch> history,GlobalMetrics validation) {
-            this.seed=seed;this.bestEpoch=bestEpoch;this.history=List.copyOf(history);this.validation=validation;
+        public final Path checkpoint;
+        Fit(long seed,int bestEpoch,List<Epoch> history,GlobalMetrics validation,Path checkpoint) {
+            this.seed=seed;this.bestEpoch=bestEpoch;this.history=List.copyOf(history);this.validation=validation;this.checkpoint=checkpoint;
         }
     }
 }

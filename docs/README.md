@@ -9,7 +9,8 @@
 3. [Nhật ký yêu cầu](change-log.md): cập nhật sau mỗi yêu cầu, bằng chứng kiểm tra và tên commit đề xuất.
 4. [Thí nghiệm Residual AR](residual-experiment.md): thiết kế, protocol, artifact và kết quả full 180 fits.
 5. [Thí nghiệm ResidualAR Huber](residual-huber-experiment.md): full 120 fits đã hoàn tất; Huber gần bằng MSE, chưa vượt Weekly.
-6. [Một store, global model nhiều items](single-store-global-experiment.md): benchmark GPU50items trước/sau tối ưu, equivalence, runtime estimate và lệnh full; full5seeds chưa chạy.
+6. [Một store, global model nhiều items](single-store-global-experiment.md): benchmark GPU50items, checkpoint/deployment package, preflight, script GPU và lệnh full 3 seed; full 3 seed chưa chạy.
+7. [Hướng dẫn training trên máy GPU mới](gpu-training-guide.md): prerequisites, preflight, một lệnh full, artifact và audit.
 
 Hướng dẫn cài đặt/chạy nằm ở [README gốc](../README.md).
 Các số liệu hiện tại lấy từ dataset cục bộ `data/train.csv`; file dữ liệu và báo cáo sinh ra không được phân phối cùng tài liệu.

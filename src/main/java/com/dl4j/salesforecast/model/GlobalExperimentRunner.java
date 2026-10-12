@@ -8,11 +8,22 @@ public final class GlobalExperimentRunner {
         var profile = new com.dl4j.salesforecast.performance.GlobalPerformanceProfile();
         return run(SingleStoreGlobalDataset.load(path,config,profile),config,profile);
     }
+    public static Result run(String path, ExperimentConfiguration config, java.nio.file.Path runDirectory) {
+        var profile = new com.dl4j.salesforecast.performance.GlobalPerformanceProfile();
+        return run(SingleStoreGlobalDataset.load(path,config,profile),config,profile,runDirectory);
+    }
     public static Result run(SingleStoreGlobalDataset data, ExperimentConfiguration config) {
         return run(data,config,new com.dl4j.salesforecast.performance.GlobalPerformanceProfile());
     }
+    public static Result run(SingleStoreGlobalDataset data, ExperimentConfiguration config, java.nio.file.Path runDirectory) {
+        return run(data,config,new com.dl4j.salesforecast.performance.GlobalPerformanceProfile(),runDirectory);
+    }
     private static Result run(SingleStoreGlobalDataset data, ExperimentConfiguration config,
             com.dl4j.salesforecast.performance.GlobalPerformanceProfile profile) {
+        return run(data,config,profile,null);
+    }
+    private static Result run(SingleStoreGlobalDataset data, ExperimentConfiguration config,
+            com.dl4j.salesforecast.performance.GlobalPerformanceProfile profile, java.nio.file.Path runDirectory) {
         if(!config.isGlobalStore() || data.storeId!=config.getStoreId()
                 || !data.items.stream().map(i->i.id).collect(java.util.stream.Collectors.toList()).equals(config.getItemIds())) {
             throw new IllegalArgumentException("Global configuration/item coverage mismatch");
@@ -34,7 +45,8 @@ public final class GlobalExperimentRunner {
         long started=System.nanoTime();
         var weekly=GlobalMetrics.weekly(data); profile.record("weekly",started);
         List<GlobalResidualLstmForecaster.Fit> fits=new ArrayList<>();
-        for(long seed:config.getSeeds()) { fits.add(GlobalResidualLstmForecaster.fit(data,config,seed,profile)); }
+        for(long seed:config.getSeeds()) { fits.add(GlobalResidualLstmForecaster.fit(data,config,seed,profile,
+                runDirectory==null?null:runDirectory.resolve("models").resolve("seed-"+seed))); }
         return new Result(data,weekly,fits,profile);
     }
     public static final class Result {

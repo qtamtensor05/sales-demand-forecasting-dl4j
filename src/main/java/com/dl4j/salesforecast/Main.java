@@ -16,12 +16,20 @@ public class Main {
         String trainPath =
                 "data/train.csv";
 
+        if(configuration.isPreflight()) {
+            var check=com.dl4j.salesforecast.model.GlobalPreflight.run(Path.of(trainPath),Path.of("output","runs"),configuration);
+            System.out.printf("GLOBAL PREFLIGHT PASS%nJava: %s%nBackend: %s%nStore: %d%nItems: %d%nSeeds: %s%nDimensions: [batch,56,30] -> H1-H7%nTrain windows: %d%nValidation origins: %d%nForecasts/seed: %d%n",
+                    System.getProperty("java.version"),check.backend,configuration.getStoreId(),configuration.getItemIds().size(),configuration.getSeeds(),check.trainWindows,check.validationOrigins,check.forecastsPerSeed);
+            if(!check.gpu) System.out.println("WARNING: CPU backend detected. Do not start intended GPU training until CUDA backend is active.");
+            return;
+        }
+
         RunArtifactSession artifacts = RunArtifactSession.start(
                 Path.of("output", "runs"), Path.of(trainPath), configuration);
         System.out.println("Run artifacts: " + artifacts.getDirectory().toAbsolutePath());
         try {
             if (configuration.isGlobalStore()) {
-                var global = com.dl4j.salesforecast.model.GlobalExperimentRunner.run(trainPath, configuration);
+                var global = com.dl4j.salesforecast.model.GlobalExperimentRunner.run(trainPath, configuration, artifacts.getDirectory());
                 artifacts.complete(global);
                 System.out.print(com.dl4j.salesforecast.model.GlobalExperimentReport.format(global, configuration));
                 System.out.println("Run completed: " + artifacts.getDirectory().toAbsolutePath());

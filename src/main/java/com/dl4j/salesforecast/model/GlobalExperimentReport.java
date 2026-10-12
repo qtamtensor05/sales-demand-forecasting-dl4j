@@ -56,6 +56,9 @@ public final class GlobalExperimentReport {
         for(var fit:result.fits) { out.append(String.format(Locale.ROOT,"%d | %.6f | %.6f | %.6f | %d | %d%n",fit.seed,fit.validation.macroMae,fit.validation.macroRmse,fit.validation.pooledRmse,fit.bestEpoch,fit.history.size())); }
         out.append(String.format(Locale.ROOT,"Seed macro RMSE mean %.6f sample std %.6f min %.6f max %.6f%n",rmse.getMean(),rmse.getStandardDeviation(),
                 result.fits.stream().mapToDouble(f->f.validation.macroRmse).min().orElseThrow(),result.fits.stream().mapToDouble(f->f.validation.macroRmse).max().orElseThrow()));
+        var selected=com.dl4j.salesforecast.output.GlobalModelArtifacts.select(result.fits);
+        out.append(String.format(Locale.ROOT,"Selected deployment model: seed %d | epoch %d | validation macro RMSE %.6f | checkpoint models/seed-%d/model.zip%n",
+                selected.seed,selected.bestEpoch,selected.validation.macroRmse,selected.seed));
         out.append("Validation selects epoch and reports metrics; overlapping targets; test was observed historically, not pristine holdout.\n");
         return out.toString();
     }

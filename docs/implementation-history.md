@@ -697,3 +697,25 @@ README/docs index/current-state/history/change-log/global. Không commit/push.
 **Bàn giao:** smoke script `2026-10-13_005123_869_gpu` SUCCESS/exit 0/BUILD SUCCESS,
 predictions CSV cùng SHA256 với smoke lịch sử cùng cấu hình. 47 liên kết local và
 `git diff --check` đạt; lịch kiểm tra mỗi 10 phút đã PAUSED.
+
+## 31. Hoàn thiện checkpoint và deployment package cho global 3 seed
+
+**Yêu cầu:** chuẩn bị source portable để máy GPU mới chạy Store 1, 50 items, ba seed
+42/123/2026 bằng một command; không chạy full training trong lượt chuẩn bị.
+
+**Lý do:** pipeline trước giữ best params trong RAM và global dùng 5 seed, chưa có model load lại,
+scaler/schema/mapping phục vụ inference hoặc selector deployment có thể audit.
+
+**Thay đổi:** tách seed global mới khỏi năm seed nghiên cứu cũ; thêm checkpoint DL4J atomic,
+load/prediction verification, metadata per-seed, selector validation-only có tie-break, package
+deployment tự chứa, preflight và script training/audit. Giữ Java 11, model, 32 units, MSE,
+Adam 0,001, batch 64, patience 5, tối đa 30 epoch, train-only scaling và split thời gian.
+
+**Kiểm chứng:** chỉ JUnit synthetic, không chạy global training/benchmark/smoke dataset thật.
+Test bảo vệ seed order, legacy 5 seed, best-not-last, save/load, corrupt checkpoint, metadata,
+scaler/mapping/schema, deterministic selection và deployment artifact. Kết quả cuối ở log 044.
+
+**Giới hạn:** full 3 seed và preflight trên máy đích chưa chạy; chưa có deployment model thật;
+chưa implement distributed aggregation nhiều máy.
+
+**Commit đề xuất:** `feat: prepare portable global DL4J training and model selection`.

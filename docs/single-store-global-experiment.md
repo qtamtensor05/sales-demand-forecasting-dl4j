@@ -387,3 +387,33 @@ Có thể chạy FULL GLOBAL EXPERIMENT khi người dùng chủ động yêu c�
 Full chưa chạy; không commit/push.
 
 **Commit đề xuất:** `perf: optimize global forecasting runtime without changing protocol`.
+
+## Chuẩn bị deployment global 3 seed ngày 2026-10-13
+
+Phần này thay thế cấu hình full 5 seed ở các mục lịch sử bên trên cho **lượt deployment mới**;
+không sửa ý nghĩa của experiment nghiên cứu 5 seed cũ. `ExperimentConfiguration` là nguồn duy
+nhất cho seed global: mặc định `[42,123,2026]`, CLI nhận `--seeds=...` theo đúng thứ tự để retry.
+Full dự kiến 3 fits, 150 item-seed rows và 378.000 prediction rows.
+
+Mỗi epoch vẫn đánh giá toàn bộ validation H1–H7 ở sales gốc. Khi validation Macro RMSE cải thiện,
+DL4J ghi file tạm, restore model, so tham số và prediction với model đang chạy, rồi atomic move
+thành `models/seed-<seed>/model.zip`. Metadata chỉ ghi `usable=true` sau khi model load-verify.
+Epoch cuối không tự thắng. Selector dùng Macro RMSE thấp nhất; tie-break Macro MAE rồi seed ID.
+Không đọc test 2017, average weights, ensemble hoặc train lại model thắng.
+
+`deployment/` copy model thắng và gồm metadata, scaler train-only, mapping 50 item, schema 56 kênh
+và selection JSON. Metadata có dataset SHA-256, protocol/runtime thực tế, H1–H7 và đường dẫn tương
+đối. Mapping cố định item 1..50 → identity 0..49 → channel 6..55.
+
+Preflight không tạo/fit network; nó kiểm dataset, Store 1, item/coverage/duplicate/missing,
+52.300 train windows, 18.000 validation origins, 126.000 forecasts/seed, backend và quyền ghi.
+CPU backend sinh WARNING. Quy trình portable:
+
+```powershell
+.\scripts\Invoke-GlobalTraining.ps1 -Preflight
+.\scripts\Invoke-GlobalTraining.ps1
+.\scripts\Audit-GlobalRun.ps1
+```
+
+Script dùng build snapshot cô lập, Tee log và lưu exit code. Audit yêu cầu `SUCCESS`, đủ artifact,
+150 metric rows và 378.000 predictions. Full 3 seed **chưa chạy**, nên chưa có model thật được chọn.

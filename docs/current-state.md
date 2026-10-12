@@ -4,6 +4,16 @@
 
 **GLOBAL IMPLEMENTED / TESTED / SMOKE TESTED / RUNTIME PROFILED / RUNTIME OPTIMIZED /
 NUMERICAL EQUIVALENCE VERIFIED: YES. FULL GLOBAL EXPERIMENT: NOT RUN.**
+Ngày 2026-10-13 đã hoàn thiện source deployment-global dùng đúng ba seed `[42,123,2026]`;
+pipeline nghiên cứu cũ vẫn giữ năm seed. Mỗi cải thiện validation Macro RMSE ghi atomically
+`models/seed-<seed>/model.zip`, load-verify và so prediction trước/sau; kết thúc run ghi metadata
+per-seed, scaler train-only, mapping 50 item, schema 56 kênh và copy checkpoint thắng vào
+`deployment/`. Chọn model chỉ bằng validation Macro RMSE, tie-break Macro MAE rồi seed nhỏ hơn;
+không dùng test 2017, không ensemble, không train lại. `--global-preflight` chỉ kiểm dữ liệu,
+backend/config/counts và quyền ghi; `Invoke-GlobalTraining.ps1` cung cấp một lệnh portable,
+`Audit-GlobalRun.ps1` kiểm SUCCESS cùng 150 metric rows/378.000 predictions. Full 3 seed chưa chạy,
+vì vậy chưa có deployment model thực tế được chọn. Suite mới 53/53 PASS, không failure/error/skip;
+chỉ dùng fixture synthetic và không chạy global experiment trên dataset thật.
 Ngày 2026-10-13: benchmark 50 items, seed 42, 2 epochs/batch 64 BEFORE
 `2026-10-12_201423_002_gpu` và AFTER `2026-10-13_002648_831_gpu` đều SUCCESS/exit0.
 Ứng dụng giảm 1.202,922 → 1.060,531 giây (1,1343×; giảm 11,84%). Giữ immutable validation
@@ -15,16 +25,16 @@ Suite mới 51/51 PASS, 0 failures/errors/skips; focused 12/12. Smoke qua script
 Kiểm tra 47 liên kết local và git diff --check đạt. Chi tiết, giới hạn nhiễu timing,
 profile và lệnh build cô lập tại [runtime optimization](single-store-global-experiment.md#runtime-optimization-ngày-2026-10-13).
 Pipeline nghiên cứu 12 chuỗi bên dưới được giữ nguyên. CLI mới `--global-store=1` dùng toàn bộ
-50 items, một Global ResidualAR-MSE mỗi seed: chỉ 5 global fits. Window 30→7, 6 dynamic +
+50 items, một Global ResidualAR-MSE mỗi seed: chỉ 3 global fits. Window 30→7, 6 dynamic +
 50 one-hot channels, scaler train-only riêng item, batch64, checkpoint validation macro RMSE.
 Full dự kiến 52.300 train windows, 18.000 validation origins, 126.000 forecasts/seed;
-đã train benchmark đủ 50 items/1 seed/2 epochs; chưa chạy full 5 seeds/tối đa 30 epochs.
+đã train benchmark đủ 50 items/1 seed/2 epochs; chưa chạy full 3 seeds/tối đa 30 epochs.
 
 Suite tại lần triển khai đầu46/46 tests, 0 failures/errors/skips, Maven BUILD SUCCESS. Smoke GPU
 `2026-10-12_193415_770_gpu` SUCCESS (1:50 phút Maven), Store1 items 1/25/50, seed42,
 2 epoch, best2, một model chung. Macro MAE/RMSE Global 8,686371/10,844962 và Weekly
 8,606614/10,793978; pooled RMSE 11,247555 và 11,201497. Smoke thắng Weekly 0/3,
-không là kết luận chất lượng 50 items/5 seeds.
+không là kết luận chất lượng 50 items/3 seeds.
 
 Schema4 riêng có scaler/item-seed/prediction/epoch CSV, macro/pooled/item/horizon/tier/seed report.
 Đủ 7.560 predictions, 3 scaler rows, 3 metric rows, 2 epoch rows và 1 best flag;

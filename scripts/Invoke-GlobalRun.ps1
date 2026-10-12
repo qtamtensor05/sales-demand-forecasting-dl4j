@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('Smoke', 'Benchmark', 'Full')]
+    [ValidateSet('Smoke', 'Benchmark', 'Preflight', 'Full')]
     [string]$Mode = 'Smoke'
 )
 
@@ -20,7 +20,8 @@ $globalRunLog = Join-Path $projectRoot ('output/global-' + $Mode.ToLowerInvarian
 $globalArgs = switch ($Mode) {
     'Smoke' { '--global-store-smoke=1' }
     'Benchmark' { '--global-store-benchmark=1' }
-    'Full' { '--global-store=1' }
+    'Preflight' { '--global-preflight --global-store=1 --seeds=42,123,2026' }
+    'Full' { '--global-store=1 --seeds=42,123,2026' }
 }
 
 Write-Host "Build snapshot: $buildSnapshot"

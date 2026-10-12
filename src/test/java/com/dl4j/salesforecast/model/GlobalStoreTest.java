@@ -67,13 +67,17 @@ class GlobalStoreTest {
     }
     @Test void globalCliIsOneFitPerSeed() {
         var full = assertDoesNotThrow(() -> ExperimentConfiguration.fromArgs(new String[]{"--global-store=1"}));
-        assertEquals(5, full.getFitCount());
+        assertEquals(List.of(42L,123L,2026L),full.getSeeds());
+        assertEquals(3, full.getFitCount());
+        assertEquals(List.of(2026L,42L),ExperimentConfiguration.fromArgs(new String[]{"--global-store=1","--seeds=2026,42"}).getSeeds());
         assertEquals(java.util.List.of("GlobalResidualAR"), full.getModels());
         var smoke = ExperimentConfiguration.fromArgs(new String[]{"--global-store-smoke"});
         assertEquals(1, smoke.getFitCount());
         assertEquals(2, smoke.getMaxEpochs());
         assertEquals(120, ExperimentConfiguration.legacy().getFitCount());
         assertEquals(180, ExperimentConfiguration.residual().getFitCount());
+        assertEquals(List.of(42L,123L,2026L,7L,99L),ExperimentConfiguration.legacy().getSeeds());
+        assertThrows(IllegalArgumentException.class,()->ExperimentConfiguration.fromArgs(new String[]{"--global-store=1","--seeds=42,42"}));
     }
 
     @Test void globalDatasetFunctionalityExists() {
@@ -91,7 +95,7 @@ class GlobalStoreTest {
         var config=ExperimentConfiguration.fromArgs(new String[]{"--global-store=2","--batch-size=32"});
         var data=SingleStoreGlobalDataset.load(file.toString(),config);
         assertEquals(50,data.items.size());assertEquals(52300,data.train.size());assertEquals(18000,data.validation.size());
-        assertEquals(5,config.getFitCount());assertEquals(32,config.getBatchSize());
+        assertEquals(3,config.getFitCount());assertEquals(32,config.getBatchSize());
         for(var item:data.items) {
             assertEquals(item.id*10,item.scaler.getMin());assertEquals(6,item.scaler.getScale());
             assertEquals(1046,item.train.getWindows().size());assertEquals(360,item.validation.getWindows().size());
@@ -149,7 +153,10 @@ class GlobalStoreTest {
     @Test void syntheticSharedFitRestoresMacroCheckpointAndExports() throws Exception {
         var data=fixture("fit",0,0);
         var config=ExperimentConfiguration.fromArgs(new String[]{"--global-store-smoke"});
-        var result=GlobalExperimentRunner.run(data,config);
+        GlobalExperimentRunner.Result result;Path run;
+        try(var session=com.dl4j.salesforecast.output.RunArtifactSession.start(directory.resolve("runs"),directory.resolve("fit.csv"),config)) {
+            run=session.getDirectory();result=GlobalExperimentRunner.run(data,config,run);session.complete(result);
+        }
         assertEquals(1,result.fits.size());
         var fit=result.fits.get(0);assertEquals(3,fit.validation.items.size());
         assertEquals(168,fit.validation.count);
@@ -159,10 +166,6 @@ class GlobalStoreTest {
         var changed=fixture("testchanged",0,20000);
         var repeat=GlobalResidualLstmForecaster.fit(changed,config,42);
         assertEquals(fit.bestEpoch,repeat.bestEpoch);assertEquals(fit.validation.macroRmse,repeat.validation.macroRmse,1e-5);
-        Path run;
-        try(var session=com.dl4j.salesforecast.output.RunArtifactSession.start(directory.resolve("runs"),directory.resolve("fit.csv"),config)) {
-            run=session.getDirectory();session.complete(result);
-        }
         var json=com.google.gson.JsonParser.parseString(Files.readString(run.resolve("run.json"))).getAsJsonObject();
         assertEquals("SUCCESS",json.get("status").getAsString());assertEquals(4,json.get("schemaVersion").getAsInt());
         assertEquals(1,json.get("fits").getAsInt());assertEquals(56,json.get("totalFeatureCount").getAsInt());
@@ -175,6 +178,20 @@ class GlobalStoreTest {
         }
         assertTrue(Files.readString(run.resolve("summary.txt")).contains("SMOKE ONLY"));
         assertTrue(Files.readString(run.resolve("summary.txt")).contains("PER ITEM"));
+        assertTrue(Files.isRegularFile(run.resolve("models/seed-42/model.zip")));
+        assertTrue(Files.isRegularFile(run.resolve("deployment/model.zip")));
+        assertTrue(Files.readString(run.resolve("deployment/selection.json")).contains("validationMacroRMSE"));
+        assertEquals(50,com.google.gson.JsonParser.parseString(Files.readString(run.resolve("deployment/item-mapping.json"))).getAsJsonArray().size());
+        assertEquals(56,com.google.gson.JsonParser.parseString(Files.readString(run.resolve("deployment/feature-schema.json"))).getAsJsonObject().get("totalFeatureCount").getAsInt());
+        assertEquals(4,Files.readAllLines(run.resolve("deployment/item-scalers.csv")).size());
+        assertEquals(64,com.google.gson.JsonParser.parseString(Files.readString(run.resolve("deployment/model-metadata.json"))).getAsJsonObject().get("datasetSha256").getAsString().length());
+        var loaded=com.dl4j.salesforecast.output.GlobalModelArtifacts.loadCheckpoint(run.resolve("deployment/model.zip"));try {
+            var input=org.nd4j.linalg.factory.Nd4j.zeros(1,56,30);
+            var first=loaded.output(input,false);var second=loaded.output(input,false);
+            assertArrayEquals(first.ravel().toDoubleVector(),second.ravel().toDoubleVector(),0);first.close();second.close();input.close();
+            var restoredValidation=GlobalResidualLstmForecaster.evaluate(loaded,data.validation,64);
+            assertEquals(result.fits.get(0).validation.macroRmse,restoredValidation.macroRmse,1e-7);
+        } finally { loaded.close(); }
         assertEquals(1,Files.readAllLines(run.resolve("global-epoch-history.csv")).stream().filter(l->l.contains(",true,")).count());
         try(var session=com.dl4j.salesforecast.output.RunArtifactSession.start(directory.resolve("runs"),directory.resolve("fit.csv"),ExperimentConfiguration.fromArgs(new String[]{"--global-store"}))) {
             assertNotEquals(run,session.getDirectory());run=session.getDirectory();

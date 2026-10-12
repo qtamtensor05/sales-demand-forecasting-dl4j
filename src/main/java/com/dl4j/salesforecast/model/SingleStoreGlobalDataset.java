@@ -30,6 +30,7 @@ public final class SingleStoreGlobalDataset {
             if (!s.getStartDate().equals(LocalDate.of(2013,1,1)) || !s.getEndDate().equals(LocalDate.of(2017,12,31))) {
                 throw new IllegalArgumentException("Global protocol requires complete 2013-2017 series: item " + id);
             }
+            if(!s.isComplete()) { throw new IllegalArgumentException("Duplicate or missing dates for item "+id); }
             prepared.add(SalesPreprocessor.preprocess(s, LocalDate.of(2015,12,31), LocalDate.of(2016,12,31),
                     ExperimentConfiguration.INPUT_DAYS, ExperimentConfiguration.HORIZON, profile));
         }

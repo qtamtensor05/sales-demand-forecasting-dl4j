@@ -32,7 +32,7 @@ kể cả bản ghi trùng; phát hiện trùng không tự loại bỏ dữ li�
 ### Pipeline ứng dụng một cửa hàng, nhiều sản phẩm
 
 Pipeline nghiên cứu 12 chuỗi độc lập ở dưới vẫn được giữ nguyên. Chế độ mới dùng Store 1,
-**toàn bộ 50 items học chung một Global ResidualAR-MSE mỗi seed**: full chỉ 5 global fits,
+**toàn bộ 50 items học chung một Global ResidualAR-MSE mỗi seed**: deployment full chỉ 3 global fits,
 không phải 250 fits. Input 6 dynamic + 50 one-hot channels, per-item train-only scaler,
 mini-batch 64, checkpoint theo validation macro RMSE qua items. Weekly tính lại đúng population.
 
@@ -40,17 +40,16 @@ mini-batch 64, checkpoint theo validation macro RMSE qua items. Weekly tính l�
 mvn -B compile exec:java '-Dexec.args=--global-store-smoke'
 ```
 
-Smoke dùng items 1/25/50, seed 42, tối đa 2 epoch. Full, lưu đầy đủ log:
+Smoke dùng items 1/25/50, seed 42, tối đa 2 epoch. Preflight và full portable:
 
 ```powershell
-$globalLog = 'output/global-full-' + (Get-Date -Format 'yyyy-MM-dd_HHmmss') + '.log'
-mvn -B clean compile exec:java '-Dexec.args=--global-store=1' 2>&1 | Tee-Object -FilePath $globalLog
-$LASTEXITCODE
+.\scripts\Invoke-GlobalTraining.ps1 -Preflight
+.\scripts\Invoke-GlobalTraining.ps1
 ```
 
 Chạy từ root repository; không build/test khác khi đang train. Đổi store bằng `=2`;
-có thể chỉ định `--batch-size=32` trong exec.args khi xử lý OOM, không giảm items/horizon.
-Full5seeds chưa chạy. Benchmark50items/seed42/2epochs đã kiểm chứng tối ưu runtime:
+có thể chỉ định CLI `--seeds=42` để retry một seed; script full cố định `42,123,2026`.
+Không tự đổi batch khi OOM. Full 3 seed chưa chạy. Benchmark50items/seed42/2epochs đã kiểm chứng tối ưu runtime:
 20:03→17:41 trong ứng dụng,51/51tests PASS,126.000predictions khớp tại precisionCSV.
 Giữ kết quả validation best epoch để xuất, vẫn chấm đủ từng epoch. Dùng script tạo build snapshot
 riêng để tránh IDE ghi đè runtime classes; lệnh sau chạy benchmark, chỉ khi chủ động chạy full
@@ -62,7 +61,9 @@ Set-Location 'C:\Users\quangTam\Documents\DL4j\sales-demand-forecasting-dl4j'
 ```
 
 Script tự lưu log/Tee-Object và exitcode. `--global-store-benchmark[=1]` giữ tất cả50items,
-chỉ giới hạn seed42/2epochs và ghi BENCHMARK ONLY; CLI full vẫn5seeds/30epochs/patience5/batch64.
+chỉ giới hạn seed42/2epochs và ghi BENCHMARK ONLY; CLI full dùng 3 seeds/30epochs/patience5/batch64.
+Mỗi seed giữ checkpoint riêng trong `models/seed-*/`; model thắng và toàn bộ scaler/mapping/schema
+nằm trong `deployment/`. Chạy `scripts/Audit-GlobalRun.ps1` sau full để kiểm status và row counts.
 Xem [hồ sơ global](docs/single-store-global-experiment.md)
 cho protocol, memory/runtime, artifact schema 4, tests và smoke. Không so trực tiếp metric
 Store1/50 items với kết quả 12-series cũ.
