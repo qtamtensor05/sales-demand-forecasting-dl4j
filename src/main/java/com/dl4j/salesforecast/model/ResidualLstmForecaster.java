@@ -22,6 +22,13 @@ public final class ResidualLstmForecaster {
         return AutoregressiveLstmForecaster.evaluate(network, split, inputDays, forecastDays, scaler, true);
     }
 
+    public static AutoregressiveLstmForecaster.FitResult fit(PreprocessingResult prepared,
+            int maxEpochs, int hiddenUnits, double learningRate, int patience, long seed,
+            TrainingProgress progress, LossMode lossMode) {
+        return AutoregressiveLstmForecaster.fit(prepared, maxEpochs, hiddenUnits,
+                learningRate, patience, seed, progress, true, lossMode);
+    }
+
     /** h is zero-based; every anchor for H1..H7 is observed at the original forecast origin. */
     public static double baseline(Window window, int h) {
         if (window == null || h < 0 || h >= 7 || window.getRawInput().size() < 7

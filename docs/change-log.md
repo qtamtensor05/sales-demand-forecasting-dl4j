@@ -1061,3 +1061,91 @@ Java error ghi FAILED nhưng kill cưỡng bức/mất điện có thể để R
 không sửa kết quả cũ, không commit/push.
 
 **Commit đề xuất:** `feat: add residual LSTM forecasting experiment`
+
+## 038 - 2026-10-12 - Xác nhận residual tiếp tục huấn luyện trên GPU
+
+**Mục tiêu và lý do:** xác nhận thêm residual không chuyển backend huấn luyện sang CPU.
+
+**Kết quả:** `pom.xml` vẫn dùng `nd4j-cuda-11.6-platform`; manifest smoke
+`2026-10-12_002237_861_gpu` ghi SUCCESS và `org.nd4j.linalg.jcublas.JCublasBackend`.
+Lệnh full residual dùng cùng backend, không cần thêm cờ GPU.
+
+**Kiểm tra và giới hạn:** đối chiếu trực tiếp dependency và manifest; `git diff --check` đạt.
+Không chạy training/test mới; full residual vẫn chưa chạy. Chỉ cập nhật nhật ký, không sửa code.
+
+**Commit đề xuất:** `docs: confirm residual GPU backend`
+
+## 039 - 2026-10-12 - Cập nhật tài liệu từ full Residual AR GPU
+
+**Mục tiêu và lý do:** xác minh run full mới nhất, phân tích kết quả theo overall, stratum, horizon,
+seed và learning curve, rồi cập nhật toàn bộ docs mà không thay thế ý nghĩa lịch sử của run cũ.
+
+**Nguồn:** `run.json`, `summary.txt`, `error-analysis.txt`, `series-scaling.csv`, `seed-metrics.csv`,
+`epoch-history.csv` và `validation-predictions.csv` của run `2026-10-12_092618_825_gpu`.
+Manifest ghi SUCCESS, JCublasBackend, Java 11.0.32.1, 12 chuỗi, 5 seed, 3 neural model, 180 fits,
+dataset hash không đổi, validation-only selection và test không tham gia selection. Run kéo dài
+3:16:03, từ 09:26:18 đến 12:42:22 giờ Việt Nam.
+
+**Kết quả:** Weekly/Direct/AR/ResidualAR có macro MAE lần lượt 8,7365/10,3217/9,7157/9,2169 và
+RMSE 11,1435/13,0076/12,1396/11,6805. Residual giảm RMSE 10,20% so Direct và 3,78% so AR,
+thắng mỗi model tại 8/12 chuỗi, nhưng kém Weekly 4,82% và thắng baseline 0/12. Residual thua AR
+ở cả 4 LOW nhưng thắng AR ở cả 4 MEDIUM và 4 HIGH; khoảng cách RMSE với Weekly tại MEDIUM/HIGH
+thu hẹp còn 5,20%/5,26%. Nó tốt hơn AR ở cả H1–H7 nhưng chưa thắng Weekly tại horizon nào.
+
+**Seed và training:** macro RMSE Residual theo seed 42/123/2026/7/99 là
+11,1603/12,6071/12,0819/11,2796/11,2735; sample std 0,6358, thấp hơn Direct 0,9213 và AR 0,9244.
+Residual best epoch trung bình 9,55, chạy 14,55 và dừng sớm 60/60 fits.
+
+**Kiểm tra:** CSV có 60 seed rows, 3.566 epoch rows, 180 best flags và 453.600 prediction,
+chia đều 151.200/model và 64.800/horizon; tất cả khóa prediction duy nhất. Dataset hash khớp.
+Tái tính MAE/RMSE khớp seed metrics với sai lệch tối đa `5,1e-11`; reconstruction residual khớp
+trong khoảng `1,1e-10`. Kiểm tra liên kết Markdown và `git diff --check` đạt. Không chạy Maven
+test hoặc training mới vì yêu cầu chỉ cập nhật báo cáo từ artifact đã hoàn tất.
+
+**Tệp ảnh hưởng:** `README.md`, `docs/README.md`, `docs/current-state.md`,
+`docs/implementation-history.md`, `docs/residual-experiment.md`, `docs/change-log.md`; không sửa
+code Java, cấu hình, dependency hoặc artifact run.
+
+**Giới hạn:** đánh giá trên 12/500 chuỗi, cửa sổ validation chồng lấn, validation vừa chọn epoch
+vừa báo metric; chưa bootstrap/CI hoặc đánh giá test 2017. Residual cải thiện neural baselines nhưng
+chưa thay thế Weekly Naive. Không commit/push.
+
+**Commit đề xuất:** `docs: record full residual validation results`
+
+## 040 - 2026-10-12 - Hoàn thiện ResidualAR Huber, tests và smoke GPU
+
+**Mục tiêu và lý do:** kiểm chứng việc chỉ thay MSE bằng Huber, giữ residual formulation và
+protocol; hoàn thiện implementation, TDD, review, smoke và tài liệu trước full experiment dài.
+
+**Thay đổi:** thêm HuberLoss/LossMode; tái sử dụng fit/rollout của AR, overload MSE cũ giữ nguyên.
+ND4J 1.0.0-M2.1 không có Huber chuẩn, dùng custom ILossFunction tương thích, delta 1 cố định.
+12.552 train labels có |label| tối đa 0,6875; ghi rõ giới hạn Huber có thể gần quadratic.
+Runner mới chỉ train ResidualAR và ResidualARHuber cùng run: full 120 fits, smoke 2 fits.
+Schema 3 lưu lossFunction theo model/huberDelta, epoch loss không còn nhãn MSE sai;
+báo cáo macro hai tầng, stratum, H1–H7, seed std/minmax, improvement so Weekly/MSE và strict wins.
+
+**Tệp ảnh hưởng:** Main; AR/residual forecaster; ExperimentConfiguration/ExperimentRunner;
+MultiSeriesExperimentRunner; ResidualComparisonReport; ba CSV exporter; RunArtifactSession;
+HuberLoss/LossMode mới; ResidualHuberTest mới và hai test residual mở rộng; README/docs index,
+current-state, implementation-history, change-log và residual-huber-experiment.md mới.
+Giữ các cập nhật docs từ yêu cầu trước; không sửa preprocessing/Direct/Weekly/pom.xml.
+
+**Kiểm tra:** RED 2 assertion failures/0 errors; focused 16/16; `mvn -B test` 39/39,
+0 failures/errors/skips, exit 0/BUILD SUCCESS trong 1:31 phút. Test kiểm tra công thức/gradient,
+mask, serialization, reconstruction, causal rollout, scaler/labels, validation RMSE checkpoint,
+MSE compatibility, CLI/export/report và SUCCESS/FAILED lifecycle. Review không thấy lỗi chặn.
+
+**Smoke:** `2026-10-12_143207_100_gpu`, SUCCESS, JCublasBackend, Java 11.0.32.1;
+Maven exit 0/BUILD SUCCESS 38,555 giây. LOW 7/34, seed 42, 2 epoch/model, hai best epoch 2.
+Đủ 10 artifact, 1 seed row, 4 epoch rows, 2 best flags, 5.040 predictions và H1–H7/model.
+Hash đúng, keys duy nhất, predictions finite; recompute metric lệch tối đa `2,642e-11`,
+reconstruction `3,553e-15`. MSE predictions khớp hoàn toàn smoke lịch sử cùng protocol.
+Weekly/MSE/Huber RMSE 6,870861/7,102983/7,103008; không kết luận chất lượng từ smoke.
+
+**Trạng thái và giới hạn:** IMPLEMENTED / TESTED / SMOKE TESTED / FULL EXPERIMENT NOT YET RUN.
+Full 120 fits ước thô 2:10:42, lệnh lưu log trong [hồ sơ Huber](residual-huber-experiment.md).
+Chưa đánh giá MEDIUM/HIGH, seed stability hoặc thắng Weekly trên 12×5. Không sử dụng test 2017
+để chọn model/delta; không triển khai log1p, không commit/push. Kiểm tra local Markdown links và
+`git diff --check` đạt; logs nằm dưới output/huber-*.log.
+
+**Commit đề xuất:** `feat: add Huber loss experiment for residual LSTM`

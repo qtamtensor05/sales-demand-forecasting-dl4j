@@ -2,7 +2,7 @@
 
 Mục tiêu: kiểm chứng việc học phần điều chỉnh quanh Weekly Naive có cải thiện validation,
 đặc biệt MEDIUM/HIGH, so với học sales tuyệt đối. Không kết hợp Huber, log1p, feature mới hoặc
-kiến trúc mới trong thí nghiệm này. Kết quả full residual chưa có; không sửa kết quả nghiên cứu cũ.
+kiến trúc mới trong thí nghiệm này. Full run đã hoàn tất; kết quả nghiên cứu cũ vẫn được giữ nguyên.
 
 ## Luồng đã kiểm tra và thiết kế
 
@@ -96,9 +96,35 @@ forecast hữu hạn; horizon/date; zero output bằng Weekly; thay actual tươ
 origin; thay riêng test không đổi checkpoint; recompute MAE/RMSE; synthetic training; runner/export
 ba model; macro hai tầng, sample std, win rate; manifest smoke/FAILED và tách thư mục run.
 
+## Kết quả full experiment ngày 2026-10-12
+
+Run `2026-10-12_092618_825_gpu` hoàn tất `SUCCESS` với 180 fits trên JCublasBackend trong
+3 giờ 16 phút 03 giây. Dataset hash, 12 chuỗi, năm seed, split và cấu hình khớp protocol.
+
+| Model | Macro MAE | Macro RMSE | RMSE so Weekly |
+| --- | ---: | ---: | ---: |
+| Weekly | 8,7365 ± 2,4252 | 11,1435 ± 3,1713 | 0,00% |
+| Direct | 10,3217 ± 4,1082 | 13,0076 ± 5,1836 | -16,73% |
+| AR | 9,7157 ± 3,5308 | 12,1396 ± 4,4385 | -8,94% |
+| ResidualAR | 9,2169 ± 2,6440 | 11,6805 ± 3,3958 | -4,82% |
+
+ResidualAR tốt hơn Direct/AR về macro và thắng mỗi model ở 8/12 chuỗi, nhưng thắng Weekly 0/12.
+LOW/MEDIUM/HIGH có RMSE 8,1070/11,4804/15,4540, tương ứng kém Weekly 3,46%/5,20%/5,26%.
+Residual thua AR ở 4/4 LOW nhưng thắng AR ở 4/4 MEDIUM và 4/4 HIGH. Target residual giải quyết
+một phần vấn đề scale của MEDIUM/HIGH, chưa đủ vượt seasonal anchor.
+
+Theo horizon, ResidualAR RMSE H1–H7 lần lượt 11,5741; 11,6071; 11,6476; 11,6842; 11,7076;
+11,7450; 11,7889. Nó tốt hơn AR ở cả bảy horizon nhưng vẫn kém Weekly. Macro RMSE theo seed là
+11,1603; 12,6071; 12,0819; 11,2796; 11,2735 cho seed 42/123/2026/7/99. Sample std 0,6358 thấp
+hơn Direct 0,9213 và AR 0,9244, dù seed 123 cho thấy residual vẫn nhạy với khởi tạo.
+
+Artifact được kiểm tra có 60 seed rows, 3.566 epoch rows, 180 best flags, 453.600 predictions;
+metric tái tính khớp trong `5,1e-11`, reconstruction trong `1,1e-10`. Residual best epoch trung
+bình 9,55, chạy trung bình 14,55 và dừng sớm 60/60 fits.
+
 ## Giới hạn nghiên cứu và vận hành
 
-Kiểm chứng ngày 2026-10-12: **IMPLEMENTED / TESTED / SMOKE TESTED / FULL EXPERIMENT NOT YET RUN**.
+Kiểm chứng ngày 2026-10-12: **IMPLEMENTED / TESTED / SMOKE TESTED / FULL EXPERIMENT COMPLETED**.
 Red test ban đầu: JUnit chạy được và assertion thất bại do thiếu class residual (1 failure,
 không phải lỗi biên dịch). Focused model đạt 4/4; suite tích hợp đầu đạt 31/31; sau review bổ sung
 ví dụ target và lifecycle, `mvn -B test` đạt **33/33**, 0 failures/errors/skips, exit 0,
@@ -117,18 +143,16 @@ nhưng một chuỗi/seed và hai epoch không đủ kết luận chất lượn
 Log Maven nằm tại `output/residual-smoke-2026-10-12.log`; log suite tại
 `output/residual-suite-final.log`, red tại `output/residual-tdd-red.log` (đều là artifact local).
 
-Review đã đối chiếu scaling/reconstruction, dữ liệu origin, tensor/mask, checkpoint, horizon,
-macro, schema và trạng thái manifest; không còn lỗi chặn trong phạm vi đã kiểm tra. Không chạy
-full legacy hoặc residual mới. Các giới hạn dưới đây vẫn áp dụng.
+Review implementation trước full run đã đối chiếu scaling/reconstruction, dữ liệu origin,
+tensor/mask, checkpoint, horizon, macro, schema và trạng thái manifest. Full run sau đó được
+kiểm tra lại từ artifact; không chạy training mới trong lượt cập nhật docs.
 
-Chưa có kết quả full residual hoặc bằng chứng cải thiện MEDIUM/HIGH. Weekly Naive macro RMSE cũ
-11,1435 vẫn là mốc lịch sử, chưa bị model mới vượt qua bằng một thí nghiệm đầy đủ. Chỉ 12/500 chuỗi,
+Đã có bằng chứng residual cải thiện so với AR tại MEDIUM/HIGH, nhưng Weekly Naive macro RMSE
+11,1435 vẫn tốt nhất. Chỉ 12/500 chuỗi,
 validation vừa chọn epoch vừa báo metric, cửa sổ chồng lấn; chưa bootstrap/CI và không có test mới.
 
 CSV đầy đủ vẫn ghi cuối run, không lưu checkpoint hay resume. Nếu JVM bị kill cưỡng bức/native crash
 hoặc mất điện trước khi Java xử lý lỗi, manifest có thể còn RUNNING; không công bố partial là SUCCESS.
 Không thay dependency hoặc Java 11. Không commit/push.
 
-Ước tính full: run GPU trước 120 fits mất 1:34:52; ngoại suy tuyến tính 180 fits khoảng 2:22:18.
-Dự trù 2–3 giờ hoặc hơn; số epoch residual và tải máy có thể làm khác đáng kể. Đây không phải
-thời gian full residual đã đo.
+Full residual đã đo 3:16:03, dài hơn ngoại suy tuyến tính 2:22:18 từ run 120 fits trước đó.

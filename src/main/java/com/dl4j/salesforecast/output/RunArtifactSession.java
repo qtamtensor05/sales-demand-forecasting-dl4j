@@ -89,7 +89,10 @@ public final class RunArtifactSession implements AutoCloseable {
                     .map(ExperimentRunner.SeedResult::getSeed).collect(java.util.stream.Collectors.toList())
                     .equals(configuration.getSeeds()))
                 || result.getSeriesResults().stream().flatMap(r -> r.getSeedResults().stream())
-                    .anyMatch(r -> (r.getResidual() != null) != configuration.includesResidual())) {
+                    .anyMatch(r -> (r.getResidual() != null) != configuration.includesResidual()
+                            || (r.getResidualHuber() != null) != configuration.isHuberComparison()
+                            || (r.getDirectMetrics() != null) == configuration.isHuberComparison()
+                            || (r.getAutoregressiveMetrics() != null) == configuration.isHuberComparison())) {
             throw new IllegalArgumentException("Result coverage does not match run configuration.");
         }
         TrainingHistoryExporter.writeCsv(result, directory.resolve("epoch-history.csv"));
@@ -98,7 +101,7 @@ public final class RunArtifactSession implements AutoCloseable {
         String errorAnalysis = configuration.includesResidual() ? ResidualComparisonReport.format(result)
                 : ErrorAnalysisRunner.formatReport(analysis);
         String warning = configuration.isSmoke() ? "SMOKE ONLY: pipeline verification, not model-quality evidence.\n\n" : "";
-        String summary = warning + MultiSeriesExperimentRunner.formatReport(result) + "\n" + errorAnalysis;
+        String summary = warning + (configuration.isHuberComparison() ? "" : MultiSeriesExperimentRunner.formatReport(result)) + "\n" + errorAnalysis;
         Files.writeString(directory.resolve("error-analysis.txt"), warning + errorAnalysis, StandardCharsets.UTF_8);
         StringBuilder scales = new StringBuilder("stratum,store,item,train_mean_sales,sales_min,sales_max,sales_scale,residual_scale\n");
         for (var series : result.getSeriesResults()) {
@@ -150,7 +153,7 @@ public final class RunArtifactSession implements AutoCloseable {
     private void writeManifest(String status, String error) throws IOException {
         String backend = Nd4j.getBackend().getClass().getName();
         java.util.Map<String, Object> values = new java.util.LinkedHashMap<>();
-        values.put("schemaVersion", configuration.includesResidual() ? 2 : 1);
+        values.put("schemaVersion", configuration.isHuberComparison() ? 3 : configuration.includesResidual() ? 2 : 1);
         values.put("runId", runId);
         values.put("status", status);
         values.put("startedAt", startedAt.toString());
@@ -170,7 +173,14 @@ public final class RunArtifactSession implements AutoCloseable {
         values.put("hiddenUnits", ExperimentRunner.DEFAULT_HIDDEN_UNITS);
         values.put("learningRate", ExperimentRunner.DEFAULT_LEARNING_RATE);
         values.put("optimizer", "Adam");
-        values.put("loss", "MSE");
+        values.put("loss", configuration.isHuberComparison() ? "MIXED" : "MSE");
+        if (configuration.isHuberComparison()) {
+            values.put("lossFunction", java.util.Map.of("ResidualAR", "MSE", "ResidualARHuber", "HUBER"));
+            values.put("huberDelta", com.dl4j.salesforecast.model.HuberLoss.DELTA);
+            values.put("huberDeltaSpace", "scaled residual prediction minus scaled residual label");
+            values.put("huberDefinition", "0.5*e^2 for abs(e)<=delta; delta*(abs(e)-0.5*delta) otherwise");
+            values.put("checkpointCriterion", "validation H1-H7 rollout RMSE in original sales units");
+        }
         values.put("inputDays", 30);
         values.put("forecastDays", 7);
         values.put("features", com.dl4j.salesforecast.preprocessing.SalesPreprocessor.getInputFeatureNames());

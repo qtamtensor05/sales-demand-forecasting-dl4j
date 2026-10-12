@@ -2,7 +2,8 @@
 
 Dự án Java hướng tới dự báo nhu cầu bán hàng với DeepLearning4J (DL4J).
 Phiên bản hiện tại phân tích dữ liệu bán hàng CSV và xuất báo cáo thống kê dạng văn bản.
-Đã có weekly naive, Direct LSTM và Autoregressive LSTM; runner đánh giá 12 chuỗi store-item đại diện theo doanh số train, lặp hai LSTM qua năm seed và chỉ dùng validation.
+Đã có Weekly Naive, Direct LSTM, Autoregressive LSTM và Residual Autoregressive LSTM; runner đánh giá
+12 chuỗi store-item đại diện theo doanh số train, lặp các LSTM qua năm seed và chỉ dùng validation.
 
 Xem [tài liệu quá trình thực hiện](docs/README.md) để theo dõi từng bước, lý do và kết quả.
 
@@ -13,7 +14,7 @@ Xem [tài liệu quá trình thực hiện](docs/README.md) để theo dõi từ
 - Tổng sales theo cửa hàng và top 10 sản phẩm trên toàn bộ cửa hàng.
 - Số bản ghi sales bằng 0, số ngày có ít nhất một bản ghi bằng 0 và số ngày bằng 0 của từng cặp store + item.
 - Kiểm tra ngày thiếu, khoảng trống bên trong chuỗi và bản ghi trùng ngày cho từng cặp store + item.
-- Xuất báo cáo UTF-8 vào `output/sales-statistics.txt`, nhóm theo cửa hàng và sản phẩm.
+- Xuất báo cáo UTF-8 theo từng run vào `output/runs/<run-id>/`, nhóm theo cửa hàng và sản phẩm.
 
 `sales` là số lượng bán, không phải doanh thu tiền tệ. Báo cáo cộng tất cả bản ghi,
 kể cả bản ghi trùng; phát hiện trùng không tự loại bỏ dữ liệu.
@@ -27,6 +28,23 @@ kể cả bản ghi trùng; phát hiện trùng không tự loại bỏ dữ li�
 - Kết nối mạng cho lần tải dependency đầu tiên. ND4J native có thể cần tải lượng dữ liệu lớn.
 
 ## Chạy dự án
+
+### Thí nghiệm ResidualAR MSE vs Huber
+
+Chế độ `--residual-huber` chỉ train `ResidualAR` (MSE) và `ResidualARHuber` trong cùng run,
+so với Weekly Naive: 12 chuỗi × 5 seed × 2 model = **120 fits**. Giữ nguyên pipeline residual,
+chỉ thay loss. Huber chuẩn dùng delta cố định 1,0 trong scaled residual error space; checkpoint
+vẫn chọn bằng validation RMSE sales. Không tuning delta hoặc dùng test 2017 để lựa chọn.
+
+```powershell
+mvn -B compile exec:java '-Dexec.args=--residual-huber-smoke'
+```
+
+Smoke chỉ 1 chuỗi/seed, tối đa 2 epoch/model. Full **chưa chạy** trong lượt triển khai này;
+lệnh đầy đủ lưu log, thời gian ước lượng và kết quả kiểm chứng nằm trong
+[hồ sơ Huber](docs/residual-huber-experiment.md). Schema 3 ghi loss theo model và đổi tên cột
+epoch loss thành `train_loss_scaled`/`val_loss_scaled`, thêm `loss_function,huber_delta`.
+Các chế độ mặc định, `--residual`, `--residual-smoke` tiếp tục dùng MSE và schema cũ.
 
 ### Thí nghiệm Residual AR (chế độ riêng)
 
@@ -61,9 +79,8 @@ $runExitCode = $LASTEXITCODE
 ```
 
 Chạy từ thư mục chứa `pom.xml`, không compile/test hoặc IDE auto-build vào `target/classes`
-trong lúc training. Run GPU cũ 120 fits mất 1 giờ 34 phút 52 giây; ngoại suy theo số fit cho
-180 fits khoảng 2 giờ 22 phút, nên dự trù 2–3 giờ hoặc hơn tùy early stopping và tải máy.
-Đây là ước tính, chưa phải benchmark residual full.
+trong lúc training. Full residual thực tế gần nhất mất 3 giờ 16 phút cho 180 fits trên RTX 4050;
+thời gian vẫn phụ thuộc early stopping và tải máy.
 
 Mỗi lượt tạo `output/runs/<run-id>/`. Ngoài artifact trước đây, có `series-scaling.csv` lưu min/max,
 scale train của từng chuỗi và `error-analysis.txt` so sánh bốn model theo macro, stratum, H1–H7,
@@ -71,10 +88,12 @@ seed, độ phân tán giữa seed và win rate từng chuỗi. `run.json` ghi `
 dataset hash, Java/backend và `smoke`. `validation-predictions.csv` giữ nguyên các cột cũ và thêm
 `predicted_residual` (sales gốc, chỉ có giá trị cho ResidualAR); `seed-metrics.csv` thêm bốn cột
 residual cuối dòng; epoch history giữ schema và thêm model `ResidualAR`. Run cũ không bị sửa.
+Full residual gần nhất là `2026-10-12_092618_825_gpu`: 180 fits trên GPU, `SUCCESS` sau
+3 giờ 16 phút. ResidualAR đạt macro MAE/RMSE `9,2169/11,6805`, tốt hơn Direct và AR nhưng vẫn
+kém Weekly Naive `8,7365/11,1435`; xem [phân tích đầy đủ](docs/residual-experiment.md).
 
 Chỉ công nhận hoàn tất khi Maven exit code 0, `BUILD SUCCESS` và manifest `SUCCESS`.
-Artifact smoke ghi rõ `SMOKE ONLY`, không chứng minh model vượt baseline. Full experiment residual
-chưa chạy; các metric nghiên cứu trước đây vẫn là kết quả của run cũ. CSV hoàn chỉnh vẫn xuất cuối
+Artifact smoke ghi rõ `SMOKE ONLY`, không chứng minh model vượt baseline. CSV hoàn chỉnh vẫn xuất cuối
 run, không resume checkpoint. Lỗi Java được ghi `FAILED`; nếu hệ điều hành cưỡng bức dừng JVM hoặc
 mất điện, manifest có thể còn `RUNNING`, tuyệt đối không coi đó là kết quả thành công.
 

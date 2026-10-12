@@ -47,6 +47,18 @@ public final class ExperimentRunner {
         for (int seedIndex = 0; seedIndex < seeds.size(); seedIndex++) {
             long seed = seeds.get(seedIndex);
             System.out.printf("%n=== Validation experiment: seed %d ===%n", seed);
+            if (configuration.isHuberComparison()) {
+                List<AutoregressiveLstmForecaster.FitResult> fits = new ArrayList<>();
+                for (LossMode loss : LossMode.values()) {
+                    TrainingProgress progress = seriesIndex < 0 ? null : TrainingProgress.forFit(
+                            seriesIndex, totalSeries, seedIndex, seeds.size(), loss.ordinal(), configuration.getModels(),
+                            stratum, storeId, itemId, seed, epochs);
+                    fits.add(ResidualLstmForecaster.fit(prepared, epochs, DEFAULT_HIDDEN_UNITS,
+                            DEFAULT_LEARNING_RATE, patience, seed, progress, loss));
+                }
+                results.add(new SeedResult(seed, fits.get(0), fits.get(1)));
+                continue;
+            }
             TrainingProgress directProgress = seriesIndex < 0 ? null : TrainingProgress.forFit(
                     seriesIndex, totalSeries, seedIndex, seeds.size(), 0, configuration.getModels(),
                     stratum, storeId, itemId, seed, epochs);
@@ -154,6 +166,7 @@ public final class ExperimentRunner {
     public static final class SeedResult {
         private final long seed;
         private final ResidualResult residual;
+        private final ResidualResult residualHuber;
         private final SalesLstmForecaster.ForecastMetrics directMetrics;
         private final AutoregressiveLstmForecaster.ForecastMetrics autoregressiveMetrics;
         private final int directBestEpoch;
@@ -171,6 +184,7 @@ public final class ExperimentRunner {
                            AutoregressiveLstmForecaster.FitResult residual) {
             this.seed = seed;
             this.residual = residual == null ? null : new ResidualResult(residual);
+            this.residualHuber = null;
             this.directMetrics = directMetrics;
             this.autoregressiveMetrics = autoregressiveMetrics;
             this.directBestEpoch = directBestEpoch;
@@ -181,6 +195,17 @@ public final class ExperimentRunner {
             this.autoregressiveHistory = List.copyOf(autoregressiveHistory);
         }
         public long getSeed() { return seed; }
+        private SeedResult(long seed, AutoregressiveLstmForecaster.FitResult mse,
+                           AutoregressiveLstmForecaster.FitResult huber) {
+            this.seed = seed;
+            this.residual = new ResidualResult(mse);
+            this.residualHuber = new ResidualResult(huber);
+            this.directMetrics = null; this.autoregressiveMetrics = null;
+            this.directBestEpoch = 0; this.autoregressiveBestEpoch = 0;
+            this.directEpochsRun = 0; this.autoregressiveEpochsRun = 0;
+            this.directHistory = List.of(); this.autoregressiveHistory = List.of();
+        }
+        public ResidualResult getResidualHuber() { return residualHuber; }
         public ResidualResult getResidual() { return residual; }
         public double getDirectMae() { return directMetrics.getMae(); }
         public double getDirectRmse() { return directMetrics.getRmse(); }

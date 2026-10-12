@@ -7,6 +7,8 @@
 1. [Lịch sử triển khai](implementation-history.md): từng bước, nhu cầu, thay đổi và kết quả.
 2. [Trạng thái hiện tại](current-state.md): pipeline, giao diện các lớp, số liệu và giới hạn.
 3. [Nhật ký yêu cầu](change-log.md): cập nhật sau mỗi yêu cầu, bằng chứng kiểm tra và tên commit đề xuất.
+4. [Thí nghiệm Residual AR](residual-experiment.md): thiết kế, protocol, artifact và kết quả full 180 fits.
+5. [Thí nghiệm ResidualAR Huber](residual-huber-experiment.md): chỉ thay loss, so sánh MSE/Huber cùng run; full chưa chạy.
 
 Hướng dẫn cài đặt/chạy nằm ở [README gốc](../README.md).
 Các số liệu hiện tại lấy từ dataset cục bộ `data/train.csv`; file dữ liệu và báo cáo sinh ra không được phân phối cùng tài liệu.

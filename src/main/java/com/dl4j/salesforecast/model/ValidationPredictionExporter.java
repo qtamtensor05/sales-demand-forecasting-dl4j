@@ -19,10 +19,15 @@ public final class ValidationPredictionExporter {
                     + (residual ? ",predicted_residual" : "") + "\n");
             for (MultiSeriesExperimentRunner.SeriesResult series : result.getSeriesResults()) {
                 for (ExperimentRunner.SeedResult seed : series.getSeedResults()) {
-                    write(out, series, seed.getSeed(), "Direct", seed.getDirectMetrics().getPredictions(), residual);
-                    write(out, series, seed.getSeed(), "AR", seed.getAutoregressiveMetrics().getPredictions(), residual);
+                    if (seed.getDirectMetrics() != null) {
+                        write(out, series, seed.getSeed(), "Direct", seed.getDirectMetrics().getPredictions(), residual);
+                        write(out, series, seed.getSeed(), "AR", seed.getAutoregressiveMetrics().getPredictions(), residual);
+                    }
                     if (seed.getResidual() != null) {
                         write(out, series, seed.getSeed(), "ResidualAR", seed.getResidual().getValidationMetrics().getPredictions(), true);
+                    }
+                    if (seed.getResidualHuber() != null) {
+                        write(out, series, seed.getSeed(), "ResidualARHuber", seed.getResidualHuber().getValidationMetrics().getPredictions(), true);
                     }
                 }
             }
@@ -38,7 +43,7 @@ public final class ValidationPredictionExporter {
                     row.getPrediction(), row.getWeeklyNaive()));
             if (extended) {
                 out.write(",");
-                if ("ResidualAR".equals(model)) {
+                if ("ResidualAR".equals(model) || "ResidualARHuber".equals(model)) {
                     out.write(String.format(Locale.ROOT, "%.10f", row.getPrediction() - row.getWeeklyNaive()));
                 }
             }

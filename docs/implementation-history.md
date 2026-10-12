@@ -536,3 +536,57 @@ Chưa kết luận residual vượt Weekly macro RMSE 11,1435 hoặc cải thi�
 không checkpoint/resume, kill cưỡng bức có thể để RUNNING. Không commit/push.
 
 **Commit đề xuất:** `feat: add residual LSTM forecasting experiment`
+
+## 26. Hoàn tất full Residual AR trên GPU và đánh giá giả thuyết
+
+**Nhu cầu:** chạy phép so sánh có kiểm soát Weekly/Direct/AR/ResidualAR trên đúng 12 chuỗi và 5 seed,
+sau đó xác định residual có giải quyết MEDIUM/HIGH hay không.
+
+**Kết quả vận hành:** run `2026-10-12_092618_825_gpu` hoàn tất `SUCCESS` trên JCublasBackend,
+Java 11.0.32.1, từ 09:26:18 đến 12:42:22 giờ Việt Nam (3:16:03). Manifest xác nhận 180 fits,
+dataset hash không đổi, validation 2016, test không dùng để selection. Artifact gồm 60 seed rows,
+3.566 epoch rows, 180 best flags và 453.600 validation predictions.
+
+**Kết quả mô hình:** ResidualAR đạt macro MAE/RMSE 9,2169/11,6805, tốt hơn Direct
+10,3217/13,0076 và AR 9,7157/12,1396, nhưng vẫn kém Weekly 8,7365/11,1435 khoảng 4,82% RMSE.
+Residual thắng Direct và AR ở 8/12 chuỗi, nhưng không thắng Weekly ở chuỗi nào sau mean năm seed.
+Tại MEDIUM/HIGH, residual thắng AR ở toàn bộ 8 chuỗi và giảm khoảng cách với Weekly xuống
+5,20%/5,26%; tại LOW nó kém Weekly 3,46% và kém AR ở cả 4 chuỗi.
+
+**Horizon, seed và học:** ResidualAR tốt hơn AR ở H1–H7 nhưng vẫn kém Weekly ở mọi horizon;
+RMSE tăng từ 11,5741 (H1) lên 11,7889 (H7). Sample std macro RMSE giữa seed là 0,6358, thấp hơn
+Direct 0,9213 và AR 0,9244. Seed 42 gần baseline nhất; seed 123 tệ nhất. Residual chọn best epoch
+trung bình 9,55, chạy 14,55 epoch và dừng sớm 60/60 fits.
+
+**Kiểm chứng và giới hạn:** dataset hash khớp; prediction đủ và không trùng khóa; metric tính lại
+khớp seed CSV trong `5,1e-11`, reconstruction trong khoảng `1,1e-10`. Đây vẫn là validation trên
+12/500 chuỗi, cửa sổ chồng lấn, chưa có CI/kiểm định và chưa đánh giá test 2017. Không sửa code,
+không chạy test/training mới trong bước cập nhật tài liệu.
+
+**Commit đề xuất:** `docs: record full residual validation results`
+
+## 27. Thí nghiệm ResidualAR Huber có đối chứng MSE cùng run
+
+**Mục tiêu và lý do:** cô lập tác động đổi loss lên residual forecasting, đặc biệt MEDIUM/HIGH,
+giữ tất cả protocol khác và không train lại Direct/AR không cần thiết.
+
+**Thay đổi:** thêm HuberLoss và LossMode vào vòng fit AR dùng chung. Kiểm tra JAR/source ND4J
+1.0.0-M2.1 không có Huber chuẩn nên triển khai ILossFunction, không đổi dependency/Java 11.
+Delta cố định 1 trong scaled residual error space; Huber chuẩn có vùng quadratic 0,5 MSE.
+Train-only kiểm tra 12.552 labels cho max |label| 0,6875: có thể phần lớn error ở vùng quadratic,
+không tự tuning delta. Giữ scaler, residual reconstruction, rollout và checkpoint RMSE sales.
+CLI mới `--residual-huber` chạy 120 fits, smoke chạy 2 fits × 2 epoch; schema 3 phân biệt loss/model,
+report macro/stratum/horizon/seed/win và improvement so Weekly/MSE. Mode cũ giữ hành vi MSE.
+
+**Kiểm chứng:** TDD RED 2 failures đúng thiếu chức năng, focused 16/16; suite 39/39,
+0 failures/errors/skips, BUILD SUCCESS. Smoke GPU `2026-10-12_143207_100_gpu` SUCCESS,
+LOW 7/34, seed 42, đủ 5.040 predictions, 4 epoch rows, 2 best flags; metric khớp `2,7e-11`,
+reconstruction dưới `4e-15`. MSE smoke predictions khớp smoke cũ. Review chưa thấy lỗi chặn.
+
+**Giới hạn:** IMPLEMENTED / TESTED / SMOKE TESTED / FULL EXPERIMENT NOT YET RUN.
+Smoke Huber RMSE 7,103008 và MSE 7,102983, Weekly 6,870861; không kết luận từ một LOW/seed.
+Full 120 fits ước khoảng 2:11 giờ từ run trước 3:16:03; chưa có kết luận MEDIUM/HIGH, horizon xa
+hoặc seed stability. Chi tiết/tệp/lệnh tại [hồ sơ Huber](residual-huber-experiment.md).
+Không test selection năm 2017, không log1p, không commit/push.
+
+**Commit đề xuất:** `feat: add Huber loss experiment for residual LSTM`

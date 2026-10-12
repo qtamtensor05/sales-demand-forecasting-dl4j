@@ -23,9 +23,9 @@ public class Main {
             Path statisticsPath = artifacts.getDirectory().resolve("dataset-statistics.txt");
             SalesDataAnalyzer.analyze(trainPath, statisticsPath);
             MultiSeriesExperimentRunner.MultiSeriesResult experiments = MultiSeriesExperimentRunner.run(trainPath, configuration);
-            ErrorAnalysisRunner.AnalysisResult analysis = ErrorAnalysisRunner.analyze(experiments);
+            ErrorAnalysisRunner.AnalysisResult analysis = configuration.isHuberComparison() ? null : ErrorAnalysisRunner.analyze(experiments);
             artifacts.complete(experiments, analysis);
-            System.out.print(MultiSeriesExperimentRunner.formatReport(experiments));
+            if (!configuration.isHuberComparison()) { System.out.print(MultiSeriesExperimentRunner.formatReport(experiments)); }
             if (configuration.isSmoke()) { System.out.println("SMOKE ONLY: not model-quality evidence."); }
             System.out.print(configuration.includesResidual() ? ResidualComparisonReport.format(experiments)
                     : ErrorAnalysisRunner.formatReport(analysis));

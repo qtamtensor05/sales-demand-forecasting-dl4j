@@ -16,7 +16,6 @@ import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.dataset.DataSet;
 import org.nd4j.linalg.factory.Nd4j;
 import org.nd4j.linalg.learning.config.Adam;
-import org.nd4j.linalg.lossfunctions.LossFunctions;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -54,6 +53,15 @@ public final class AutoregressiveLstmForecaster {
     static FitResult fit(PreprocessingResult prepared, int maxEpochs, int hiddenUnits,
                          double learningRate, int patience, long randomSeed,
                          TrainingProgress progress, boolean residual) {
+        return fit(prepared, maxEpochs, hiddenUnits, learningRate, patience, randomSeed, progress, residual, LossMode.MSE);
+    }
+
+    static FitResult fit(PreprocessingResult prepared, int maxEpochs, int hiddenUnits,
+                         double learningRate, int patience, long randomSeed,
+                         TrainingProgress progress, boolean residual, LossMode lossMode) {
+        if (lossMode == null || (!residual && lossMode != LossMode.MSE)) {
+            throw new IllegalArgumentException("Huber is supported only by the residual experiment.");
+        }
         if (prepared == null) { throw new IllegalArgumentException("Preprocessing result is required."); }
         if (maxEpochs <= 0 || hiddenUnits <= 0 || patience <= 0 || !(learningRate > 0.0)
                 || !Double.isFinite(learningRate)) {
@@ -75,7 +83,7 @@ public final class AutoregressiveLstmForecaster {
                 .list()
                 .layer(new LSTM.Builder().nIn(featureCount).nOut(hiddenUnits)
                         .activation(Activation.TANH).build())
-                .layer(new RnnOutputLayer.Builder(LossFunctions.LossFunction.MSE)
+                .layer(new RnnOutputLayer.Builder(lossMode.createLoss())
                         .nIn(hiddenUnits).nOut(1).activation(Activation.IDENTITY).build())
                 .build();
         MultiLayerNetwork network = new MultiLayerNetwork(configuration);

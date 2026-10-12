@@ -126,9 +126,19 @@ class ResidualLstmForecasterTest {
 
     @Test
     void smokeTrainsAndRollsOutWithoutTeacherForcingOrTestSelection() throws Exception {
+        verifyTraining(LossMode.MSE);
+    }
+
+    @Test void huberUsesSameLabelsRolloutAndSalesRmseCheckpoint() throws Exception {
+        verifyTraining(LossMode.HUBER);
+    }
+
+    private void verifyTraining(LossMode loss) throws Exception {
         var p = prepared("smoke", 0, 0, false);
         var changed = prepared("future", 10000, 20000, false);
-        var fit = ResidualLstmForecaster.fit(p, 2, 4, 0.001, 1, 42L, null);
+        var fit = ResidualLstmForecaster.fit(p, 2, 4, 0.001, 1, 42L, null, loss);
+        var layer = (org.deeplearning4j.nn.conf.layers.RnnOutputLayer) fit.getNetwork().getLayerWiseConfigurations().getConf(1).getLayer();
+        assertEquals(loss.createLoss().getClass(), layer.getLossFn().getClass());
         assertEquals(42L, fit.getRandomSeed());
         assertEquals(7, fit.getValidationMetrics().getHorizons().size());
         assertEquals(56, fit.getValidationMetrics().getForecastCount());
@@ -155,8 +165,12 @@ class ResidualLstmForecasterTest {
         var zero = ResidualLstmForecaster.evaluate(fit.getNetwork(), p.getValidation(), 30, 7, p.getScaler());
         assertTrue(zero.getPredictions().stream().allMatch(r -> r.getPrediction() == r.getWeeklyNaive()));
         var testChanged = prepared("testonly", 0, 20000, false);
-        var fitAgain = ResidualLstmForecaster.fit(testChanged, 2, 4, 0.001, 1, 42L, null);
+        var fitAgain = ResidualLstmForecaster.fit(testChanged, 2, 4, 0.001, 1, 42L, null, loss);
         assertEquals(fit.getBestEpoch(), fitAgain.getBestEpoch());
         assertEquals(best, fitAgain.getValidationMetrics().getRmse(), 1e-5);
+        if (loss == LossMode.MSE) {
+            var legacy = ResidualLstmForecaster.fit(p, 2, 4, 0.001, 1, 42L, null);
+            assertEquals(best, legacy.getValidationMetrics().getRmse(), 1e-5);
+        }
     }
 }

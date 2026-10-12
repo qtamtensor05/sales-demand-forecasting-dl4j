@@ -6,10 +6,15 @@ import java.util.List;
 public final class ExperimentConfiguration {
     private final boolean residual;
     private final boolean smoke;
+    private final boolean huber;
 
     private ExperimentConfiguration(boolean residual, boolean smoke) {
+        this(residual, smoke, false);
+    }
+    private ExperimentConfiguration(boolean residual, boolean smoke, boolean huber) {
         this.residual = residual;
         this.smoke = smoke;
+        this.huber = huber;
     }
     public static ExperimentConfiguration legacy() { return new ExperimentConfiguration(false, false); }
     public static ExperimentConfiguration residual() { return new ExperimentConfiguration(true, false); }
@@ -18,14 +23,18 @@ public final class ExperimentConfiguration {
         if (args.length == 0) { return legacy(); }
         if (args.length == 1 && "--residual".equals(args[0])) { return residual(); }
         if (args.length == 1 && "--residual-smoke".equals(args[0])) { return smoke(); }
-        throw new IllegalArgumentException("Usage: [--residual | --residual-smoke]");
+        if (args.length == 1 && "--residual-huber".equals(args[0])) { return new ExperimentConfiguration(true, false, true); }
+        if (args.length == 1 && "--residual-huber-smoke".equals(args[0])) { return new ExperimentConfiguration(true, true, true); }
+        throw new IllegalArgumentException("Usage: [--residual | --residual-smoke | --residual-huber | --residual-huber-smoke]");
     }
     public boolean includesResidual() { return residual; }
     public boolean isSmoke() { return smoke; }
+    public boolean isHuberComparison() { return huber; }
     public int getMaxEpochs() { return smoke ? 2 : SalesLstmForecaster.DEFAULT_SEARCH_EPOCHS; }
     public int getPatience() { return SalesLstmForecaster.DEFAULT_EARLY_STOPPING_PATIENCE; }
     public int getSeriesCount() { return smoke ? 1 : 12; }
     public List<Long> getSeeds() { return smoke ? List.of(42L) : ExperimentRunner.DEFAULT_SEEDS; }
-    public List<String> getModels() { return residual ? List.of("Direct", "AR", "ResidualAR") : List.of("Direct", "AR"); }
+    public List<String> getModels() { return huber ? List.of("ResidualAR", "ResidualARHuber")
+            : residual ? List.of("Direct", "AR", "ResidualAR") : List.of("Direct", "AR"); }
     public int getFitCount() { return getSeriesCount() * getSeeds().size() * getModels().size(); }
 }

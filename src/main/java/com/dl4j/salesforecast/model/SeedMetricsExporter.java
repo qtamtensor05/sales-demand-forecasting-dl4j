@@ -10,6 +10,11 @@ public final class SeedMetricsExporter {
     private SeedMetricsExporter() { }
 
     public static void writeCsv(MultiSeriesExperimentRunner.MultiSeriesResult result, Path path) throws IOException {
+        if (result.getSeriesResults().stream().flatMap(s -> s.getSeedResults().stream())
+                .anyMatch(s -> s.getResidualHuber() != null)) {
+            writeHuberCsv(result, path);
+            return;
+        }
         boolean residual = result.getSeriesResults().stream().flatMap(s -> s.getSeedResults().stream())
                 .anyMatch(s -> s.getResidual() != null);
         StringBuilder csv = new StringBuilder("stratum,store,item,seed,direct_mae,direct_rmse,direct_best_epoch,"
@@ -30,6 +35,22 @@ public final class SeedMetricsExporter {
                     else { csv.append(String.format(Locale.ROOT, ",%.10f,%.10f,%d,%d",
                             fit.getValidationMetrics().getMae(), fit.getValidationMetrics().getRmse(),
                             fit.getBestEpoch(), fit.getEpochsRun())); }
+                }
+                csv.append('\n');
+            }
+        }
+        Files.writeString(path, csv, StandardCharsets.UTF_8);
+    }
+
+    private static void writeHuberCsv(MultiSeriesExperimentRunner.MultiSeriesResult result, Path path) throws IOException {
+        StringBuilder csv = new StringBuilder("stratum,store,item,seed,residual_mae,residual_rmse,residual_best_epoch,residual_epochs_run,"
+                + "huber_mae,huber_rmse,huber_best_epoch,huber_epochs_run\n");
+        for (var series : result.getSeriesResults()) {
+            for (var seed : series.getSeedResults()) {
+                csv.append(String.format(Locale.ROOT, "%s,%d,%d,%d", series.getStratum(), series.getStoreId(), series.getItemId(), seed.getSeed()));
+                for (var fit : java.util.List.of(seed.getResidual(), seed.getResidualHuber())) {
+                    csv.append(String.format(Locale.ROOT, ",%.10f,%.10f,%d,%d", fit.getValidationMetrics().getMae(),
+                            fit.getValidationMetrics().getRmse(), fit.getBestEpoch(), fit.getEpochsRun()));
                 }
                 csv.append('\n');
             }

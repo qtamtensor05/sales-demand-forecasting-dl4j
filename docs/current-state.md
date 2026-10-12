@@ -1,6 +1,29 @@
 # Trạng thái hiện tại
 
-## Residual AR — cập nhật 2026-10-12
+## ResidualAR Huber — triển khai và smoke ngày 2026-10-12
+
+**IMPLEMENTED / TESTED / SMOKE TESTED / FULL EXPERIMENT NOT YET RUN.**
+Chế độ `--residual-huber` so sánh Weekly, ResidualAR-MSE và ResidualARHuber trong cùng run;
+12 chuỗi × 5 seed × 2 neural model = 120 fits. Không train lại Direct/AR. Chỉ thay loss;
+giữ residual formulation, scaler train-only, features, split, architecture và checkpoint theo
+validation RMSE sales. Custom ILossFunction tương thích ND4J 1.0.0-M2.1, không nâng dependency.
+Delta cố định 1,0 trong scaled residual error space; không tuning. Nhãn train có |label| tối đa
+0,6875 nên Huber có thể chủ yếu ở vùng quadratic (0,5 MSE), cần ghi nhận giới hạn này.
+
+Suite mới `mvn -B test`: **39/39**, 0 failures/errors/skips, exit 0, BUILD SUCCESS.
+Smoke `2026-10-12_143207_100_gpu` SUCCESS trên JCublasBackend/Java 11.0.32.1, LOW 7/34,
+seed 42, hai epoch mỗi model; 4 epoch rows, 2 best flags, 1 seed row, 5.040 predictions.
+Metric tái tính sai lệch tối đa `2,7e-11`, reconstruction dưới `4e-15`, không trùng khóa;
+MSE predictions khớp hoàn toàn smoke MSE trước đó. Maven smoke mất 38,555 giây.
+
+Smoke MAE/RMSE Weekly = 5,376190/6,870861; MSE = 5,635561/7,102983;
+Huber = 5,635588/7,103008. Không dùng smoke kết luận Huber cải thiện hay vượt Weekly.
+Chưa có kết quả Huber full về MEDIUM/HIGH, seed stability hoặc win rate 12 chuỗi.
+Schema 3 ghi loss theo model, delta và cột epoch loss trung tính; schema legacy/residual cũ giữ nguyên.
+Chi tiết thiết kế, tests, artifact, lệnh full và ước lượng khoảng 2:11 giờ trong
+[hồ sơ Huber](residual-huber-experiment.md). Không commit/push.
+
+## Residual AR — full experiment ngày 2026-10-12
 
 Đã triển khai Residual Autoregressive LSTM dưới chế độ riêng `--residual`; lệnh mặc định vẫn
 chạy 120 fits của Direct/AR. Full residual chạy 12 chuỗi × 5 seed × 3 neural model = 180 fits,
@@ -16,17 +39,51 @@ Schema residual v2 thêm cột ở cuối CSV, lưu config thật và min/max/sc
 cũ. Chi tiết thiết kế, tệp thay đổi, kiểm thử, lệnh và giới hạn tại
 [thí nghiệm residual](residual-experiment.md).
 
-**IMPLEMENTED / TESTED:** `mvn -B test` đạt 33/33, 0 failures/errors/skips, BUILD SUCCESS trong
-1 phút 12 giây trên CUDA ở lượt này. Các mục kết quả cũ bên dưới giữ ý nghĩa lịch sử, không phải
-kết quả residual. **FULL EXPERIMENT NOT YET RUN**; chưa có bằng chứng residual vượt Weekly Naive
-RMSE 11,1435 hoặc cải thiện MEDIUM/HIGH. Không kết hợp Huber/log1p trong thí nghiệm đầu.
+**IMPLEMENTED / TESTED / SMOKE TESTED / FULL EXPERIMENT COMPLETED.** `mvn -B test` trước full run
+đạt 33/33. Run `2026-10-12_092618_825_gpu` hoàn tất 180 fits trên CUDA, giữ nguyên dataset hash,
+12 chuỗi, 5 seed và validation-only selection; không kết hợp Huber/log1p.
 
 **SMOKE TESTED:** `mvn -B compile exec:java '-Dexec.args=--residual-smoke'` kết thúc exit 0,
 BUILD SUCCESS trong 38,900 giây, run `2026-10-12_002237_861_gpu` có manifest SUCCESS, Java
 11.0.32.1 và JCublasBackend. Chuỗi LOW store 7/item 34, seed 42, ba model × 2 epoch; đủ 6 dòng
 history, 3 best flags, 1 dòng seed, 7.560 prediction (2.520/model) và 10 artifact. Tái tính metric
 từ CSV khớp seed CSV trong dung sai `2e-9`; residual reconstruction khớp trong `2e-10`.
-Đây là smoke pipeline, không phải kết quả so sánh mô hình đầy đủ. Full 180 fits chưa chạy.
+Đây là smoke pipeline, không phải kết quả so sánh mô hình đầy đủ.
+
+### Kết quả full ResidualAR mới nhất
+
+Run bắt đầu 09:26:18 và hoàn tất 12:42:22 giờ Việt Nam, thời lượng 3 giờ 16 phút 03 giây.
+Manifest ghi `SUCCESS`, `JCublasBackend`, Java 11.0.32.1, 12 chuỗi, 5 seed, 3 neural model,
+30 epoch tối đa và `testUsedForSelection=false`. Dataset SHA-256 trùng run chuẩn trước.
+
+| Model | Macro MAE mean ± std | Macro RMSE mean ± std | RMSE so Weekly |
+| --- | ---: | ---: | ---: |
+| Weekly Naive | 8,7365 ± 2,4252 | 11,1435 ± 3,1713 | mốc so sánh |
+| Direct LSTM | 10,3217 ± 4,1082 | 13,0076 ± 5,1836 | -16,73% |
+| AR LSTM | 9,7157 ± 3,5308 | 12,1396 ± 4,4385 | -8,94% |
+| ResidualAR | 9,2169 ± 2,6440 | 11,6805 ± 3,3958 | -4,82% |
+
+ResidualAR giảm RMSE khoảng 10,20% so Direct và 3,78% so AR, đồng thời thắng Direct/AR ở 8/12
+chuỗi. Tuy nhiên nó không thắng Weekly Naive ở chuỗi nào sau khi bình quân 5 seed; macro RMSE còn
+cao hơn baseline 0,5370. Giả thuyết residual giúp neural model có tín hiệu, nhưng chưa đủ để thay
+thế Weekly Naive.
+
+Theo nhóm, ResidualAR RMSE là 8,1070 ở LOW, 11,4804 ở MEDIUM và 15,4540 ở HIGH. Nó kém Weekly
+lần lượt 3,46%, 5,20% và 5,26%. So với AR tuyệt đối, residual kém ở cả 4 LOW nhưng tốt hơn ở cả
+4 MEDIUM và cả 4 HIGH. Đây là câu trả lời chính cho mục tiêu nghiên cứu: residual thu hẹp đáng kể
+vấn đề MEDIUM/HIGH, nhưng chưa đưa hai nhóm này vượt baseline mùa vụ.
+
+ResidualAR tăng dần từ RMSE 11,5741 ở H1 lên 11,7889 ở H7; cả bảy horizon đều kém Weekly khoảng
+3,85%–5,81%, nhưng tốt hơn AR tại mọi horizon. Độ nhạy seed thấp hơn hai model cũ: sample std của
+macro RMSE là 0,6358, so với 0,9213 Direct và 0,9244 AR. Seed 42 gần baseline nhất (11,1603) và
+thắng Weekly ở 5/12 chuỗi riêng lẻ; seed 123 tệ nhất (12,6071). Không seed nào có macro RMSE thấp
+hơn Weekly.
+
+Artifact có 60 dòng seed, 3.566 dòng epoch, 180 best flags và 453.600 prediction, chia đều
+151.200/model và 64.800/horizon. ResidualAR chọn best epoch trung bình 9,55, chạy trung bình 14,55;
+cả 60 fits đều dừng sớm. Tái tính MAE/RMSE từ prediction khớp seed metrics với sai lệch tối đa
+`5,1e-11`; reconstruction `baseline + predictedResidual` khớp prediction trong khoảng `1,1e-10`.
+Không chạy Maven test mới trong lượt cập nhật tài liệu này.
 
 ## Pipeline
 
@@ -48,12 +105,12 @@ năm seed 42, 123, 2026, 7, 99 cho Direct lẫn Autoregressive. Không tune lạ
 weekly naive tính một lần trên validation mỗi chuỗi. Macro trước hết lấy trung bình năm seed trong
 từng chuỗi, sau đó lấy trung bình không trọng số giữa 12 chuỗi. Không đọc test.
 
-`ExperimentRunner` giữ toàn bộ validation metric của Direct và Autoregressive theo từng horizon
-cho mỗi seed. `ErrorAnalysisRunner` tổng hợp MAE/RMSE theo nhóm LOW/MEDIUM/HIGH, horizon 1–7 và
-seed; báo mean ± sample standard deviation, phần trăm cải thiện so với weekly naive và số chuỗi
-thắng baseline theo RMSE. Neural metric được bình quân seed trong từng chuỗi trước khi macro-average
-không trọng số giữa chuỗi. `Main` ghi báo cáo UTF-8 vào `output/error-analysis-validation.txt` sau
-khi lượt multi-series kết thúc; hệ thống phân tích không huấn luyện thêm và không đọc test 2017.
+`ExperimentRunner` giữ validation metric của Direct, Autoregressive và ResidualAR theo từng horizon
+cho mỗi seed khi chạy chế độ residual. Báo cáo tổng hợp MAE/RMSE theo LOW/MEDIUM/HIGH, horizon 1–7
+và seed; báo mean ± sample standard deviation, phần trăm cải thiện so với weekly naive và số chuỗi
+thắng từng đối chứng theo RMSE. Neural metric được bình quân seed trong từng chuỗi trước khi
+macro-average không trọng số giữa chuỗi. `Main` ghi báo cáo UTF-8 vào `error-analysis.txt` trong
+thư mục run; bước tổng hợp không huấn luyện thêm và không tính metric test 2017.
 
 Cấu hình LSTM dùng 30 ngày đầu vào, dự báo trực tiếp
 7 ngày, Adam và seed tường minh. Mỗi ngày input có 6 kênh: sales, lag-7, rolling mean 7/14 ngày,
@@ -204,12 +261,10 @@ Thí nghiệm mới chỉ lấy 12/500 chuỗi, dùng cùng cấu hình được
 của 500 chuỗi; chưa bootstrap hoặc đánh giá theo mọi cặp. Test 2017 đã được quan sát trong các bước
 trước; lượt chạy này không đọc test.
 
-Bước kế tiếp: khi chấp nhận chi phí, chạy lại lệnh mặc định để tạo breakdown horizon/seed đầy đủ.
-Lượt tương đương trước gồm 120 fits và mất khoảng 2 giờ 05 phút; cần lưu trọn log và chờ kết thúc
-theo quiet-log workflow. Chỉ sau khi đọc breakdown mới kiểm chứng giả thuyết rằng loss MSE trên
-sales tuyệt đối khiến chuỗi MEDIUM/HIGH và các đỉnh nhu cầu chi phối gradient; một thử nghiệm phù
-hợp sau đó là loss/target theo tỷ lệ hoặc variance-stabilizing transform fit train-only, so sánh
-trên đúng validation protocol. Test 2017 không được dùng để chọn giải pháp.
+Bước kế tiếp: phân tích vì sao ResidualAR seed 123 suy giảm và vì sao residual làm mất lợi thế LOW,
+sau đó chỉ thử một thay đổi có kiểm soát, chẳng hạn Huber trên residual hoặc một cơ chế chọn/ensemble
+seed định trước. Giữ nguyên split, feature, chuỗi, seed và train-only scaling; không dùng test 2017
+để chọn giải pháp.
 
 ## Quy trình agent cho lượt huấn luyện dài
 
@@ -237,7 +292,7 @@ Ba skill dùng lại quy tắc log huấn luyện dài của `sales-project-prog
 120 fits, nâng dependency, commit hay push. Đây là thay đổi workflow agent; code Java, pipeline dữ
 liệu, normalization và split hiện tại không đổi.
 
-## Run GPU hoàn chỉnh mới nhất: 2026-10-10_184201_989_gpu
+## Run GPU Direct/AR trước Residual: 2026-10-10_184201_989_gpu
 
 Manifest xác nhận trạng thái `SUCCESS`, backend `JCublasBackend`, Java 11.0.32.1, dataset SHA-256
 `038f25690a65149c94f86ddd3deceda20c037a5cfd754cafdfc539a72992f2ed`, validation 2016 và
@@ -250,8 +305,8 @@ Kiểm tra tính đầy đủ ghi nhận 60 dòng seed, 2.693 dòng epoch, 120 f
 Tính lại MAE/RMSE từ prediction cho từng bộ stratum/store/item/model/seed khớp seed metrics với
 sai lệch lớn nhất khoảng `5,1e-11`; mọi fit có đúng 2.520 dự báo cuốn chiếu.
 
-Macro validation mới nhất, sau khi bình quân năm seed trong từng chuỗi rồi bình quân không trọng số
-qua 12 chuỗi:
+Macro validation Direct/AR của run này, sau khi bình quân năm seed trong từng chuỗi rồi bình quân
+không trọng số qua 12 chuỗi:
 
 | Phương pháp | MAE mean ± sample std | RMSE mean ± sample std | Cải thiện RMSE so Weekly Naive |
 | --- | ---: | ---: | ---: |
@@ -277,10 +332,8 @@ Weekly Naive 11,1435; đây không phải bằng chứng lợi thế ổn địn
 best trung bình 10,18, chạy trung bình 15,18 và cả 60/60 fit đều dừng sớm, phù hợp với dấu hiệu
 validation rollout suy giảm sớm hơn dù train loss tiếp tục giảm.
 
-Giả thuyết cải thiện ưu tiên là huấn luyện LSTM dự báo phần dư quanh Weekly Naive thay vì sales tuyệt
-đối, có thể kết hợp `log1p` hoặc Huber loss fit train-only. Cách này giữ trực tiếp tín hiệu chu kỳ
-bảy ngày đã mạnh, giảm ảnh hưởng biên độ của MEDIUM/HIGH và để LSTM học phần điều chỉnh. Giả thuyết
-phải được so sánh trên cùng validation protocol; test 2017 không được dùng để chọn biến thể.
+Giả thuyết dự báo phần dư quanh Weekly Naive đã được kiểm chứng trong full run mới ở đầu tài liệu.
+Kết quả cho thấy residual cải thiện Direct/AR tại MEDIUM/HIGH nhưng chưa vượt Weekly Naive.
 
 Giới hạn: chỉ 12/500 chuỗi được chọn đại diện; validation vừa chọn epoch vừa đánh giá cấu hình cố
 định; forecast windows chồng lấn; sample std phản ánh phân tán giữa chuỗi, không phải confidence

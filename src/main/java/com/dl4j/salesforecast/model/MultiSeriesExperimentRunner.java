@@ -149,6 +149,10 @@ public final class MultiSeriesExperimentRunner {
 
     public static String formatReport(MultiSeriesResult result) {
         if (result == null) { throw new IllegalArgumentException("Multi-series result is required."); }
+        if (result.getSeriesResults().stream().flatMap(s -> s.getSeedResults().stream())
+                .anyMatch(s -> s.getResidualHuber() != null)) {
+            return ResidualComparisonReport.format(result);
+        }
         StringBuilder report = new StringBuilder();
         report.append("MULTI-SERIES VALIDATION EXPERIMENT\n")
                 .append("Seeds: ").append(result.seeds).append('\n')

@@ -34,6 +34,14 @@ public final class TrainingHistoryExporter {
                                 epoch.getEpoch() == seed.getResidual().getBestEpoch()));
                     }
                 }
+                if (seed.getResidualHuber() != null) {
+                    for (var epoch : seed.getResidualHuber().getHistory()) {
+                        rows.add(new Row(series.getStratum(), series.getStoreId(), series.getItemId(),
+                                "ResidualARHuber", seed.getSeed(), epoch.getEpoch(), epoch.getTrainingLoss(),
+                                epoch.getValidationLoss(), epoch.getValidationMetrics().getRmse(),
+                                epoch.getEpoch() == seed.getResidualHuber().getBestEpoch()));
+                    }
+                }
                 for (AutoregressiveLstmForecaster.EpochMetrics epoch : seed.getAutoregressiveHistory()) {
                     rows.add(new Row(series.getStratum(), series.getStoreId(), series.getItemId(),
                             "AR", seed.getSeed(), epoch.getEpoch(), epoch.getTrainingLoss(),
@@ -49,11 +57,15 @@ public final class TrainingHistoryExporter {
         if (rows == null || rows.stream().anyMatch(row -> row == null)) {
             throw new IllegalArgumentException("History rows must be non-null.");
         }
-        StringBuilder csv = new StringBuilder(HEADER);
+        boolean huber = rows.stream().anyMatch(r -> "ResidualARHuber".equals(r.model));
+        StringBuilder csv = new StringBuilder(huber ? HEADER.replace("train_loss_scaled_mse", "train_loss_scaled")
+                .replace("val_loss_scaled_mse", "val_loss_scaled").replace("is_best_epoch\n", "is_best_epoch,loss_function,huber_delta\n") : HEADER);
         for (Row row : rows) {
-            csv.append(String.format(Locale.ROOT, "%s,%d,%d,%s,%d,%d,%.10f,%.10f,%.10f,%s\n",
+            csv.append(String.format(Locale.ROOT, "%s,%d,%d,%s,%d,%d,%.10f,%.10f,%.10f,%s",
                     row.stratum, row.storeId, row.itemId, row.model, row.seed, row.epoch,
                     row.trainingLoss, row.validationLoss, row.validationRmse, row.bestEpoch));
+            if (huber) { csv.append("ResidualARHuber".equals(row.model) ? ",HUBER,1.0" : ",MSE,"); }
+            csv.append('\n');
         }
         return csv.toString();
     }
