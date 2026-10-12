@@ -28,6 +28,7 @@ public final class GlobalResidualLstmForecaster {
         network.init();
         profile.record("network.init",initStart);
         INDArray best = null;
+        GlobalMetrics bestValidation = null;
         try {
             double bestRmse=Double.POSITIVE_INFINITY;int bestEpoch=0,stale=0;
             List<Epoch> history=new ArrayList<>();
@@ -61,14 +62,18 @@ public final class GlobalResidualLstmForecaster {
                     bestRmse=evaluation.macroRmse;bestEpoch=epoch;stale=0;
                     if(best!=null) { best.close(); }
                     best=network.params().dup();
+                    // Immutable predictions already computed at these exact weights. Retain only
+                    // the selected epoch, not every epoch, and keep all per-epoch validation calls.
+                    bestValidation=evaluation;
                 } else if(++stale>=config.getPatience()) { break; }
             }
             if(best==null) { throw new IllegalStateException("No finite checkpoint"); }
             network.setParams(best);
             long finalStart=System.nanoTime();
-            var evaluation=evaluate(input->network.output(input,false),data.validation,config.getBatchSize(),profile);
+            if(bestValidation==null) { throw new IllegalStateException("Missing selected validation snapshot"); }
+            profile.count("validation.cachedCheckpointResults",1);
             profile.record("validation.finalCheckpoint",finalStart);
-            return new Fit(seed,bestEpoch,history,evaluation);
+            return new Fit(seed,bestEpoch,history,bestValidation);
         } finally {
             // Fit snapshots retain metrics, never a resident model per item or seed.
             network.close(); if(best!=null && !best.wasClosed()) { best.close(); }

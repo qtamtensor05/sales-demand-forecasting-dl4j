@@ -50,7 +50,20 @@ $LASTEXITCODE
 
 Chạy từ root repository; không build/test khác khi đang train. Đổi store bằng `=2`;
 có thể chỉ định `--batch-size=32` trong exec.args khi xử lý OOM, không giảm items/horizon.
-Full chưa chạy trong lượt triển khai này. Xem [hồ sơ global](docs/single-store-global-experiment.md)
+Full5seeds chưa chạy. Benchmark50items/seed42/2epochs đã kiểm chứng tối ưu runtime:
+20:03→17:41 trong ứng dụng,51/51tests PASS,126.000predictions khớp tại precisionCSV.
+Giữ kết quả validation best epoch để xuất, vẫn chấm đủ từng epoch. Dùng script tạo build snapshot
+riêng để tránh IDE ghi đè runtime classes; lệnh sau chạy benchmark, chỉ khi chủ động chạy full
+mới đổi `Benchmark` thành `Full`:
+
+```powershell
+Set-Location 'C:\Users\quangTam\Documents\DL4j\sales-demand-forecasting-dl4j'
+.\scripts\Invoke-GlobalRun.ps1 -Mode Benchmark
+```
+
+Script tự lưu log/Tee-Object và exitcode. `--global-store-benchmark[=1]` giữ tất cả50items,
+chỉ giới hạn seed42/2epochs và ghi BENCHMARK ONLY; CLI full vẫn5seeds/30epochs/patience5/batch64.
+Xem [hồ sơ global](docs/single-store-global-experiment.md)
 cho protocol, memory/runtime, artifact schema 4, tests và smoke. Không so trực tiếp metric
 Store1/50 items với kết quả 12-series cũ.
 

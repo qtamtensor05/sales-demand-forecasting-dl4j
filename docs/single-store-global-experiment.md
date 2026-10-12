@@ -1,7 +1,10 @@
 # Một cửa hàng, nhiều sản phẩm: Global ResidualAR
 
-**IMPLEMENTED: YES / TESTED: YES / SMOKE TESTED: YES / FULL GLOBAL EXPERIMENT: NOT RUN.**
-Đã train một model chung nhiều item ở synthetic và smoke; chưa train full 50 items × 5 seed.
+**IMPLEMENTED / TESTED / SMOKE TESTED / RUNTIME PROFILED / RUNTIME OPTIMIZED /
+NUMERICAL EQUIVALENCE VERIFIED: YES. FULL GLOBAL EXPERIMENT: NOT RUN.**
+Đã benchmark50items/seed42/2epochs trước/sau; chưa chạy full50items×5seeds/tối đa30epochs.
+Kết quả hiện tại ở [runtime optimization](#runtime-optimization-ngày-2026-10-13);
+các mục triển khai/smoke bên dưới giữ bằng chứng lịch sử tại ngày2026-10-12.
 
 ## Phạm vi ứng dụng
 
@@ -214,3 +217,173 @@ người dùng chạy full; nếu cần tối ưu sẽ profile riêng trước k
 Kiểm tra liên kết Markdown và `git diff --check` đạt. Không chạy full trong lượt này,
 không đánh giá test 2017, không commit/push. Commit đề xuất:
 `feat: add single-store global residual forecasting`.
+
+## Runtime optimization ngày 2026-10-13
+
+### 1. Trạng thái
+
+GLOBAL IMPLEMENTED / TESTED / SMOKE TESTED / RUNTIME PROFILED / RUNTIME OPTIMIZED /
+NUMERICAL EQUIVALENCE VERIFIED: **YES**. FULL GLOBAL EXPERIMENT: **NOT RUN**.
+Benchmark dùng Store 1, đủ 50 items, seed 42, 2 epochs, batch 64.
+Full vẫn 5 seeds × tối đa 30 epochs, patience 5; giữ model, dữ liệu, scaling, RNG và protocol.
+
+### 2. Bottleneck đo được
+
+BEFORE: train 652,193s (54,22%), validation 543,474s (45,18%), data 1,259s (0,10%),
+artifact 2,721s (0,23%); còn lại là init, hash audit và overhead.
+Train fit mất 517,474s, score 132,907s; validation model.output mất 537,740s.
+Validation đã batch 64 từ đầu: ceil(18.000/64) × 7 = 1.974 calls/evaluation.
+Lần đánh giá lại checkpoint cuối mất 187,425s dù kết quả đã được tính ở epoch được chọn.
+
+Tensor train 1,552s, tensor validation 3,308s, đọc output 0,812s, dựng feature 0,281s,
+metrics 0,052s và export predictions 2,598s. Các phần này không phải bottleneck chính,
+nên không thêm cache toàn bộ tensors, threading, sửa scalar reads hoặc dependency.
+
+### 3. BEFORE benchmark
+
+Run `2026-10-12_201423_002_gpu`: SUCCESS, Maven exit 0 / BUILD SUCCESS 20:08,
+ứng dụng 20:02,922. JCublasBackend, Java 11.0.32.1, RTX 4050 Laptop.
+Dataset SHA-256: `038f25690a65149c94f86ddd3deceda20c037a5cfd754cafdfc539a72992f2ed`.
+Train epochs 307,552 / 344,664s; validation 185,594 / 170,457s; final evaluation 187,425s.
+52.300 train windows, 818 batches/epoch (last 12), 18.000 validation origins,
+282 validation batches (last 16), 126.000 forecasts/evaluation. Ba evaluations, 5.922 output calls.
+
+### 4. Tối ưu thực tế
+
+GlobalResidualLstmForecaster giữ `bestValidation` immutable khi copy best params.
+Mỗi improvement thay snapshot; epoch sau kém hơn vẫn giữ snapshot best trước đó.
+Cuối fit vẫn restore best params, trả predictions/metrics đã tính ở đúng weights đó.
+Mọi epoch vẫn đánh giá đầy đủ; không thay checkpoint frequency, tolerance 1e-8,
+training order, score, dtype, scalar arithmetic, optimizer hoặc network definition.
+Đây là tái sử dụng kết quả của cùng phép tính đã hoàn tất; population giữ nguyên.
+
+History chỉ giữ metrics và một snapshot predictions của best epoch.
+Thêm nanoTime profile, benchmark CLI riêng, window fingerprints và script audit.
+Invoke-GlobalRun.ps1 tạo source/build riêng trong output/, giữ cwd ở repo gốc và lưu log/exit code.
+
+### 5–6. AFTER và speedup
+
+Run `2026-10-13_002648_831_gpu`: cùng dataset/config/backend, SUCCESS, exit 0,
+Maven 17:53; ứng dụng 17:40,531. Train epochs 546,332 / 235,937s;
+validation 143,552 / 126,814s. Hai evaluations, 3.948 calls; final result lấy từ cache.
+Số predictions xuất cuối run vẫn **126.000**.
+
+| Phase (seconds) | Before | After | Before/after |
+| --- | ---: | ---: | ---: |
+| Data preparation | 1,259 | 2,333 | 0,540× |
+| Training total, 2 epochs | 652,193 | 782,259 | 0,834× |
+| Validation total, gồm final ở BEFORE | 543,474 | 270,364 | 2,010× |
+| Artifact/report | 2,721 | 2,448 | 1,112× |
+| Application total | 1.202,922 | 1.060,531 | **1,134×** |
+
+Tiết kiệm 142,391s (2:22,391), **11,84%** tổng benchmark.
+Train code không đổi nhưng chậm hơn 130,067s; timing khác nhau rõ giữa các epoch.
+Một cặp run khác giờ/tải máy/warm-up/nhiệt/power không cô lập được mọi nguyên nhân nhiễu.
+Không diễn giải validation total 2,01× là inference kernel nhanh gấp đôi.
+Bằng chứng cấu trúc: bỏ 1.974 calls lặp/fit, giữ toàn bộ validation từng epoch và cùng outputs.
+Không bỏ epoch đầu khỏi số đo, không warm-up riêng.
+
+Train trung bình 326,096 → 391,130s/epoch; toàn mini-batch trung bình 0,398625 → 0,478141s,
+vẫn 818 batches/epoch. Train + validation trung bình 504,134 → 526,312s/epoch.
+Cache tiết kiệm một evaluation cuối fit, không làm training nhanh hơn.
+
+### 7. Numerical equivalence
+
+`python scripts/compare_global_benchmarks.py output/runs/2026-10-12_201423_002_gpu output/runs/2026-10-13_002648_831_gpu --output output/global-performance-comparison.json`
+exit 0 / PASS. Tolerance cố định trước tối ưu **1e-9 sales**, không nới sau benchmark.
+
+- Max/mean absolute prediction difference = 0 ở precision CSV 10 decimals, đủ 126.000 rows.
+- Macro MAE/RMSE, pooled MAE/RMSE, per-item MAE/RMSE, epoch loss/metrics difference = 0.
+- Weekly, actual, ordered keys và scaler CSV giống nhau; best epoch = 2 ở cả hai.
+- Đủ 50 item metrics, 50 scaler rows, 2 epoch rows, 1 best flag; không duplicate/nonfinite,
+  thiếu horizon hoặc sai ngày. Target date = origin + horizon và thuộc validation 2016.
+- Train windows SHA-256: `7a8bb38c2c073ff6088ffb862454877c4078908e18dcecf250b1577e6ff1e1a7`.
+- Validation windows SHA-256: `7d115f7cc07df8dc4c995c8ca6be38e3e6f581e1bd844402bf5b40fdb7835a2b`.
+  Hash bao gồm ordered item/scaler/dates/raw/normalized targets/inputs/features ở exact double bits.
+- Recompute per-item metrics lệch tối đa 4,936e-11; reconstruction CSV 1,001e-10 do làm tròn.
+  Không tuyên bố bit-identical weights hoặc full-precision predictions chưa xuất.
+
+Benchmark macro MAE/RMSE = 7,7605530704 / 9,7600911319; pooled RMSE = 10,0967482487.
+Chỉ dùng để kiểm tra equivalence; chưa kết luận chất lượng 5 seeds hoặc dùng quality chọn tối ưu.
+
+### 8–9. Tests và review
+
+RED benchmark CLI: 1 failure/0 errors vì mode chưa tồn tại, output/global-profile-red.log.
+RED cache: 1 failure/0 errors đúng 3 evaluations thay vì 2, output/global-cache-red.log.
+Focused 12/12 PASS, output/global-cache-focused.log.
+Full suite **51/51 PASS**, 0 failures/errors/skips, exit 0 / BUILD SUCCESS 2:12,
+output/global-cache-suite.log. Giữ nguyên 46 tests cũ.
+
+Năm tests mới kiểm benchmark/profile, oracle C/F layout, batch cuối, input tensors từng horizon,
+dates/anchors/residual/per-item/macro/pooled, deterministic shuffle, future actual mutation
+với predictor phụ thuộc history và best epoch 1 khác last epoch 2.
+Legacy global synthetic smoke và old research regression nằm trong full suite.
+Smoke thực tế qua script mới: `2026-10-13_005123_869_gpu`, SUCCESS, exit 0 / BUILD SUCCESS
+59,509s Maven, items 1/25/50, seed 42, 2 epochs/best 2; macro RMSE 10,844962.
+Predictions CSV khớp smoke lịch sử cùng config; log output/global-script-smoke.log.
+
+Review source/diff không thấy lỗi chặn trong scope đã kiểm: immutable cache gắn đúng checkpoint,
+không RNG calls mới, không future actual inference/teacher forcing, scaler train-only,
+đầy đủ population/checkpoint frequency/export. Không đổi dependencies hoặc Java 11.
+
+### 10. Ước lượng full từ benchmark 50 items
+
+AFTER train + validation epoch 1 = 689,884s, epoch 2 = 362,751s, mean 526,312s (**8,772 phút**).
+Nếu 5 seeds × 30 epochs (150 epochs), lấy mean ước **21,93 giờ**, cộng init/export nhỏ.
+Lấy hai tốc độ epoch đã thấy cho **15,11–28,75 giờ**; đây không là bound phần cứng hoặc SLA.
+
+Chưa có cơ sở dự đoán early stopping của global full. Minh họa nếu 10 epochs/seed thì mean
+ước 7,31 giờ, không dự đoán sẽ dừng ở 10. Earliest patience 5 có thể 6 epochs nếu best 1
+và 5 epochs không cải thiện. Cache chỉ tiết kiệm một validation/fit nên tỷ lệ lợi ích giảm khi
+mỗi fit chạy nhiều epochs. Số đo 50 items thay ngoại suy từ smoke 3 items trước đây.
+
+### 11. Full command đã chuẩn bị, CHƯA thực thi
+
+```powershell
+Set-Location 'C:\Users\quangTam\Documents\DL4j\sales-demand-forecasting-dl4j'
+New-Item -ItemType Directory -Force output | Out-Null
+.\scripts\Invoke-GlobalRun.ps1 -Mode Full
+```
+
+Script gọi `mvn -B -f <snapshot>/pom.xml compile exec:java '-Dexec.args=--global-store=1'`,
+Tee-Object log timestamp, lưu exit code riêng và fail nếu Maven khác 0; cwd vẫn repo gốc.
+Full là **5 global fits**, 126.000 predictions/seed, 630.000 rows cuối.
+`-Mode Benchmark` chạy 50 items/seed 42/2 epochs; `-Mode Smoke` chạy 3 items.
+
+### 12–13. Tệp và artifact
+
+Thêm GlobalPerformanceProfile, GlobalDataFingerprint, GlobalPerformanceTest,
+ReferenceGlobalValidation test oracle, scripts/compare_global_benchmarks.py và Invoke-GlobalRun.ps1.
+Sửa ExperimentConfiguration/Main/GlobalExperimentRunner/Report/GlobalResidualLstmForecaster,
+SingleStoreGlobalDataset/TimeSeriesAnalyzer/SalesPreprocessor (overload instrumentation),
+GlobalArtifactExporter/RunArtifactSession và README/docs. Không đổi pom/dependencies/Java 11.
+
+Global run bổ sung `performance-profile.json` và manifest benchmark flag; CSV/header/precision giữ nguyên.
+Profile có nested phases, không cộng mọi row; host wall time, không là CUDA kernel profiler.
+Scope từ GlobalRunner entry qua export/manifest, loại Maven/ND4J startup/hash session ban đầu,
+final profile serialization/console summary; Maven total báo riêng.
+
+BEFORE/AFTER artifacts ở output/runs/ hai run IDs trên; performance-profile.json trong mỗi run.
+Logs: output/global-profile-before-isolated.log và global-profile-after-isolated.log.
+Audit: output/global-performance-comparison.json. Không sửa artifact của run cũ.
+
+Baseline đầu `2026-10-12_195613_061_gpu` FAILED sau 15:50 do NoSuchMethodError Epoch constructor.
+Class trong target bị ghi lại trong lúc JVM chạy; class timestamp/IDE Java cho thấy xung đột
+compiler. Không dùng run lỗi làm benchmark. Build cô lập trước/sau đều SUCCESS.
+
+### 14–16. Giới hạn, hướng tiếp và commit
+
+Một cặp benchmark/seed 42/hai epochs; chưa đo lặp nhiều lần hoặc nhiều seeds.
+CPU load/power/warm-up không cố định. Chưa có accuracy claim 5 seeds/test 2017.
+Cache thêm một snapshot CPU 126.000 immutable predictions khi epoch sau chạy, ước 8–16 MiB
+với giả định 64–128 bytes/row; đây không phải heap profile. Không giữ GPU tensors thêm.
+Batch input 0,4102 MiB, labels + mask 0,01465 MiB; không materialize full train inputs 335,17 MiB.
+Global windows là Java objects/shared feature references, chưa đo exact heap size.
+GPU snapshot BEFORE 46%/2.192 MiB lúc 20:18 là một mẫu, không là peak hoặc utilization average.
+Chưa có checkpoint disk/resume; build snapshots/logs giữ để audit, không tự xóa.
+
+Automation kiểm tra mỗi 10 phút đã **PAUSED** theo yêu cầu ngày 2026-10-13.
+Có thể chạy FULL GLOBAL EXPERIMENT khi người dùng chủ động yêu cầu: tests/benchmark/equivalence đạt.
+Full chưa chạy; không commit/push.
+
+**Commit đề xuất:** `perf: optimize global forecasting runtime without changing protocol`.

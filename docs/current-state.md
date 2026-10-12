@@ -2,14 +2,25 @@
 
 ## Pipeline ứng dụng: Store 1, global model cho 50 items
 
-**IMPLEMENTED / TESTED / SMOKE TESTED / FULL GLOBAL EXPERIMENT NOT RUN.**
+**GLOBAL IMPLEMENTED / TESTED / SMOKE TESTED / RUNTIME PROFILED / RUNTIME OPTIMIZED /
+NUMERICAL EQUIVALENCE VERIFIED: YES. FULL GLOBAL EXPERIMENT: NOT RUN.**
+Ngày 2026-10-13: benchmark 50 items, seed 42, 2 epochs/batch 64 BEFORE
+`2026-10-12_201423_002_gpu` và AFTER `2026-10-13_002648_831_gpu` đều SUCCESS/exit0.
+Ứng dụng giảm 1.202,922 → 1.060,531 giây (1,1343×; giảm 11,84%). Giữ immutable validation
+của best epoch để xuất cuối run, tránh chạy lại cùng checkpoint; vẫn đánh giá đủ 18.000 origins
+× 7 mỗi epoch. Model.output calls 5.922→3.948; predictions xuất vẫn 126.000, scaler/window hashes,
+Weekly, per-item/epoch/macro/pooled metrics giống nhau, max/mean prediction diff=0 tại precision CSV.
+Suite mới 51/51 PASS, 0 failures/errors/skips; focused 12/12. Smoke qua script build cô lập
+`2026-10-13_005123_869_gpu` SUCCESS, predictions CSV khớp smoke lịch sử cùng cấu hình.
+Kiểm tra 47 liên kết local và git diff --check đạt. Chi tiết, giới hạn nhiễu timing,
+profile và lệnh build cô lập tại [runtime optimization](single-store-global-experiment.md#runtime-optimization-ngày-2026-10-13).
 Pipeline nghiên cứu 12 chuỗi bên dưới được giữ nguyên. CLI mới `--global-store=1` dùng toàn bộ
 50 items, một Global ResidualAR-MSE mỗi seed: chỉ 5 global fits. Window 30→7, 6 dynamic +
 50 one-hot channels, scaler train-only riêng item, batch64, checkpoint validation macro RMSE.
 Full dự kiến 52.300 train windows, 18.000 validation origins, 126.000 forecasts/seed;
-đã kiểm tra coverage dữ liệu và test loader 50 items, chưa train full 50 items.
+đã train benchmark đủ 50 items/1 seed/2 epochs; chưa chạy full 5 seeds/tối đa 30 epochs.
 
-Suite hiện tại 46/46 tests, 0 failures/errors/skips, Maven BUILD SUCCESS. Smoke GPU
+Suite tại lần triển khai đầu46/46 tests, 0 failures/errors/skips, Maven BUILD SUCCESS. Smoke GPU
 `2026-10-12_193415_770_gpu` SUCCESS (1:50 phút Maven), Store1 items 1/25/50, seed42,
 2 epoch, best2, một model chung. Macro MAE/RMSE Global 8,686371/10,844962 và Weekly
 8,606614/10,793978; pooled RMSE 11,247555 và 11,201497. Smoke thắng Weekly 0/3,
@@ -19,8 +30,9 @@ Schema4 riêng có scaler/item-seed/prediction/epoch CSV, macro/pooled/item/hori
 Đủ 7.560 predictions, 3 scaler rows, 3 metric rows, 2 epoch rows và 1 best flag;
 keys duy nhất, finite, hash đúng, metric recompute trong 4,9e-11, reconstruction dưới 1,5e-14.
 Không dùng test 2017 selection; không tuning Huber/log1p/embedding hoặc thay pipeline cũ.
-Full có thể dài: ngoại suy từ smoke khoảng 9,5–11 phút/epoch, tối đa 24–28 giờ cho 150 epoch;
-early stopping có thể giảm, chưa đo full. Xem [hồ sơ global](single-store-global-experiment.md)
+Full có thể dài: benchmark AFTER 50 items đo trung bình 8,772 phút/epoch; 150 epochs ước 21,93 giờ,
+biến thiên theo hai epoch cho 15,1–28,75 giờ; early stopping chưa biết. Đây là ước lượng,
+thay ngoại suy smoke 3 items trước đây. Xem [hồ sơ global](single-store-global-experiment.md)
 cho thiết kế, tệp, tests, lệnh và giới hạn. Không commit/push.
 
 ## ResidualAR Huber — full hoàn tất ngày 2026-10-12

@@ -90,6 +90,20 @@ class GlobalPerformanceTest {
         assertTrue(profile.snapshot().get("scope").toString().contains("Nested phases overlap"));
         assertTrue(((java.util.Map<?,?>)profile.snapshot().get("seconds")).containsKey("train"));
     }
+    @Test void selectedEpochPredictionsAreRetainedWithoutDuplicateFinalInference() throws Exception {
+        var data=fixture("checkpoint",0);
+        var config=ExperimentConfiguration.fromArgs(new String[]{"--global-store-smoke"});
+        var profile=new com.dl4j.salesforecast.performance.GlobalPerformanceProfile();
+        var fit=GlobalResidualLstmForecaster.fit(data,config,42,profile);
+        assertEquals(fit.history.size(),profile.count("validation.evaluations"),
+                "Every epoch must validate once; exporting the selected result must not infer again");
+        assertEquals(fit.history.size()*7,profile.count("modelOutputCalls"));
+        assertEquals(168,fit.validation.count);
+        assertEquals(fit.history.get(fit.bestEpoch-1).validation.macroRmse,fit.validation.macroRmse,0);
+        assertEquals(fit.history.get(fit.bestEpoch-1).validation.pooledRmse,fit.validation.pooledRmse,0);
+        assertEquals(1,fit.bestEpoch); // Fixture worsens at epoch 2: cache must not return the last epoch.
+        assertEquals(3,fit.validation.predictions.size());
+    }
     @Test void benchmarkKeepsFullPopulationAndOnlyLimitsSeedsAndEpochs() {
         var benchmark = assertDoesNotThrow(() -> ExperimentConfiguration.fromArgs(new String[]{"--global-store-benchmark"}));
         var full = ExperimentConfiguration.fromArgs(new String[]{"--global-store"});

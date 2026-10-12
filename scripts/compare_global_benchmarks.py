@@ -7,6 +7,7 @@ import argparse
 import csv
 import json
 import math
+from datetime import date, timedelta
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -33,8 +34,11 @@ def audit(run):
     assert profile["counts"]["trainWindows"] == 52300
     assert profile["counts"]["validationOriginsPerEvaluation"] == 18000
     assert profile["counts"]["train.batches"] == 1636
-    assert profile["counts"]["validation.evaluations"] == 3
-    assert profile["counts"]["validation.forecasts"] == 378000
+    cached = profile["counts"].get("validation.cachedCheckpointResults", 0)
+    assert cached in (0, 1)
+    assert profile["counts"]["validation.evaluations"] == 3 - cached
+    assert profile["counts"]["validation.forecasts"] == 126000 * (3 - cached)
+    assert profile["counts"]["modelOutputCalls"] == 1974 * (3 - cached)
     predictions = read_csv(run, "global-validation-predictions.csv")
     assert len(predictions) == 126000
     keys = [(p["store"], p["item"], p["seed"], p["model"], p["origin_date"], p["target_date"], p["horizon"]) for p in predictions]
@@ -43,6 +47,11 @@ def audit(run):
     assert len(Counter((p["item"], p["origin_date"]) for p in predictions)) == 18000
     for p in predictions:
         assert all(math.isfinite(float(p[k])) for k in ("actual_sales", "weekly_baseline", "predicted_residual", "predicted_sales"))
+        assert date.fromisoformat(p["target_date"]) == date.fromisoformat(p["origin_date"]) + timedelta(days=int(p["horizon"]))
+        assert date.fromisoformat(p["target_date"]).year == 2016
+    scales = read_csv(run, "global-series-scaling.csv")
+    assert len(scales) == 50 and {int(s["item"]) for s in scales} == set(range(1, 51))
+    assert all(int(s["train_window_count"]) == 1046 and int(s["validation_window_count"]) == 360 for s in scales)
     reconstruction = max(abs(float(p["predicted_sales"]) - float(p["weekly_baseline"]) - float(p["predicted_residual"])) for p in predictions)
     assert reconstruction < TOLERANCE
     errors = defaultdict(list)
@@ -57,11 +66,15 @@ def audit(run):
     assert len(epochs) == 2 and sum(e["best_flag"] == "true" for e in epochs) == 1
     best = next(int(e["epoch"]) for e in epochs if e["best_flag"] == "true")
     assert {int(m["best_epoch"]) for m in metrics} == {best}
-    assert best == min(epochs, key=lambda e: float(e["validation_macro_rmse"]))["epoch"] or str(best) == min(epochs, key=lambda e: float(e["validation_macro_rmse"]))["epoch"]
+    assert best == int(min(epochs, key=lambda e: float(e["validation_macro_rmse"]))["epoch"])
     aggregates = {"macroMae": sum(s[0] for s in scores.values()) / 50,
                   "macroRmse": sum(s[1] for s in scores.values()) / 50,
                   "pooledMae": sum(abs(e) for es in errors.values() for e in es) / 126000,
                   "pooledRmse": math.sqrt(sum(e*e for es in errors.values() for e in es) / 126000)}
+    selected = next(e for e in epochs if int(e["epoch"]) == best)
+    for key, column in (("macroMae", "validation_macro_mae"), ("macroRmse", "validation_macro_rmse"),
+                        ("pooledMae", "validation_pooled_mae"), ("pooledRmse", "validation_pooled_rmse")):
+        assert abs(aggregates[key] - float(selected[column])) < TOLERANCE
     return manifest, profile, predictions, keys, metrics, epochs, best, aggregates, recompute, reconstruction
 
 
@@ -74,7 +87,8 @@ def main():
     ignored = {"runId", "startedAt", "updatedAt"}
     assert {k:v for k,v in b[0].items() if k not in ignored} == {k:v for k,v in a[0].items() if k not in ignored}
     assert b[1]["evidence"] == a[1]["evidence"], "Window/scaler hashes changed"
-    assert b[1]["counts"] == a[1]["counts"], "Work counts changed"
+    computational = {"validation.evaluations", "validation.forecasts", "modelOutputCalls", "validation.cachedCheckpointResults"}
+    assert {k:v for k,v in b[1]["counts"].items() if k not in computational} == {k:v for k,v in a[1]["counts"].items() if k not in computational}, "Population/training counts changed"
     assert read_csv(args.before,"global-series-scaling.csv") == read_csv(args.after,"global-series-scaling.csv")
     assert b[3] == a[3], "Ordered target keys changed"
     for x,y in zip(b[2],a[2]):
@@ -94,7 +108,7 @@ def main():
                   maxPerItemMetricAbsDiff=per_item_diff,maxEpochMetricAbsDiff=epoch_diff,weeklyDiff=0,
                   forecastCount=126000,bestEpochBefore=b[6],bestEpochAfter=a[6],
                   recomputeMaxBefore=b[8],recomputeMaxAfter=a[8],reconstructionMaxBefore=b[9],reconstructionMaxAfter=a[9],
-                  windowHashes=b[1]["evidence"],counts=a[1]["counts"],timing=timing)
+                  windowHashes=b[1]["evidence"],countsBefore=b[1]["counts"],countsAfter=a[1]["counts"],timing=timing)
     args.output.write_text(json.dumps(result,indent=2)+"\n",encoding="utf-8")
     print(json.dumps(result,indent=2))
 

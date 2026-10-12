@@ -1220,3 +1220,42 @@ early stopping có thể giảm, chưa đo thực tế full. Không auto-run ful
 embedding/ensemble/tuning. Chưa checkpoint disk/resume; không commit/push.
 
 **Commit đề xuất:** `feat: add single-store global residual forecasting`
+
+## 043 - 2026-10-13 - Profile và tối ưu runtime global, benchmark/equivalence
+
+**Yêu cầu và lý do:** profile trước tối ưu, giảm runtime giữ nguyên model/protocol/số học;
+benchmark50items trước/sau, tests, audit và chuẩn bị full command, không chạy full5seeds.
+
+**Thay đổi:** benchmarkCLI giới hạn riêngseed42/2epochs, giữ toàn bộ50items/batch64;
+nanoTime profile tách data/train/score/validation/output/features/export/manifest; SHA256 exact
+ordered windows. Giữ bestValidation immutable tại checkpoint để xuất cuối fit, không inference
+lại cùng weights. Script compare audit chặt1e-9; Invoke-GlobalRun tạo build snapshot riêng
+và Tee log/exitcode, tránh IDE ghi lại classes. Mọi epoch vẫn validation đủ18.000×7.
+
+**Kết quả xác minh:** REDbenchmarkCLI1failure/0errors, REDcache1failure/0errors đúng nguyên nhân;
+focused12/12 PASS, `mvn -B -f output/benchmark-build-after/pom.xml test`51/51 PASS,
+0failures/errors/skips, exit0/BUILD SUCCESS2:12. BEFORE `2026-10-12_201423_002_gpu`
+và AFTER `2026-10-13_002648_831_gpu` SUCCESS/exit0/JCublasBackend cùng dataset/config.
+Ứng dụng1.202,922→1.060,531s, giảm142,391s/11,84%, speedup1,1343×;
+validation543,474→270,364s gồm bỏ final evaluation187,425s, outputcalls5.922→3.948.
+126.000predictions xuất đủ và khớp tại precisionCSV, max/meanpredictiondiff0;
+scaler/Weekly/keys/windowhashes và peritem/epoch/macro/pooledmetrics diff0, bestepoch2.
+Audit output/global-performance-comparison.json PASS; recompute4,936e-11, reconstructionCSV1,001e-10.
+
+**Giới hạn và review:** một cặp benchmark, train652,193→782,259s do biến động runtime chưa
+cô lập nguồn; không claim2× kernels. Cache chỉ giữ best snapshotCPU, không thay population/
+checkpointfrequency/RNG/train-onlyscaler/no teacherforcing/testselection. Review không thấy
+lỗi chặn trong scope kiểm tra. AFTERmean8,772phút/epoch; full150epochước21,93giờ,
+tốc độhai epoch cho15,1–28,75giờ, chưa biết earlystop. FULL GLOBAL EXPERIMENT NOT RUN.
+Runđầu195613FAILED/classmismatch không dùng làmbaseline. Automation10phút PAUSED theo yêu cầu.
+
+**Tệp và evidence:** xem [hồ sơ global](single-store-global-experiment.md#runtime-optimization-ngày-2026-10-13)
+cho danh sách source/tests/scripts, profile/logs hai run, bảngphase, hashes, memory, command và
+giới hạn. Cập nhật README/docs index/current-state/history/change-log/global; giữ lịch sử cũ.
+Không commit/push.
+
+**Commit đề xuất:** `perf: optimize global forecasting runtime without changing protocol`
+
+**Kiểm tra bàn giao:** smoke qua script `2026-10-13_005123_869_gpu` SUCCESS, Maven exit 0,
+BUILD SUCCESS 59,509s. SHA256 file predictions khớp smoke lịch sử cùng config.
+47 liên kết Markdown local hợp lệ; `git diff --check` đạt. Lịch kiểm tra mỗi 10 phút đã PAUSED.

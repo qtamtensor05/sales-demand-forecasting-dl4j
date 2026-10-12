@@ -661,3 +661,39 @@ early stopping có thể giảm, chưa đo thực tế full. Không auto-run ful
 embedding/ensemble/tuning. Chưa checkpoint disk/resume; không commit/push.
 
 **Commit đề xuất:** `feat: add single-store global residual forecasting`
+
+## 30. Profile và tối ưu runtime global, kiểm chứng trước/sau
+
+**Mục tiêu và lý do:** giảm runtime mà giữ nguyên model, dữ liệu, train order, scaler,
+validation population, checkpoint và số liệu; chuẩn bị full command, không chạy full5seeds.
+
+**Triển khai:** thêm nanoTime profile, benchmark riêng50items/seed42/2epochs, hash exact ordered
+windows và script audit. Profile xác định train/inference chiếm gần toàn bộ runtime; tensor,
+features và export nhỏ. Giữ immutable validation snapshot của best epoch để xuất cuối fit,
+tránh inference lại cùng weights; vẫn đánh giá đủ mọi epoch. Thêm script PowerShell tạo build
+snapshot riêng, lưu log/exitcode để tránh IDE ghi đè classes khi train.
+
+**Kiểm chứng ngày2026-10-13:** TDD RED đúng thiếu benchmarkCLI và thừa final evaluation;
+focused12/12, fullsuite51/51 PASS, 0 failures/errors/skips, exit0/BUILD SUCCESS2:12.
+BEFORE `2026-10-12_201423_002_gpu`, AFTER `2026-10-13_002648_831_gpu` đều SUCCESS/exit0.
+Ứng dụng1.202,922→1.060,531s (1,134×, giảm11,84%). Outputcalls5.922→3.948 do tái sử dụng
+checkpoint result; mỗi epoch vẫn18.000origins×7. Audit đủ126.000rows, scalerCSV/Weekly/keys/
+train-validation window hashes giống nhau; predictions, per-item/epoch/macro/pooled metrics
+diff0 ở precisionCSV, bestepoch2 ở cảhai; tolerance cố định1e-9. Không đổi dependencies.
+
+**Giới hạn:** một cặp benchmark khác giờ/tải máy; train chậm hơn130s dù code không đổi,
+không diễn giải validationtotal2,01× là inferencekernel2×. AFTERmean8,772phút/epoch,
+150epochước21,93giờ, biến thiên tốc độ hai epoch cho15,1–28,75giờ; earlystop chưa biết.
+Cache thêm một snapshotCPU, không cacheGPU/alltraintensors. RunbaselineđầuFAILED do class
+mismatch giữ làm evidence, không dùng vào phép so sánh. Chưa full5seeds/testselection2017.
+Automation10phút đã dừng theo yêu cầu. Chi tiết tại [hồ sơ global](single-store-global-experiment.md).
+
+**Tệp:** profile/fingerprint/tests/oracle mới; configuration/globalrunner/forecaster/report,
+panel reader/preprocessor overload, artifactexport/session/Main; scripts audit và Invoke-GlobalRun;
+README/docs index/current-state/history/change-log/global. Không commit/push.
+
+**Commit đề xuất:** `perf: optimize global forecasting runtime without changing protocol`
+
+**Bàn giao:** smoke script `2026-10-13_005123_869_gpu` SUCCESS/exit 0/BUILD SUCCESS,
+predictions CSV cùng SHA256 với smoke lịch sử cùng cấu hình. 47 liên kết local và
+`git diff --check` đạt; lịch kiểm tra mỗi 10 phút đã PAUSED.
