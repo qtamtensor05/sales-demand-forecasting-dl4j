@@ -69,7 +69,8 @@ class GlobalStoreTest {
         var full = assertDoesNotThrow(() -> ExperimentConfiguration.fromArgs(new String[]{"--global-store=1"}));
         assertEquals(List.of(42L,123L,2026L),full.getSeeds());
         assertEquals(3, full.getFitCount());
-        assertEquals(10,full.getMaxEpochs());
+        assertEquals(20,full.getMaxEpochs());
+        assertEquals(3,full.getPatience());
         assertEquals(64,full.getBatchSize());
         assertEquals(256,ExperimentConfiguration.fromArgs(new String[]{"--global-store=1","--validation-batch-size=256"}).getValidationBatchSize());
         assertEquals(List.of(2026L,42L),ExperimentConfiguration.fromArgs(new String[]{"--global-store=1","--seeds=2026,42"}).getSeeds());
@@ -77,17 +78,36 @@ class GlobalStoreTest {
         var smoke = ExperimentConfiguration.fromArgs(new String[]{"--global-store-smoke"});
         assertEquals(1, smoke.getFitCount());
         assertEquals(2, smoke.getMaxEpochs());
+        assertEquals(5, smoke.getPatience());
         assertEquals(120, ExperimentConfiguration.legacy().getFitCount());
         assertEquals(180, ExperimentConfiguration.residual().getFitCount());
         assertEquals(List.of(42L,123L,2026L,7L,99L),ExperimentConfiguration.legacy().getSeeds());
         assertThrows(IllegalArgumentException.class,()->ExperimentConfiguration.fromArgs(new String[]{"--global-store=1","--seeds=42,42"}));
         var calibration=ExperimentConfiguration.fromArgs(new String[]{"--global-store-calibration=1","--batch-size=128","--validation-batch-size=512"});
         assertTrue(calibration.isCalibration());assertEquals(List.of(42L),calibration.getSeeds());
-        assertEquals(1,calibration.getMaxEpochs());assertEquals(128,calibration.getBatchSize());assertEquals(512,calibration.getValidationBatchSize());
+        assertEquals(1,calibration.getMaxEpochs());assertEquals(5,calibration.getPatience());
+        assertEquals(128,calibration.getBatchSize());assertEquals(512,calibration.getValidationBatchSize());
+        var preflight=ExperimentConfiguration.fromArgs(new String[]{"--global-preflight","--global-store=1"});
+        assertEquals(10,preflight.getMaxEpochs());assertEquals(5,preflight.getPatience());
     }
 
     @Test void globalDatasetFunctionalityExists() {
         assertDoesNotThrow(() -> Class.forName("com.dl4j.salesforecast.model.SingleStoreGlobalDataset"));
+    }
+
+    @Test void fullManifestRecordsTwentyEpochCapAndPatienceThree() throws Exception {
+        var config=ExperimentConfiguration.fromArgs(new String[]{"--global-store=1","--batch-size=256","--validation-batch-size=1024"});
+        Path dataset=directory.resolve("metadata-only.csv");Files.writeString(dataset,"date,store,item,sales\n");
+        Path run;
+        try(var session=com.dl4j.salesforecast.output.RunArtifactSession.start(directory.resolve("runs"),dataset,config)) {
+            run=session.getDirectory();
+            var json=com.google.gson.JsonParser.parseString(Files.readString(run.resolve("run.json"))).getAsJsonObject();
+            assertEquals(20,json.get("maxEpochs").getAsInt());
+            assertEquals(3,json.get("patience").getAsInt());
+            assertEquals(256,json.get("batchSize").getAsInt());
+            assertEquals(1024,json.get("validationBatchSize").getAsInt());
+            assertFalse(json.get("testUsedForSelection").getAsBoolean());
+        }
     }
 
     @Test void fullPanelLoadsAllFiftyItemsWithoutFiftyModels() throws Exception {

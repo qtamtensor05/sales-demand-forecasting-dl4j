@@ -741,3 +741,69 @@ PASS. Chỉ dùng fixture synthetic, không chạy smoke/calibration/full thật
 deployment model vẫn chưa biết.
 
 **Commit đề xuất:** `feat: add calibrated RTX 3090 global training workflow`.
+
+## 33. Khôi phục ND4J CUDA runtime trên Windows RTX 3090
+
+**Mục tiêu:** điều tra `NoAvailableBackendException`, sửa tối thiểu để CUDA hoạt động và kiểm chứng
+tensor/LSTM/save-load, toàn bộ tests cùng preflight; không chạy calibration hoặc full training.
+
+**Nguyên nhân:** Surefire classpath có `JCublasBackend`, native ND4J và classifier Windows, không có
+CPU backend cạnh tranh. `ServiceLoader` tìm thấy `JCublasBackend` nhưng `isAvailable()` bị loại vì
+`jnicudart.dll` phụ thuộc `cudart64_110.dll` không tồn tại. JavaCPP CUDA classifier Windows thường
+chỉ chứa JNI wrappers; classifier runtime `windows-x86_64-redist` không được `cuda-platform` kéo vào.
+ND4J bọc việc backend duy nhất bị reject thành thông báo chung `NoAvailableBackendException`.
+
+**Sửa:** thêm runtime dependency `org.bytedeco:cuda:11.6-8.3-1.5.7` classifier
+`windows-x86_64-redist`, giữ nguyên DL4J/ND4J/CUDA backend. Thêm `Nd4jCudaDiagnosticTest` kiểm tra
+từng tầng discovery, initialization, device, tensor/matrix, LSTM shape 56×30, loss, một update,
+forward lần hai, save/load và finite prediction bằng dữ liệu synthetic.
+
+**Kiểm chứng ngày 2026-10-13:** test backend PASS; diagnostic PASS trên device 0 RTX 3090;
+full suite 56/56 PASS, 0 failure/error/skip; preflight PASS với Store 1/50 items, 52.300 train
+windows và 18.000 validation origins. Không cài CUDA Toolkit, không đổi driver, model, dataset,
+seed, preprocessing, scaler train-only hoặc split thời gian. Calibration/full không chạy.
+
+**Commit đề xuất:** `fix: bundle Windows CUDA runtime for ND4J`.
+
+## 34. Sửa selector cho calibration artifact một epoch
+
+**Mục tiêu:** sửa `Select-GlobalCalibration.ps1` để đọc ba run calibration RTX 3090 đã hoàn tất,
+áp dụng đúng policy hiện tại và dừng trước full training; không sửa hoặc chạy lại calibration.
+
+**Nguyên nhân và sửa:** PowerShell unwrap output `Import-Csv` có đúng một row thành scalar nên
+`.Count` không bằng 1. Selector nay ép `@(Import-Csv ...)`, kiểm tra riêng directory, `run.json`
+và `global-epoch-history.csv`, load manifest mới trong từng vòng lặp, yêu cầu SUCCESS/calibration
+true, rồi parse RMSE và hai timing bằng InvariantCulture. Candidate JSON bổ sung `trainSeconds`
+và `validationSeconds`; policy baseline 64/256, threshold 1% và sort time/RMSE/batch giữ nguyên.
+
+**Kiểm chứng:** RED exit 1 đúng lỗi epoch count ở run đầu. Sau sửa, parser PowerShell PASS;
+selector đọc đủ ba run một epoch và JSON đọc lại bằng `ConvertFrom-Json`. Limit RMSE là
+10,386533569838; cả ba candidate hợp lệ; 256/1024 được chọn với RMSE 10,3434761594 và
+68,818477 giây/epoch. Test policy Java 2/2 PASS. SHA-256 toàn bộ file trong ba run trước/sau
+giống nhau. Không chạy calibration, full training, model fit hoặc thay dependency/protocol.
+
+**Commit đề xuất:** `fix: handle single-row calibration artifacts`.
+
+## 35. Tăng cap Full global lên 20 epoch với patience 3
+
+**Mục tiêu:** cho Full Global ResidualAR thêm cơ hội vượt epoch 10 khi validation còn cải thiện,
+đồng thời dừng sớm sau ba epoch liên tiếp không cải thiện; không chạy Full/Calibration/Smoke.
+
+**Khảo sát source:** `ExperimentConfiguration.getMaxEpochs()` quyết định mode: Calibration 1,
+Smoke/Benchmark 2, Full global 10. `getPatience()` trước đó trả constant legacy 5 cho mọi mode,
+nên trạng thái thực tế là Full 10/5, khác giả định 10/3. `Invoke-GlobalRun.ps1 -Mode Full` chỉ
+truyền mode/seeds/batches; Java configuration là nguồn epoch/patience. `RunArtifactSession` đọc
+hai getter để ghi manifest. Forecaster validation sau từng epoch, reset stale khi Macro RMSE cải
+thiện, lưu best checkpoint, dừng khi stale đạt patience rồi restore best params.
+
+**Thay đổi:** thêm constants Full riêng `GLOBAL_FULL_MAX_EPOCHS=20` và
+`GLOBAL_FULL_PATIENCE=3`. Full dùng 20/3; Preflight giữ config 10/5 nhưng không fit,
+Smoke/Benchmark giữ 2/5, Calibration giữ 1/5. Không đổi CLI, batch 256/1024, model, seed,
+split, scaler hoặc selection.
+
+**Kiểm chứng:** RED 2/2 failures đúng vì Full còn 10. GREEN protocol/config/manifest tests 3/3
+PASS, không failure/error/skip; manifest tạm ghi maxEpochs 20, patience 3, batch 256/1024 và
+testUsedForSelection false. Ba PowerShell scripts parse PASS. Chỉ chạy tests configuration và
+metadata; không model fit, Full, Calibration hoặc Smoke.
+
+**Commit đề xuất:** `feat: extend global full training cap to 20 epochs`.

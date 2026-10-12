@@ -435,3 +435,17 @@ Batch size là thay đổi hiệu năng đã được người dùng phê duyệ
 target, scaler train-only, validation population hoặc model selection. Một epoch calibration chỉ
 là phép chọn cấu hình vận hành; không là kết luận chất lượng model. Chưa chạy workflow này trên
 RTX 3090 nên khoảng 10–30 phút chưa được xác nhận bằng đo thực tế.
+
+## Protocol Full 20 epoch, patience 3
+
+Quyết định sau calibration ngày 2026-10-13 này supersede riêng giới hạn Full 10 epoch/patience 5
+ở mục ngay trên. Full dùng selected train/validation batch 256/1024, ba seed 42/123/2026,
+hard cap 20 epoch/seed và patience 3. Smoke vẫn 2 epoch; Calibration vẫn đúng một epoch;
+Preflight không fit network.
+
+Calibration 256/1024 đo 68,818477 giây/epoch và RMSE 10,3434761594, nằm trong ngưỡng regression
+1% so baseline. Timing này là lý do vận hành để cho phép tăng cap với early stopping chặt hơn;
+calibration một epoch không phải bằng chứng chất lượng cuối hoặc dự báo runtime Full chính xác.
+Mỗi epoch Full vẫn đánh giá validation H1–H7 sales gốc; Macro RMSE cải thiện sẽ reset stale counter
+và lưu best checkpoint. Ba epoch liên tiếp không cải thiện sẽ dừng trước cap; test 2017 không dùng
+cho dừng sớm, chọn epoch, batch hoặc checkpoint.

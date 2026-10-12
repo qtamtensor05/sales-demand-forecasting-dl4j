@@ -1324,3 +1324,127 @@ sec/epoch, RMSE, runtime full hoặc deployment model. Ngưỡng 1% là policy v
 không phải kết luận thống kê từ nhiều seed.
 
 **Commit đề xuất:** `feat: add calibrated RTX 3090 global training workflow`
+
+## 046 - 2026-10-13 - Sửa ND4J CUDA backend trên RTX 3090
+
+**Mục tiêu và lý do:** tìm root cause và đưa ND4J CUDA backend về trạng thái hoạt động thật trên
+Windows 10/RTX 3090; kiểm chứng bằng phép tính GPU, LSTM synthetic, full tests và preflight, không
+chạy calibration/full training hay thay protocol mô hình.
+
+**Chẩn đoán:** Java 11.0.32.1 và Maven 3.9.16 hoạt động khi đặt đúng PATH; shell mặc định ban đầu
+trỏ JRE 8 và thiếu `mvn`. Runtime/test classpath có `nd4j-cuda-11.6`, preset/native Windows,
+`cuda-platform`, JavaCPP 1.5.7 và không có `nd4j-native(-platform)` cạnh tranh. Service descriptor
+tồn tại và tìm thấy `org.nd4j.linalg.jcublas.JCublasBackend`. Lỗi native đầu tiên là
+`jnicudart.dll: Can't find dependent libraries`; log trước đó cho thấy không tìm thấy
+`cudart64_110.dll`. JAR `cuda-...-windows-x86_64` chỉ chứa JNI wrappers, còn classifier
+`windows-x86_64-redist` chứa CUDA 11.6/cuDNN 8.3 DLL chưa có trên classpath. Vì backend CUDA duy
+nhất bị `isAvailable()` reject, ND4J bọc lỗi thành `NoAvailableBackendException`; 16 lỗi sau là
+hệ quả static initialization, không phải root cause độc lập.
+
+**Thay đổi:** thêm dependency runtime `org.bytedeco:cuda:11.6-8.3-1.5.7` classifier
+`windows-x86_64-redist` vào `pom.xml` (artifact khoảng 1,8 GB). Thêm
+`Nd4jCudaDiagnosticTest` kiểm tra Java, ServiceLoader/class source/availability, Nd4j/backend,
+execution environment/device, tensor allocation, matrix operation/commit, network LSTM nhỏ với
+input `[4,56,30]`, loss, một fit/update, second forward, model save/load và finite prediction.
+Cập nhật hướng dẫn GPU, trạng thái và lịch sử. Không sửa model/data/seed/features/scaler/split.
+
+**Kết quả và kiểm tra:** RED `BackendConfigurationTest` có 0 failure/1 error đúng do thiếu DLL.
+Sau fix test này 1/1 PASS. Diagnostic 1/1 PASS: backend
+`org.nd4j.linalg.jcublas.JCublasBackend`, CUDA build 11.6.55, 1 device, selected device 0,
+RTX 3090 cc 8.6; mọi mục smoke synthetic PASS. `mvn -B test` **56/56 PASS**, 0 failure,
+0 error, 0 skip, BUILD SUCCESS trong 35,906 giây. Preflight exit 0/BUILD SUCCESS: Java 11,
+Store 1, 50 items, seeds 42/123/2026, train/validation batch 64/256, 52.300/18.000 windows,
+126.000 forecasts/seed và CUDA backend. Kiểm tra dependency tree/classpath/artifact/service
+descriptor và cache hoàn tất; không xóa cache. Log nằm trong `output/cuda-*.log` và log preflight
+timestamp. CUDA Toolkit **không cài** vì redist bundled đã đủ; driver **không đổi** vì CUDA 11.6
+đã chạy trên driver 616.56. Không commit/push.
+
+**Tệp ảnh hưởng:** `pom.xml`, `src/test/java/com/dl4j/salesforecast/Nd4jCudaDiagnosticTest.java`,
+`docs/gpu-training-guide.md`, `docs/current-state.md`, `docs/implementation-history.md`,
+`docs/change-log.md`. Các build snapshot/log trong `output/` là evidence cục bộ.
+
+**Giới hạn:** chưa đo utilization hoặc peak VRAM; cảnh báo debug khi thử nạp tên generic và một
+số module cuDNN riêng không chặn ND4J/LSTM smoke. Maven cache tăng khoảng 1,8 GB. Shell mới vẫn
+cần trỏ Java 11/Maven đúng PATH. Calibration, benchmark dataset thật và full global training
+chưa chạy theo yêu cầu.
+
+**Commit đề xuất:** `fix: bundle Windows CUDA runtime for ND4J`
+
+## 047 - 2026-10-13 - Sửa selector đọc calibration một epoch
+
+**Mục tiêu và lý do:** sửa `scripts/Select-GlobalCalibration.ps1` để đọc đúng ba calibration run
+đã hoàn tất trên RTX 3090 và chọn batch theo policy hiện tại; không chạy lại calibration hoặc
+khởi động full training, không thay model/data/dependency/threshold.
+
+**Root cause:** `Import-Csv` trả trực tiếp một `PSCustomObject` khi CSV chỉ có một data row.
+Biến `$epochs` vì vậy là scalar; `$epochs.Count -ne 1` đánh giá sai và selector dừng ở run đầu dù
+file có đúng một epoch. Manifest vốn nằm trong vòng lặp nhưng script chưa kiểm tra rõ directory và
+hai input file trước khi đọc.
+
+**Thay đổi:** ép `$epochs = @(Import-Csv ...)`; với từng directory kiểm tra container,
+`run.json`, `global-epoch-history.csv`, load manifest riêng, yêu cầu `status=SUCCESS` và
+`calibration=true`. Parse `validation_macro_rmse`, `train_seconds`, `validation_seconds` bằng
+InvariantCulture. Candidate giữ các timing riêng và tổng `secondsPerEpoch`. Baseline 64/256,
+threshold 1%, điều kiện `RMSE <= limit` và sort tăng dần time → RMSE → train batch không đổi.
+Không hard-code selected.
+
+**Kết quả artifact thật:** selector đọc đủ ba manifest SUCCESS/calibration và mỗi CSV đúng một
+epoch. Baseline RMSE 10,2836966038, limit 10,386533569838. Candidate 64/256 = 245,840646 giây,
+regression 0%; 128/512 = 135,626906 giây, regression 0,117551%; 256/1024 = 68,818477 giây,
+regression 0,581304%. Cả ba eligible; selector chọn 256/1024 theo tốc độ. JSON mới:
+`output/global-calibration-selection-selector-fix-2026-10-13.json`, trường `selected` đầy đủ.
+
+**Kiểm tra:** RED selector exit 1 với thông báo epoch count; sau sửa PowerShell syntax PASS,
+selector exit 0, JSON `ConvertFrom-Json` PASS, assertions candidate/baseline/selected PASS.
+`GlobalCalibrationSelectionTest` 2/2 PASS, 0 failure/error/skip, BUILD SUCCESS. Hash SHA-256
+toàn bộ file trong ba run trước/sau giống nhau; không ghi đè calibration/model artifacts.
+Không chạy `Invoke-GlobalTraining.ps1`, calibration, full, ba seed hoặc bất kỳ model fit nào.
+
+**Tệp ảnh hưởng:** `scripts/Select-GlobalCalibration.ps1`, `docs/current-state.md`,
+`docs/implementation-history.md`, `docs/change-log.md`. Các JSON/log/hash dưới `output/` là
+evidence cục bộ và không phải calibration artifact đầu vào.
+
+**Giới hạn:** kiểm chứng PowerShell trên ba run Windows hiện tại và policy unit test Java;
+chưa thêm Pester suite riêng. Full training vẫn chưa chạy và chỉ được bắt đầu theo yêu cầu mới.
+
+**Commit đề xuất:** `fix: handle single-row calibration artifacts`
+
+## 048 - 2026-10-13 - Tăng Full global lên tối đa 20 epoch, patience 3
+
+**Mục tiêu và lý do:** chuẩn bị Full Global ResidualAR dùng selected batch 256/1024 với hard cap
+20 epoch và early-stopping patience 3, tránh chạm cap 10 khi validation còn cải thiện. Calibration
+256/1024 đo 68,818477 giây/epoch nhưng một epoch chỉ hỗ trợ chọn batch, không chứng minh chất lượng
+model cuối hoặc runtime Full.
+
+**Phát hiện trước sửa:** source thực tế không phải 10/3. `ExperimentConfiguration.getMaxEpochs()`
+trả Full global 10; `getPatience()` trả `SalesLstmForecaster.DEFAULT_EARLY_STOPPING_PATIENCE=5`
+cho mọi mode. Full command không nhận epoch CLI mà đi qua Java configuration. Manifest lấy trực
+tiếp hai getter. Vì vậy chỉ sửa 10→20 sẽ tạo 20/5 và không đạt target.
+
+**Thay đổi:** thêm `GLOBAL_FULL_MAX_EPOCHS=20` và `GLOBAL_FULL_PATIENCE=3`, chỉ áp dụng cho
+Full global. Preflight giữ config 10/5 nhưng không fit; Calibration giữ 1/5, Smoke/Benchmark giữ
+2/5. Cập nhật assertions config và
+test manifest metadata-only; cập nhật README, hướng dẫn GPU, current state, hồ sơ global và lịch sử.
+Không đổi CLI, selected batch, threshold, seeds, architecture, optimizer, loss, feature, split,
+train-only scaling, CUDA/dependency hoặc artifact lịch sử.
+
+**Early stopping/data leakage:** `GlobalResidualLstmForecaster` vẫn chạy validation sau mỗi epoch,
+checkpoint khi validation reconstructed-sales Macro RMSE cải thiện, reset `stale=0`, tăng stale
+khi không cải thiện và break tại `stale >= config.getPatience()`, rồi restore best params.
+Validation dataset là 2016; test 2017 không được loader global đưa vào selection và manifest ghi
+`testUsedForSelection=false`. Semantics này chỉ được inspect/static verify, không sửa.
+
+**Kiểm tra:** TDD RED hai config tests đều expected 20/actual 10. Sau sửa focused configuration
+và metadata tests **3/3 PASS**, 0 failure/error/skip, BUILD SUCCESS. Manifest tạm xác nhận
+20/3, batch 256/1024 và test exclusion. Parser PowerShell PASS cho Invoke-GlobalRun,
+Invoke-GlobalTraining và selector. Không chạy model fit, Full, Calibration hoặc Smoke.
+
+**Tệp ảnh hưởng:** `ExperimentConfiguration.java`, `GlobalStoreTest.java`,
+`GlobalPerformanceTest.java`, README gốc, `docs/gpu-training-guide.md`, `docs/current-state.md`,
+`docs/single-store-global-experiment.md`, `docs/implementation-history.md`, `docs/change-log.md`.
+
+**Giới hạn:** chưa đo số epoch thực tế, runtime hoặc chất lượng Full ba seed; cap 20 không buộc chạy
+đủ 20. Ước lượng từ một calibration epoch không gồm biến động epoch/seed, init, checkpoint/export.
+Full chỉ được chạy khi người dùng chủ động thực thi command riêng.
+
+**Commit đề xuất:** `feat: extend global full training cap to 20 epochs`

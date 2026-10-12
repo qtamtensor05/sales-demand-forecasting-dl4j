@@ -4,6 +4,32 @@
 
 **GLOBAL IMPLEMENTED / TESTED / SMOKE TESTED / RUNTIME PROFILED / RUNTIME OPTIMIZED /
 NUMERICAL EQUIVALENCE VERIFIED: YES. FULL GLOBAL EXPERIMENT: NOT RUN.**
+Ba calibration artifact RTX 3090 hoàn thành ngày 2026-10-13 đã được đọc lại mà không training:
+64/256 có RMSE 10,2836966038 và 245,840646 giây/epoch; 128/512 có RMSE 10,2957852301
+và 135,626906 giây/epoch; 256/1024 có RMSE 10,3434761594 và 68,818477 giây/epoch.
+Selector PowerShell đã sửa lỗi `Import-Csv` unwrap CSV một dòng thành scalar. Với baseline 64/256,
+ngưỡng regression 1% cho limit 10,386533569838; cả ba candidate hợp lệ và policy hiện tại chọn
+256/1024 vì nhanh nhất. Kết quả nằm tại
+`output/global-calibration-selection-selector-fix-2026-10-13.json`. Full training chưa chạy.
+Protocol Full hiện dùng batch 256/1024, seeds `[42,123,2026]`, hard cap 20 epoch/seed và
+early-stopping patience 3. Source trước lượt sửa thực tế là 10/5, không phải 10/3 như giả định;
+constants Full riêng đã được thêm để đạt đúng 20/3 mà giữ Smoke 2/5 và Calibration 1/5.
+Validation Macro RMSE được tính sau mỗi epoch; improvement reset counter và lưu checkpoint,
+ba epoch liên tiếp không cải thiện thì dừng, sau đó dùng best checkpoint. Test 2017 không tham gia.
+CUDA trên máy đích Windows 10/RTX 3090 đã được khôi phục ngày 2026-10-13. Root cause là
+classifier `windows-x86_64` của JavaCPP CUDA chỉ có JNI wrappers, trong khi classpath thiếu
+`windows-x86_64-redist` chứa `cudart64_110.dll`, cuBLAS và cuDNN. `ServiceLoader` vẫn tìm thấy
+`JCublasBackend`, nhưng `isAvailable()` reject backend do `jnicudart.dll: Can't find dependent
+libraries`, rồi ND4J báo chung `NoAvailableBackendException`. `pom.xml` nay thêm đúng runtime
+redist 11.6-8.3-1.5.7, không đổi DL4J/ND4J 1.0.0-M2.1.
+
+Kiểm chứng mới: `BackendConfigurationTest` PASS; diagnostic synthetic xác nhận backend chính xác
+`org.nd4j.linalg.jcublas.JCublasBackend`, một CUDA device, selected device 0, RTX 3090 cc 8.6,
+tensor/matrix, LSTM forward, loss, backward/update, second forward, save/load và finite prediction
+đều PASS. Full Maven suite **56/56 PASS**, 0 failure/error/skip. Global preflight dataset thật PASS:
+Store 1, 50 items, 52.300 train windows, 18.000 validation origins, 126.000 forecasts/seed.
+Không cài CUDA Toolkit, không đổi NVIDIA driver 616.56, không chạy calibration/full training;
+không thay preprocessing, train-only scaling, split hoặc model protocol.
 Ngày 2026-10-13 đã hoàn thiện source deployment-global dùng đúng ba seed `[42,123,2026]`;
 pipeline nghiên cứu cũ vẫn giữ năm seed. Mỗi cải thiện validation Macro RMSE ghi atomically
 `models/seed-<seed>/model.zip`, load-verify và so prediction trước/sau; kết thúc run ghi metadata
@@ -15,7 +41,7 @@ backend/config/counts và quyền ghi; `Invoke-GlobalTraining.ps1` cung cấp m�
 vì vậy chưa có deployment model thực tế được chọn. Suite mới 53/53 PASS, không failure/error/skip;
 chỉ dùng fixture synthetic và không chạy global experiment trên dataset thật.
 Protocol GPU mới được xác nhận sau đó: workflow một lệnh chạy preflight → smoke → calibration
-`64/256`, `128/512`, `256/1024` (train/validation batch) → full ba seed, tối đa 10 epoch.
+`64/256`, `128/512`, `256/1024` (train/validation batch) → full ba seed, tối đa 20 epoch.
 Mỗi calibration dùng toàn bộ 50 items, seed 42 và đúng một epoch. Chính sách chọn là ứng viên
 nhanh nhất có Macro RMSE không tệ hơn baseline 64/256 quá 1%; tie-break RMSE rồi train batch nhỏ.
 Quyết định được ghi `calibration-selection.json` và copy vào run full. Đây là thay đổi có chủ ý
@@ -37,7 +63,7 @@ Pipeline nghiên cứu 12 chuỗi bên dưới được giữ nguyên. CLI mới
 50 one-hot channels, scaler train-only riêng item, train/validation batch do calibration chọn,
 checkpoint validation macro RMSE.
 Full dự kiến 52.300 train windows, 18.000 validation origins, 126.000 forecasts/seed;
-đã train benchmark đủ 50 items/1 seed/2 epochs; chưa chạy full 3 seeds/tối đa 10 epochs.
+đã train benchmark đủ 50 items/1 seed/2 epochs; chưa chạy full 3 seeds/tối đa 20 epochs.
 
 Suite tại lần triển khai đầu46/46 tests, 0 failures/errors/skips, Maven BUILD SUCCESS. Smoke GPU
 `2026-10-12_193415_770_gpu` SUCCESS (1:50 phút Maven), Store1 items 1/25/50, seed42,

@@ -62,6 +62,16 @@
             <version>${dl4j.version}</version>
         </dependency>
 
+        <!-- JavaCPP's Windows CUDA classifier contains JNI wrappers only. -->
+        <!-- Add the matching CUDA 11.6/cuDNN 8.3 runtime DLL bundle explicitly. -->
+        <dependency>
+            <groupId>org.bytedeco</groupId>
+            <artifactId>cuda</artifactId>
+            <version>11.6-8.3-1.5.7</version>
+            <classifier>windows-x86_64-redist</classifier>
+            <scope>runtime</scope>
+        </dependency>
+
         <!-- Keep transitive versions on releases that include published security fixes. -->
         <dependency>
             <groupId>com.google.code.gson</groupId>
