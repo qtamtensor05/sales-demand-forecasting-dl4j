@@ -69,6 +69,9 @@ class GlobalStoreTest {
         var full = assertDoesNotThrow(() -> ExperimentConfiguration.fromArgs(new String[]{"--global-store=1"}));
         assertEquals(List.of(42L,123L,2026L),full.getSeeds());
         assertEquals(3, full.getFitCount());
+        assertEquals(10,full.getMaxEpochs());
+        assertEquals(64,full.getBatchSize());
+        assertEquals(256,ExperimentConfiguration.fromArgs(new String[]{"--global-store=1","--validation-batch-size=256"}).getValidationBatchSize());
         assertEquals(List.of(2026L,42L),ExperimentConfiguration.fromArgs(new String[]{"--global-store=1","--seeds=2026,42"}).getSeeds());
         assertEquals(java.util.List.of("GlobalResidualAR"), full.getModels());
         var smoke = ExperimentConfiguration.fromArgs(new String[]{"--global-store-smoke"});
@@ -78,6 +81,9 @@ class GlobalStoreTest {
         assertEquals(180, ExperimentConfiguration.residual().getFitCount());
         assertEquals(List.of(42L,123L,2026L,7L,99L),ExperimentConfiguration.legacy().getSeeds());
         assertThrows(IllegalArgumentException.class,()->ExperimentConfiguration.fromArgs(new String[]{"--global-store=1","--seeds=42,42"}));
+        var calibration=ExperimentConfiguration.fromArgs(new String[]{"--global-store-calibration=1","--batch-size=128","--validation-batch-size=512"});
+        assertTrue(calibration.isCalibration());assertEquals(List.of(42L),calibration.getSeeds());
+        assertEquals(1,calibration.getMaxEpochs());assertEquals(128,calibration.getBatchSize());assertEquals(512,calibration.getValidationBatchSize());
     }
 
     @Test void globalDatasetFunctionalityExists() {

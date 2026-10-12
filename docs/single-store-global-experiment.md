@@ -417,3 +417,21 @@ CPU backend sinh WARNING. Quy trình portable:
 
 Script dùng build snapshot cô lập, Tee log và lưu exit code. Audit yêu cầu `SUCCESS`, đủ artifact,
 150 metric rows và 378.000 predictions. Full 3 seed **chưa chạy**, nên chưa có model thật được chọn.
+
+## Protocol RTX 3090: calibration batch và full tối đa 10 epoch
+
+Quyết định ngày 2026-10-13 này supersede batch 64/max 30 cho future deployment run. Một command
+chạy tuần tự: preflight; smoke GPU 3 items với train/validation batch 64/256; ba calibration
+toàn bộ 50 items bằng seed 42, đúng một epoch cho các cặp 64/256, 128/512, 256/1024; sau đó full
+ba seed với cặp được chọn và tối đa 10 epoch, patience vẫn 5.
+
+Calibration ghi Macro RMSE validation sales gốc và `train_seconds + validation_seconds` của epoch.
+Baseline là 64/256. Ứng viên hợp lệ nếu RMSE không cao hơn baseline quá 1%; trong tập hợp đó chọn
+sec/epoch thấp nhất, rồi RMSE thấp hơn, rồi train batch nhỏ hơn. `calibration-selection.json` ghi
+policy, threshold, baseline, limit, toàn bộ candidates và selected pair. Calibration không tạo
+deployment package; chỉ full mới lưu checkpoint mỗi seed và `deployment/model.zip`.
+
+Batch size là thay đổi hiệu năng đã được người dùng phê duyệt, không đổi tensor channels/window,
+target, scaler train-only, validation population hoặc model selection. Một epoch calibration chỉ
+là phép chọn cấu hình vận hành; không là kết luận chất lượng model. Chưa chạy workflow này trên
+RTX 3090 nên khoảng 10–30 phút chưa được xác nhận bằng đo thực tế.

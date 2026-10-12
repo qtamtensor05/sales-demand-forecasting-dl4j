@@ -23,14 +23,19 @@ windows, 18.000 validation origins và 126.000 forecasts/seed. Không chạy ful
 .\scripts\Invoke-GlobalTraining.ps1
 ```
 
-Expected: 3 fits, tối đa 30 epoch/seed, patience 5, batch 64. Script không cài dependency và
-không tự giảm batch. Log ở `output/global-full-*.log`, exit code ở file thêm `.exit`.
+Một command tự chạy preflight, smoke GPU, rồi calibration ba cặp train/validation batch:
+`64/256`, `128/512`, `256/1024`. Mỗi candidate dùng seed 42, toàn bộ 50 items và một epoch.
+Ứng viên nhanh nhất trong ngưỡng Macro RMSE không tệ hơn baseline 64/256 quá 1% được chọn.
+Sau đó full chạy 3 fits, tối đa 10 epoch/seed, patience 5 bằng cặp đã chọn. Script không cài
+dependency hoặc âm thầm đổi batch khi OOM. Log từng phase ở `output/global-*.log`, exit code ở
+file thêm `.exit`; quyết định calibration ở `output/global-calibration-selection-*.json`.
 
 Run ở `output/runs/<run-id>/`. Thành công khi `.exit` là `0`, Maven có `BUILD SUCCESS`, và
 `run.json` có `status: SUCCESS`. Checkpoint seed ở `models/seed-*/`; model thắng ở
 `deployment/model.zip`; `deployment/selection.json` ghi seed, epoch, Macro RMSE và nguồn.
 Metric nằm trong `global-item-seed-metrics.csv`, `global-epoch-history.csv`; runtime trong
 `performance-profile.json`.
+Run full còn có `calibration-selection.json` để nối model deployment với phép đo chọn batch.
 
 ```powershell
 .\scripts\Audit-GlobalRun.ps1

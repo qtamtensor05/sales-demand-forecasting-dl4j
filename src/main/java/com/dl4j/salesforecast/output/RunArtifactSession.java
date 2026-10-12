@@ -130,7 +130,7 @@ public final class RunArtifactSession implements AutoCloseable {
         if (!configuration.isGlobalStore() || terminal) { throw new IllegalStateException("Active global session required"); }
         long artifactStart=System.nanoTime();
         String summary = GlobalArtifactExporter.write(result, configuration, directory);
-        GlobalModelArtifacts.finalizeArtifacts(result,configuration,directory,runId,datasetSha256);
+        if(!configuration.isCalibration()) GlobalModelArtifacts.finalizeArtifacts(result,configuration,directory,runId,datasetSha256);
         long reportStart=System.nanoTime();
         Files.writeString(directory.resolve("summary.txt"), summary, StandardCharsets.UTF_8);
         Files.writeString(directory.resolve("error-analysis.txt"), summary, StandardCharsets.UTF_8);
@@ -220,6 +220,7 @@ public final class RunArtifactSession implements AutoCloseable {
             values.put("schemaVersion", 4);
             values.put("mode", "SINGLE_STORE_GLOBAL");
             values.put("benchmark", configuration.isBenchmark());
+            values.put("calibration", configuration.isCalibration());
             values.put("performanceProfile", "performance-profile.json");
             values.put("storeId", configuration.getStoreId());
             values.put("itemCount", configuration.getItemIds().size());
@@ -233,6 +234,7 @@ public final class RunArtifactSession implements AutoCloseable {
             values.put("identityMapping", "itemId 1..50 -> channel dynamicFeatureCount + itemId - 1, repeated each timestep");
             values.put("totalFeatureCount", com.dl4j.salesforecast.model.GlobalBatch.CHANNELS);
             values.put("batchSize", configuration.getBatchSize());
+            values.put("validationBatchSize", configuration.getValidationBatchSize());
             values.put("horizon", ExperimentConfiguration.HORIZON);
             values.put("validationPeriod", "2016-01-01..2016-12-31");
             values.put("testPeriod", "2017-01-01..2017-12-31");

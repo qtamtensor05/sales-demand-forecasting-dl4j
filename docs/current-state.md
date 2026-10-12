@@ -14,6 +14,14 @@ backend/config/counts và quyền ghi; `Invoke-GlobalTraining.ps1` cung cấp m�
 `Audit-GlobalRun.ps1` kiểm SUCCESS cùng 150 metric rows/378.000 predictions. Full 3 seed chưa chạy,
 vì vậy chưa có deployment model thực tế được chọn. Suite mới 53/53 PASS, không failure/error/skip;
 chỉ dùng fixture synthetic và không chạy global experiment trên dataset thật.
+Protocol GPU mới được xác nhận sau đó: workflow một lệnh chạy preflight → smoke → calibration
+`64/256`, `128/512`, `256/1024` (train/validation batch) → full ba seed, tối đa 10 epoch.
+Mỗi calibration dùng toàn bộ 50 items, seed 42 và đúng một epoch. Chính sách chọn là ứng viên
+nhanh nhất có Macro RMSE không tệ hơn baseline 64/256 quá 1%; tie-break RMSE rồi train batch nhỏ.
+Quyết định được ghi `calibration-selection.json` và copy vào run full. Đây là thay đổi có chủ ý
+so với batch 64/max 30 trước đó; train-only scaler, split, feature, target và test exclusion giữ nguyên.
+Sau thay đổi này full suite đạt 55/55 tests, 0 failures/errors/skips; selector PowerShell synthetic
+chọn đúng 128/512 trong fixture khi 256/1024 nhanh hơn nhưng vượt ngưỡng RMSE. Không chạy dataset thật.
 Ngày 2026-10-13: benchmark 50 items, seed 42, 2 epochs/batch 64 BEFORE
 `2026-10-12_201423_002_gpu` và AFTER `2026-10-13_002648_831_gpu` đều SUCCESS/exit0.
 Ứng dụng giảm 1.202,922 → 1.060,531 giây (1,1343×; giảm 11,84%). Giữ immutable validation
@@ -26,9 +34,10 @@ Kiểm tra 47 liên kết local và git diff --check đạt. Chi tiết, giới 
 profile và lệnh build cô lập tại [runtime optimization](single-store-global-experiment.md#runtime-optimization-ngày-2026-10-13).
 Pipeline nghiên cứu 12 chuỗi bên dưới được giữ nguyên. CLI mới `--global-store=1` dùng toàn bộ
 50 items, một Global ResidualAR-MSE mỗi seed: chỉ 3 global fits. Window 30→7, 6 dynamic +
-50 one-hot channels, scaler train-only riêng item, batch64, checkpoint validation macro RMSE.
+50 one-hot channels, scaler train-only riêng item, train/validation batch do calibration chọn,
+checkpoint validation macro RMSE.
 Full dự kiến 52.300 train windows, 18.000 validation origins, 126.000 forecasts/seed;
-đã train benchmark đủ 50 items/1 seed/2 epochs; chưa chạy full 3 seeds/tối đa 30 epochs.
+đã train benchmark đủ 50 items/1 seed/2 epochs; chưa chạy full 3 seeds/tối đa 10 epochs.
 
 Suite tại lần triển khai đầu46/46 tests, 0 failures/errors/skips, Maven BUILD SUCCESS. Smoke GPU
 `2026-10-12_193415_770_gpu` SUCCESS (1:50 phút Maven), Store1 items 1/25/50, seed42,

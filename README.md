@@ -34,7 +34,8 @@ kể cả bản ghi trùng; phát hiện trùng không tự loại bỏ dữ li�
 Pipeline nghiên cứu 12 chuỗi độc lập ở dưới vẫn được giữ nguyên. Chế độ mới dùng Store 1,
 **toàn bộ 50 items học chung một Global ResidualAR-MSE mỗi seed**: deployment full chỉ 3 global fits,
 không phải 250 fits. Input 6 dynamic + 50 one-hot channels, per-item train-only scaler,
-mini-batch 64, checkpoint theo validation macro RMSE qua items. Weekly tính lại đúng population.
+train/validation batch được calibration trên GPU đích, checkpoint theo validation macro RMSE qua
+items. Weekly tính lại đúng population.
 
 ```powershell
 mvn -B compile exec:java '-Dexec.args=--global-store-smoke'
@@ -48,8 +49,10 @@ Smoke dùng items 1/25/50, seed 42, tối đa 2 epoch. Preflight và full portab
 ```
 
 Chạy từ root repository; không build/test khác khi đang train. Đổi store bằng `=2`;
-có thể chỉ định CLI `--seeds=42` để retry một seed; script full cố định `42,123,2026`.
-Không tự đổi batch khi OOM. Full 3 seed chưa chạy. Benchmark50items/seed42/2epochs đã kiểm chứng tối ưu runtime:
+có thể chỉ định CLI `--seeds=42` để retry một seed. Workflow RTX 3090 tự smoke rồi calibration
+train/validation batch `64/256`, `128/512`, `256/1024`; chọn candidate nhanh nhất trong ngưỡng
+RMSE baseline +1%, sau đó full cố định `42,123,2026`, tối đa 10 epoch/seed. Không tự đổi batch
+khi OOM. Full 3 seed chưa chạy. Benchmark50items/seed42/2epochs đã kiểm chứng tối ưu runtime:
 20:03→17:41 trong ứng dụng,51/51tests PASS,126.000predictions khớp tại precisionCSV.
 Giữ kết quả validation best epoch để xuất, vẫn chấm đủ từng epoch. Dùng script tạo build snapshot
 riêng để tránh IDE ghi đè runtime classes; lệnh sau chạy benchmark, chỉ khi chủ động chạy full
@@ -61,7 +64,7 @@ Set-Location 'C:\Users\quangTam\Documents\DL4j\sales-demand-forecasting-dl4j'
 ```
 
 Script tự lưu log/Tee-Object và exitcode. `--global-store-benchmark[=1]` giữ tất cả50items,
-chỉ giới hạn seed42/2epochs và ghi BENCHMARK ONLY; CLI full dùng 3 seeds/30epochs/patience5/batch64.
+chỉ giới hạn seed42/2epochs và ghi BENCHMARK ONLY; CLI full dùng 3 seeds/max10epochs/patience5.
 Mỗi seed giữ checkpoint riêng trong `models/seed-*/`; model thắng và toàn bộ scaler/mapping/schema
 nằm trong `deployment/`. Chạy `scripts/Audit-GlobalRun.ps1` sau full để kiểm status và row counts.
 Xem [hồ sơ global](docs/single-store-global-experiment.md)

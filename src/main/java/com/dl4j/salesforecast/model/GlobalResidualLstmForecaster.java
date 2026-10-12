@@ -57,7 +57,7 @@ public final class GlobalResidualLstmForecaster {
                 profile.record("train.total",start); profile.record("seed."+seed+".epoch."+epoch+".train",start);
                 profile.count("train.batches",batches); profile.count("seed."+seed+".epoch."+epoch+".batches",batches);
                 double trainSeconds=seconds(start);long evaluationStart=System.nanoTime();
-                var evaluation=evaluate(input->network.output(input,false),data.validation,config.getBatchSize(),profile);
+                var evaluation=evaluate(input->network.output(input,false),data.validation,config.getValidationBatchSize(),profile);
                 double validationSeconds=seconds(evaluationStart);
                 profile.record("seed."+seed+".epoch."+epoch+".validation",evaluationStart);
                 history.add(new Epoch(epoch,loss,evaluation.withoutPredictions(),trainSeconds,validationSeconds));

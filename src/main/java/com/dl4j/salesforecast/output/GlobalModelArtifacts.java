@@ -73,6 +73,7 @@ public final class GlobalModelArtifacts {
         selection.put("selectionMetric","validationMacroRMSE");selection.put("validationMacroRMSE",selected.validation.macroRmse);
         selection.put("sourceCheckpoint",runDirectory.relativize(selected.checkpoint).toString().replace('\\','/'));
         selection.put("runId",runId);selection.put("datasetSha256",datasetHash);
+        selection.put("trainBatchSize",config.getBatchSize());selection.put("validationBatchSize",config.getValidationBatchSize());
         selection.put("tieBreak","lower validation macro RMSE, then lower validation macro MAE, then lower seed ID");
         writeJsonAtomic(deployment.resolve("selection.json"),selection);
     }
@@ -93,6 +94,7 @@ public final class GlobalModelArtifacts {
         values.put("targetPolicy","(actual-observedSales(t-7))/trainSalesScale; reconstruct baseline+output*scale");
         values.put("loss","MSE");values.put("optimizer","Adam");values.put("learningRate",ExperimentRunner.DEFAULT_LEARNING_RATE);
         values.put("batchSize",config.getBatchSize());values.put("hiddenUnits",ExperimentRunner.DEFAULT_HIDDEN_UNITS);
+        values.put("validationBatchSize",config.getValidationBatchSize());
         String dl4jVersion=MultiLayerNetwork.class.getPackage().getImplementationVersion();
         values.put("javaVersion",System.getProperty("java.version"));values.put("dl4jVersion",dl4jVersion==null?"unknown":dl4jVersion);
         values.put("nd4jBackend",Nd4j.getBackend().getClass().getName());values.put("createdAt",Instant.now().toString());

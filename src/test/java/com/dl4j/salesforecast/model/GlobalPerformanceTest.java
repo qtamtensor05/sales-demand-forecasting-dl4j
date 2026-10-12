@@ -115,7 +115,7 @@ class GlobalPerformanceTest {
         assertEquals(64, benchmark.getBatchSize());
         assertEquals(5, benchmark.getPatience());
         assertEquals(1, benchmark.getFitCount());
-        assertEquals(30, full.getMaxEpochs());
+        assertEquals(10, full.getMaxEpochs());
         assertEquals(3, full.getFitCount());
     }
 }

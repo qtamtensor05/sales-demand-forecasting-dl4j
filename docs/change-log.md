@@ -1294,3 +1294,33 @@ thật hoặc runtime mới; audit 150/378.000 chỉ có thể chạy sau full. 
 độc lập từ nhiều máy.
 
 **Commit đề xuất:** `feat: prepare portable global DL4J training and model selection`
+
+## 045 - 2026-10-13 - Thêm calibration batch cho workflow RTX 3090
+
+**Mục tiêu:** xác nhận và triển khai protocol mới preflight → GPU smoke → calibration ba cặp
+train/validation batch → full ba seed tối đa 10 epoch → checkpoint/deployment.
+
+**Lý do:** RTX 3090 24GB có thể dùng batch lớn hơn; cần đo sec/epoch và validation Macro RMSE
+trước khi khóa cấu hình full, thay vì tiếp tục batch 64/max 30 không hiệu chỉnh trên máy đích.
+
+**Đã thay đổi:** `ExperimentConfiguration` tách train/validation batch, thêm calibration một epoch
+seed 42 và giảm full global xuống max 10 epoch. Forecaster dùng validation batch riêng. Thêm selector
+Java và PowerShell với policy baseline 64/256, ngưỡng RMSE +1%, ưu tiên thời gian, RMSE, batch nhỏ.
+`Invoke-GlobalTraining.ps1` chạy tuần tự preflight, smoke 64/256, calibration 64/256–128/512–
+256/1024 và full bằng candidate thắng. Manifest/model metadata/deployment selection ghi cả hai batch;
+run full nhận bản sao `calibration-selection.json`. Calibration không tạo deployment giả.
+
+**Tệp chính:** configuration, forecaster, runner/report/Main/session/model artifacts; test calibration;
+`Invoke-GlobalRun.ps1`, `Invoke-GlobalTraining.ps1`, `Select-GlobalCalibration.ps1`, audit script;
+README và tài liệu global/GPU/current-state/history/change-log.
+
+**Kiểm tra:** RED test compile xác nhận API calibration chưa tồn tại. Focused sau triển khai 14/14
+PASS. `mvn -B -Dmaven.repo.local=C:\Users\quangTam\.m2\repository test`: **55/55 PASS**, không
+failure/error/skip, BUILD SUCCESS, 3:31. PowerShell parser PASS; integration fixture chọn đúng
+128/512 và loại 256/1024 dù nhanh hơn vì RMSE vượt ngưỡng. Không chạy dữ liệu thật.
+
+**Giới hạn:** chưa chạy preflight/smoke/calibration/full trên RTX 3090; chưa biết batch thắng,
+sec/epoch, RMSE, runtime full hoặc deployment model. Ngưỡng 1% là policy vận hành đã ghi rõ,
+không phải kết luận thống kê từ nhiều seed.
+
+**Commit đề xuất:** `feat: add calibrated RTX 3090 global training workflow`

@@ -29,8 +29,8 @@ public final class GlobalExperimentRunner {
             throw new IllegalArgumentException("Global configuration/item coverage mismatch");
         }
         long featureBytes=4L*config.getBatchSize()*GlobalBatch.CHANNELS*ExperimentConfiguration.INPUT_DAYS;
-        System.out.printf("GLOBAL store=%d items=%d globalFits=%d trainWindows=%d validationOrigins=%d batchSize=%d featureBytesPerBatch=%d%n",
-                data.storeId,data.items.size(),config.getFitCount(),data.train.size(),data.validation.size(),config.getBatchSize(),featureBytes);
+        System.out.printf("GLOBAL store=%d items=%d globalFits=%d trainWindows=%d validationOrigins=%d trainBatchSize=%d validationBatchSize=%d featureBytesPerBatch=%d%n",
+                data.storeId,data.items.size(),config.getFitCount(),data.train.size(),data.validation.size(),config.getBatchSize(),config.getValidationBatchSize(),featureBytes);
         for(var item:data.items) { System.out.printf("item=%d trainWindows=%d validationOrigins=%d%n",item.id,item.train.getWindows().size(),item.validation.getWindows().size()); }
         if(data.items.stream().map(i->i.train.getWindows().size()).distinct().count()>1) {
             System.out.println("WARNING: unequal training windows per item; no resampling applied.");

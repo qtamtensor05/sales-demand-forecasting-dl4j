@@ -8,6 +8,9 @@ import java.util.stream.Collectors;
 public final class GlobalExperimentReport {
     public static String format(GlobalExperimentRunner.Result result, ExperimentConfiguration config) {
         String report = format(result,config.isSmoke());
+        if(config.isCalibration()) return report.replace("FULL SINGLE-STORE GLOBAL VALIDATION",
+                "CALIBRATION ONLY: one epoch for batch selection, not model-quality evidence")
+                .replace("Selected deployment model:","Calibration candidate:");
         return config.isBenchmark() ? report.replace("FULL SINGLE-STORE GLOBAL VALIDATION",
                 "BENCHMARK ONLY: 50-item runtime check, not full model-quality experiment") : report;
     }

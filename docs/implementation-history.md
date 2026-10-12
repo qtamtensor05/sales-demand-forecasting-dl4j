@@ -719,3 +719,25 @@ scaler/mapping/schema, deterministic selection và deployment artifact. Kết qu
 chưa implement distributed aggregation nhiều máy.
 
 **Commit đề xuất:** `feat: prepare portable global DL4J training and model selection`.
+
+## 32. Workflow RTX 3090 có smoke, calibration batch và full 10 epoch
+
+**Yêu cầu:** thay protocol batch 64/max 30 bằng chuỗi preflight → GPU smoke → calibration
+64/256, 128/512, 256/1024 → chọn cấu hình → full 3 seed × tối đa 10 epoch.
+
+**Thay đổi:** cấu hình tách train/validation batch; calibration mode dùng seed 42, 50 items,
+một epoch; full global mặc định tối đa 10 epoch. Selector giữ RMSE bằng ngưỡng baseline +1%, rồi
+ưu tiên sec/epoch, RMSE và train batch. Script một lệnh chạy đủ phase, lưu selection artifact và
+copy provenance vào run full. Calibration không tạo deployment checkpoint; full vẫn lưu best model
+từng seed và chọn deployment bằng validation Macro RMSE.
+
+**Bất biến giữ nguyên:** scaler fit train-only, split 2013–2015/2016, tensor 56×30, H1–H7,
+ResidualAR-MSE, LSTM 32, Adam 0,001, patience 5 và không dùng test 2017 để chọn.
+
+**Kiểm chứng:** focused 14/14 PASS; full Maven 55/55 PASS; PowerShell selector integration và parser
+PASS. Chỉ dùng fixture synthetic, không chạy smoke/calibration/full thật.
+
+**Giới hạn:** chưa đo RTX 3090 nên khoảng calibration 10–30 phút, cấu hình thắng, runtime full và
+deployment model vẫn chưa biết.
+
+**Commit đề xuất:** `feat: add calibrated RTX 3090 global training workflow`.

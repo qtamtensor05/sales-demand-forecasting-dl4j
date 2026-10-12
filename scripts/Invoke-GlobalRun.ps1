@@ -1,6 +1,10 @@
 param(
-    [ValidateSet('Smoke', 'Benchmark', 'Preflight', 'Full')]
-    [string]$Mode = 'Smoke'
+    [ValidateSet('Smoke', 'Benchmark', 'Preflight', 'Calibration', 'Full')]
+    [string]$Mode = 'Smoke',
+    [ValidateSet(64,128,256)]
+    [int]$TrainBatchSize = 64,
+    [ValidateSet(64,256,512,1024)]
+    [int]$ValidationBatchSize = 64
 )
 
 $ErrorActionPreference = 'Stop'
@@ -18,10 +22,11 @@ Copy-Item -LiteralPath 'pom.xml' -Destination (Join-Path $buildSnapshot 'pom.xml
 Copy-Item -LiteralPath 'src' -Destination (Join-Path $buildSnapshot 'src') -Recurse
 $globalRunLog = Join-Path $projectRoot ('output/global-' + $Mode.ToLowerInvariant() + '-' + $runStamp + '.log')
 $globalArgs = switch ($Mode) {
-    'Smoke' { '--global-store-smoke=1' }
+    'Smoke' { "--global-store-smoke=1 --batch-size=$TrainBatchSize --validation-batch-size=$ValidationBatchSize" }
     'Benchmark' { '--global-store-benchmark=1' }
-    'Preflight' { '--global-preflight --global-store=1 --seeds=42,123,2026' }
-    'Full' { '--global-store=1 --seeds=42,123,2026' }
+    'Preflight' { "--global-preflight --global-store=1 --seeds=42,123,2026 --batch-size=$TrainBatchSize --validation-batch-size=$ValidationBatchSize" }
+    'Calibration' { "--global-store-calibration=1 --batch-size=$TrainBatchSize --validation-batch-size=$ValidationBatchSize" }
+    'Full' { "--global-store=1 --seeds=42,123,2026 --batch-size=$TrainBatchSize --validation-batch-size=$ValidationBatchSize" }
 }
 
 Write-Host "Build snapshot: $buildSnapshot"
