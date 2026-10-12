@@ -1,5 +1,28 @@
 # Trạng thái hiện tại
 
+## Pipeline ứng dụng: Store 1, global model cho 50 items
+
+**IMPLEMENTED / TESTED / SMOKE TESTED / FULL GLOBAL EXPERIMENT NOT RUN.**
+Pipeline nghiên cứu 12 chuỗi bên dưới được giữ nguyên. CLI mới `--global-store=1` dùng toàn bộ
+50 items, một Global ResidualAR-MSE mỗi seed: chỉ 5 global fits. Window 30→7, 6 dynamic +
+50 one-hot channels, scaler train-only riêng item, batch64, checkpoint validation macro RMSE.
+Full dự kiến 52.300 train windows, 18.000 validation origins, 126.000 forecasts/seed;
+đã kiểm tra coverage dữ liệu và test loader 50 items, chưa train full 50 items.
+
+Suite hiện tại 46/46 tests, 0 failures/errors/skips, Maven BUILD SUCCESS. Smoke GPU
+`2026-10-12_193415_770_gpu` SUCCESS (1:50 phút Maven), Store1 items 1/25/50, seed42,
+2 epoch, best2, một model chung. Macro MAE/RMSE Global 8,686371/10,844962 và Weekly
+8,606614/10,793978; pooled RMSE 11,247555 và 11,201497. Smoke thắng Weekly 0/3,
+không là kết luận chất lượng 50 items/5 seeds.
+
+Schema4 riêng có scaler/item-seed/prediction/epoch CSV, macro/pooled/item/horizon/tier/seed report.
+Đủ 7.560 predictions, 3 scaler rows, 3 metric rows, 2 epoch rows và 1 best flag;
+keys duy nhất, finite, hash đúng, metric recompute trong 4,9e-11, reconstruction dưới 1,5e-14.
+Không dùng test 2017 selection; không tuning Huber/log1p/embedding hoặc thay pipeline cũ.
+Full có thể dài: ngoại suy từ smoke khoảng 9,5–11 phút/epoch, tối đa 24–28 giờ cho 150 epoch;
+early stopping có thể giảm, chưa đo full. Xem [hồ sơ global](single-store-global-experiment.md)
+cho thiết kế, tệp, tests, lệnh và giới hạn. Không commit/push.
+
 ## ResidualAR Huber — full hoàn tất ngày 2026-10-12
 
 **IMPLEMENTED / TESTED / SMOKE TESTED / FULL EXPERIMENT COMPLETED.**

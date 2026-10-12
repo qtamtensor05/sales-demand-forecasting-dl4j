@@ -126,6 +126,28 @@ public final class RunArtifactSession implements AutoCloseable {
         }
     }
 
+    public void complete(com.dl4j.salesforecast.model.GlobalExperimentRunner.Result result) throws IOException {
+        if (!configuration.isGlobalStore() || terminal) { throw new IllegalStateException("Active global session required"); }
+        long artifactStart=System.nanoTime();
+        String summary = GlobalArtifactExporter.write(result, configuration, directory);
+        long reportStart=System.nanoTime();
+        Files.writeString(directory.resolve("summary.txt"), summary, StandardCharsets.UTF_8);
+        Files.writeString(directory.resolve("error-analysis.txt"), summary, StandardCharsets.UTF_8);
+        Files.writeString(directory.resolve("report.html"), html(summary)
+                .replace("epoch-history.csv", "global-epoch-history.csv")
+                .replace("seed-metrics.csv", "global-item-seed-metrics.csv")
+                .replace("validation-predictions.csv", "global-validation-predictions.csv"), StandardCharsets.UTF_8);
+        result.profile.record("artifact.reportWrite",reportStart);
+        // A profile must exist before SUCCESS; refresh it after measuring manifest finalization.
+        result.profile.write(directory);
+        long manifestStart=System.nanoTime();
+        writeManifest("SUCCESS", null);
+        result.profile.record("artifact.manifest",manifestStart);
+        result.profile.record("artifact.total",artifactStart);
+        result.profile.write(directory);
+        terminal = true;
+    }
+
     public Path getDirectory() { return directory; }
 
     private void installConsoleCapture() throws IOException {
@@ -193,6 +215,36 @@ public final class RunArtifactSession implements AutoCloseable {
                 ? "(sales(t)-observedSales(t-7))/salesScale; inverse: baseline + output*salesScale" : "disabled");
         values.put("residualScalerFit", false);
         values.put("scalerArtifact", "series-scaling.csv");
+        if (configuration.isGlobalStore()) {
+            values.put("schemaVersion", 4);
+            values.put("mode", "SINGLE_STORE_GLOBAL");
+            values.put("benchmark", configuration.isBenchmark());
+            values.put("performanceProfile", "performance-profile.json");
+            values.put("storeId", configuration.getStoreId());
+            values.put("itemCount", configuration.getItemIds().size());
+            values.put("itemIds", configuration.getItemIds());
+            values.put("modelType", "GlobalResidualAR");
+            values.put("targetType", "WEEKLY_RESIDUAL");
+            values.put("lossFunction", "MSE");
+            values.put("itemIdentityType", "ONE_HOT");
+            values.put("dynamicFeatureCount", com.dl4j.salesforecast.model.GlobalBatch.DYNAMIC);
+            values.put("identityFeatureCount", ExperimentConfiguration.ITEM_IDENTITY_COUNT);
+            values.put("identityMapping", "itemId 1..50 -> channel dynamicFeatureCount + itemId - 1, repeated each timestep");
+            values.put("totalFeatureCount", com.dl4j.salesforecast.model.GlobalBatch.CHANNELS);
+            values.put("batchSize", configuration.getBatchSize());
+            values.put("horizon", ExperimentConfiguration.HORIZON);
+            values.put("validationPeriod", "2016-01-01..2016-12-31");
+            values.put("testPeriod", "2017-01-01..2017-12-31");
+            values.put("testEvaluated", false);
+            values.put("scalingPolicy", "PER_ITEM_TRAIN_ONLY");
+            values.put("seriesSelection", configuration.isSmoke() ? "Fixed smoke item IDs 1,25,50" : "ALL item IDs 1..50; no subset selection");
+            values.put("scalerArtifact", "global-series-scaling.csv");
+            values.put("checkpointCriterion", "validation H1-H7 reconstructed-sales macro RMSE across all included items");
+            values.put("shuffle", "train windows only; java.util.Random(seed + 1000003 * epoch), chronology within sample unchanged");
+            values.put("trainingLossAggregation", "sample-weighted mean of post-update minibatch scores, parameters change within epoch");
+            values.put("tensorFeatureBytesPerBatch", 4L * configuration.getBatchSize() * com.dl4j.salesforecast.model.GlobalBatch.CHANNELS * ExperimentConfiguration.INPUT_DAYS);
+            values.put("memoryEstimateScope", "input tensor only, excludes labels, masks, activations, gradients, workspaces and CPU windows");
+        }
         if (error != null) { values.put("error", error); }
         String json = new com.google.gson.GsonBuilder().setPrettyPrinting().create().toJson(values) + "\n";
         Path temporary = manifest.resolveSibling("run.json.tmp");

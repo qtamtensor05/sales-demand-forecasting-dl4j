@@ -1180,3 +1180,43 @@ validation dùng chọn epoch, windows chồng lấn, chưa CI/test độc lập
 residual + variance stabilization/log1p; không triển khai trong yêu cầu báo cáo này.
 
 **Commit đề xuất:** `docs: report full residual Huber validation results`
+
+## 042 - 2026-10-12 - Global ResidualAR một cửa hàng, nhiều items
+
+**Mục tiêu và lý do:** bổ sung pipeline ứng dụng một store/nhiều items, một global model mỗi
+seed; giữ nghiên cứu 12 chuỗi độc lập và không tiếp tục tuning Huber/log1p.
+
+**Triển khai:** đọc panel Store một pass, kiểm tra đủ 50 IDs, tái sử dụng per-item preprocessing/
+train-only scaling. Global ResidualAR-MSE nhận 6 dynamic + 50 one-hot channels, output1,
+LSTM32/Adam0,001, mini-batch64, deterministic train shuffle. Một fit học tất cả items;
+full năm seeds chỉ 5 fits. Rollout causal H1–H7 dùng residual utilities, checkpoint macro RMSE
+sales qua items, pooled báo riêng. CLI global/smoke có storeId và batchSize, schema4 riêng
+reuse immutable run lifecycle; không thay schema/behavior legacy.
+
+**Tệp:** thêm SingleStoreGlobalDataset, GlobalBatch, GlobalMetrics, GlobalResidualLstmForecaster,
+GlobalExperimentRunner/Report, GlobalArtifactExporter và GlobalStoreTest. Sửa Main,
+ExperimentConfiguration, TimeSeriesAnalyzer (panel reader), AR (visibility helper causal),
+RunArtifactSession; cập nhật README/docs index/current-state/history/change-log và
+[single-store-global-experiment.md](single-store-global-experiment.md).
+
+**Kiểm chứng:** TDD RED 2 failures/0 errors vì thiếu global CLI/dataset; preprocessing 3/3,
+focused 6/6; sau thêm full-panel fixture, suite 46/46, không failures/errors/skips, exit0,
+BUILD SUCCESS 1:53 phút. Có tests 50 items/52.300 windows, scalers, constant item, identity/mask,
+batch/shuffle, no future leakage, shared synthetic fit, macro khác pooled, restore checkpoint,
+artifact uniqueness và SUCCESS/FAILED; legacy tests giữ nguyên.
+
+**Smoke:** `2026-10-12_193415_770_gpu` SUCCESS trên JCublasBackend/Java11.0.32.1,
+Store1 items 1/25/50, seed42, 1 fit, 2 epoch/best2, Maven exit0/BUILD SUCCESS 1:50 phút.
+Đủ 9 artifact, 3 scaling rows, 3 item-seed rows, 2 epoch rows, 1 best flag, 7.560 predictions.
+Keys duy nhất, finite, H1–H7 đủ, hash và per-item train scalers khớp CSV. Metric tái tính
+lệch tối đa 4,8131e-11; reconstruction 1,4100e-14. Global/Weekly macro RMSE
+10,844962/10,793978, thắng0/3; không dùng smoke kết luận chất lượng full.
+
+**Review và giới hạn:** không thấy lỗi chặn trong phạm vi review/test/smoke; Markdown links
+và git diff --check đạt. IMPLEMENTED / TESTED / SMOKE TESTED / FULL GLOBAL EXPERIMENT NOT RUN.
+Full50 chưa train, chỉ kiểm tra loader/coverage; chưa có win rate50, seed stability hoặc kết luận
+so Weekly toàn Store1. Ngoại suy smoke 9,5–11 phút/epoch, tối đa24–28 giờ cho150 epoch;
+early stopping có thể giảm, chưa đo thực tế full. Không auto-run full, test selection2017,
+embedding/ensemble/tuning. Chưa checkpoint disk/resume; không commit/push.
+
+**Commit đề xuất:** `feat: add single-store global residual forecasting`

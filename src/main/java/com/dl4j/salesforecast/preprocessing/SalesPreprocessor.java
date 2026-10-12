@@ -33,6 +33,12 @@ public final class SalesPreprocessor {
     public static PreprocessingResult preprocess(TimeSeriesResult series,
                                                 LocalDate trainEnd, LocalDate validationEnd,
                                                 int inputDays, int forecastDays) {
+        return preprocess(series, trainEnd, validationEnd, inputDays, forecastDays, null);
+    }
+    public static PreprocessingResult preprocess(TimeSeriesResult series,
+                                                LocalDate trainEnd, LocalDate validationEnd,
+                                                int inputDays, int forecastDays,
+                                                com.dl4j.salesforecast.performance.GlobalPerformanceProfile profile) {
         Objects.requireNonNull(series, "series");
         Objects.requireNonNull(trainEnd, "trainEnd");
         Objects.requireNonNull(validationEnd, "validationEnd");
@@ -61,6 +67,7 @@ public final class SalesPreprocessor {
                     + FEATURE_HISTORY_DAYS + " days of causal feature history before its input window.");
         }
 
+        long started = System.nanoTime();
         double min = Double.POSITIVE_INFINITY;
         double max = Double.NEGATIVE_INFINITY;
         for (int i = 0; i < trainSize; i++) {
@@ -68,15 +75,20 @@ public final class SalesPreprocessor {
             max = Math.max(max, raw.get(i));
         }
         MinMaxScaler scaler = new MinMaxScaler(min, max);
+        if (profile != null) { profile.record("data.scalers", started); }
+        started = System.nanoTime();
         List<Double> normalized = new ArrayList<>();
         for (double value : raw) { normalized.add(scaler.transform(value)); }
         List<List<Double>> inputFeatures = createInputFeatures(dates, raw, scaler);
+        if (profile != null) { profile.record("data.features", started); }
+        started = System.nanoTime();
         Split train = createSplit("TRAIN", 0, trainSize, dates, raw, normalized, inputFeatures,
                 inputDays, forecastDays);
         Split validation = createSplit("VALIDATION", trainSize, validationLimit,
                 dates, raw, normalized, inputFeatures, inputDays, forecastDays);
         Split test = createSplit("TEST", validationLimit, dates.size(),
                 dates, raw, normalized, inputFeatures, inputDays, forecastDays);
+        if (profile != null) { profile.record("data.windows", started); }
         return new PreprocessingResult(series.getStoreId(), series.getItemId(), inputDays,
                 forecastDays, scaler, train, validation, test);
     }

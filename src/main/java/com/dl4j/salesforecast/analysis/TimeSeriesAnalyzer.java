@@ -86,6 +86,37 @@ public final class TimeSeriesAnalyzer {
         return observations;
     }
 
+    /** One CSV pass for a panel; reuses the same series diagnostics as individual analysis. */
+    public static Map<Integer, TimeSeriesResult> analyzeStoreQuietly(String filePath, int storeId) {
+        return analyzeStoreQuietly(filePath, storeId, null);
+    }
+    public static Map<Integer, TimeSeriesResult> analyzeStoreQuietly(String filePath, int storeId,
+            com.dl4j.salesforecast.performance.GlobalPerformanceProfile profile) {
+        long started = System.nanoTime();
+        if (storeId <= 0) { throw new IllegalArgumentException("Store must be positive."); }
+        Map<Integer, List<Observation>> items = new TreeMap<>();
+        try (Reader reader = Files.newBufferedReader(Path.of(filePath), StandardCharsets.UTF_8);
+             CSVParser parser = CSVFormat.DEFAULT.builder().setHeader().setSkipHeaderRecord(true).build().parse(reader)) {
+            for (CSVRecord row : parser) {
+                if (Integer.parseInt(row.get("store").trim()) != storeId) { continue; }
+                int item = Integer.parseInt(row.get("item").trim());
+                int sales = Integer.parseInt(row.get("sales").trim());
+                if (item <= 0 || sales < 0) { throw new IllegalArgumentException("Invalid item/sales at row " + row.getRecordNumber()); }
+                items.computeIfAbsent(item, k -> new ArrayList<>()).add(new Observation(
+                        LocalDate.parse(row.get("date").trim()), sales));
+            }
+        } catch (IOException e) { throw new UncheckedIOException(e); }
+        if (profile != null) { profile.record("data.csvRead", started); }
+        started = System.nanoTime();
+        Map<Integer, TimeSeriesResult> result = new TreeMap<>();
+        items.forEach((item, observations) -> {
+            observations.sort(Comparator.comparing(o -> o.date));
+            result.put(item, new TimeSeriesResult(storeId, item, observations));
+        });
+        if (profile != null) { profile.record("data.buildSeries", started); }
+        return java.util.Collections.unmodifiableMap(result);
+    }
+
     private static void printReport(TimeSeriesResult result) {
         System.out.println("\n==========================================");
         System.out.println("TIME SERIES ANALYSIS");

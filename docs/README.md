@@ -9,6 +9,7 @@
 3. [Nhật ký yêu cầu](change-log.md): cập nhật sau mỗi yêu cầu, bằng chứng kiểm tra và tên commit đề xuất.
 4. [Thí nghiệm Residual AR](residual-experiment.md): thiết kế, protocol, artifact và kết quả full 180 fits.
 5. [Thí nghiệm ResidualAR Huber](residual-huber-experiment.md): full 120 fits đã hoàn tất; Huber gần bằng MSE, chưa vượt Weekly.
+6. [Một store, global model nhiều items](single-store-global-experiment.md): pipeline ứng dụng riêng, Store 1/50 items, một model mỗi seed; full chưa chạy.
 
 Hướng dẫn cài đặt/chạy nằm ở [README gốc](../README.md).
 Các số liệu hiện tại lấy từ dataset cục bộ `data/train.csv`; file dữ liệu và báo cáo sinh ra không được phân phối cùng tài liệu.

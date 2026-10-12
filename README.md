@@ -29,6 +29,31 @@ kể cả bản ghi trùng; phát hiện trùng không tự loại bỏ dữ li�
 
 ## Chạy dự án
 
+### Pipeline ứng dụng một cửa hàng, nhiều sản phẩm
+
+Pipeline nghiên cứu 12 chuỗi độc lập ở dưới vẫn được giữ nguyên. Chế độ mới dùng Store 1,
+**toàn bộ 50 items học chung một Global ResidualAR-MSE mỗi seed**: full chỉ 5 global fits,
+không phải 250 fits. Input 6 dynamic + 50 one-hot channels, per-item train-only scaler,
+mini-batch 64, checkpoint theo validation macro RMSE qua items. Weekly tính lại đúng population.
+
+```powershell
+mvn -B compile exec:java '-Dexec.args=--global-store-smoke'
+```
+
+Smoke dùng items 1/25/50, seed 42, tối đa 2 epoch. Full, lưu đầy đủ log:
+
+```powershell
+$globalLog = 'output/global-full-' + (Get-Date -Format 'yyyy-MM-dd_HHmmss') + '.log'
+mvn -B clean compile exec:java '-Dexec.args=--global-store=1' 2>&1 | Tee-Object -FilePath $globalLog
+$LASTEXITCODE
+```
+
+Chạy từ root repository; không build/test khác khi đang train. Đổi store bằng `=2`;
+có thể chỉ định `--batch-size=32` trong exec.args khi xử lý OOM, không giảm items/horizon.
+Full chưa chạy trong lượt triển khai này. Xem [hồ sơ global](docs/single-store-global-experiment.md)
+cho protocol, memory/runtime, artifact schema 4, tests và smoke. Không so trực tiếp metric
+Store1/50 items với kết quả 12-series cũ.
+
 ### Thí nghiệm ResidualAR MSE vs Huber
 
 Chế độ `--residual-huber` chỉ train `ResidualAR` (MSE) và `ResidualARHuber` trong cùng run,

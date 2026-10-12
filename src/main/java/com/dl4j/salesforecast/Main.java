@@ -20,6 +20,13 @@ public class Main {
                 Path.of("output", "runs"), Path.of(trainPath), configuration);
         System.out.println("Run artifacts: " + artifacts.getDirectory().toAbsolutePath());
         try {
+            if (configuration.isGlobalStore()) {
+                var global = com.dl4j.salesforecast.model.GlobalExperimentRunner.run(trainPath, configuration);
+                artifacts.complete(global);
+                System.out.print(com.dl4j.salesforecast.model.GlobalExperimentReport.format(global, configuration));
+                System.out.println("Run completed: " + artifacts.getDirectory().toAbsolutePath());
+                return;
+            }
             Path statisticsPath = artifacts.getDirectory().resolve("dataset-statistics.txt");
             SalesDataAnalyzer.analyze(trainPath, statisticsPath);
             MultiSeriesExperimentRunner.MultiSeriesResult experiments = MultiSeriesExperimentRunner.run(trainPath, configuration);

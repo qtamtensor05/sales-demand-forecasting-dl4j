@@ -212,7 +212,7 @@ public final class AutoregressiveLstmForecaster {
         return new ForecastMetrics(horizonMetrics, overall.count, overall.mae(), overall.rmse(), predictions);
     }
 
-    private static List<Double> createFeatureVector(LocalDate date, double currentSales,
+    static List<Double> createFeatureVector(LocalDate date, double currentSales,
                                                     List<Double> previousSales, MinMaxScaler scaler) {
         if (previousSales.size() < ROLLING_LONG_DAYS || previousSales.size() < LAG_DAYS) {
             throw new IllegalStateException("Autoregressive history is too short to compute input features.");
