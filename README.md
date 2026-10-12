@@ -40,8 +40,9 @@ vẫn chọn bằng validation RMSE sales. Không tuning delta hoặc dùng test
 mvn -B compile exec:java '-Dexec.args=--residual-huber-smoke'
 ```
 
-Smoke chỉ 1 chuỗi/seed, tối đa 2 epoch/model. Full **chưa chạy** trong lượt triển khai này;
-lệnh đầy đủ lưu log, thời gian ước lượng và kết quả kiểm chứng nằm trong
+Smoke chỉ 1 chuỗi/seed, tối đa 2 epoch/model. Full `2026-10-12_152631_034_gpu` đã SUCCESS
+trên GPU sau 1:00:41: Huber RMSE 11,680508 gần bằng MSE 11,680474, chưa vượt Weekly 11,1435.
+Lệnh đầy đủ lưu log và kết quả kiểm chứng nằm trong
 [hồ sơ Huber](docs/residual-huber-experiment.md). Schema 3 ghi loss theo model và đổi tên cột
 epoch loss thành `train_loss_scaled`/`val_loss_scaled`, thêm `loss_function,huber_delta`.
 Các chế độ mặc định, `--residual`, `--residual-smoke` tiếp tục dùng MSE và schema cũ.

@@ -1149,3 +1149,34 @@ Chưa đánh giá MEDIUM/HIGH, seed stability hoặc thắng Weekly trên 12×5.
 `git diff --check` đạt; logs nằm dưới output/huber-*.log.
 
 **Commit đề xuất:** `feat: add Huber loss experiment for residual LSTM`
+
+
+## 041 - 2026-10-12 - Báo cáo full ResidualAR Huber trên GPU
+
+**Mục tiêu và lý do:** cập nhật báo cáo từ run người dùng vừa train xong, kiểm tra artifact và
+đánh giá Huber so MSE/Weekly cùng run, không train lại hoặc dùng test 2017 để chọn model.
+
+**Kết quả:** run `2026-10-12_152631_034_gpu` SUCCESS, JCublasBackend/Java 11.0.32.1,
+120 fits, 12 chuỗi, năm seed, delta 1, từ 15:26:31 đến 16:27:11 (1:00:40,79).
+Log Maven BUILD SUCCESS; không có bản ghi exit code shell riêng.
+MSE MAE/RMSE 9,216867/11,680474; Huber 9,215712/11,680508; Weekly 8,7365/11,1435.
+Huber không cải thiện macro RMSE, thắng MSE 1/12 và Weekly 0/12. MEDIUM/HIGH và horizon
+xa không cải thiện; RMSE seed std đều 0,6358. Chênh lệch rất nhỏ, không có kiểm định ý nghĩa.
+
+**Kiểm chứng:** 60 seed rows, 1.747 epoch rows, 120 best flags (một/fit), 302.400 predictions,
+2.520/fit, đủ H1–H7, finite và không duplicate keys. Dataset hash khớp; MAE/RMSE tính lại
+khớp seed CSV trong 5,1e-11, reconstruction trong 1,1e-10. MSE/Huber chạy 873/874 epoch,
+cả hai dừng sớm 60/60; chỉ một cặp có best epoch khác. Kiểm tra Markdown links và
+`git diff --check` đạt. Không chạy Maven tests mới; 39 tests là bằng chứng lượt trước.
+
+**Tệp cập nhật:** README.md, docs/README.md, docs/current-state.md,
+docs/residual-huber-experiment.md, docs/implementation-history.md, docs/change-log.md.
+Chi tiết bảng macro/stratum/horizon/seed trong [hồ sơ Huber](residual-huber-experiment.md).
+Không sửa code, dependency, dữ liệu hoặc artifact; không commit/push.
+
+**Giới hạn và hướng tiếp:** FULL EXPERIMENT COMPLETED nhưng Huber delta 1 chưa có lợi thế.
+Không lưu phân bố training error nên chưa chứng minh tỷ lệ loss ở vùng linear. Chỉ 12/500 chuỗi,
+validation dùng chọn epoch, windows chồng lấn, chưa CI/test độc lập. Chỉ đề xuất thí nghiệm riêng
+residual + variance stabilization/log1p; không triển khai trong yêu cầu báo cáo này.
+
+**Commit đề xuất:** `docs: report full residual Huber validation results`

@@ -1,5 +1,89 @@
 # Thí nghiệm ResidualAR với Huber loss
 
+## Kết quả full Huber ngày 2026-10-12
+
+**IMPLEMENTED / TESTED / SMOKE TESTED / FULL EXPERIMENT COMPLETED.**
+Run `2026-10-12_152631_034_gpu` ghi SUCCESS, JCublasBackend, Java 11.0.32.1,
+12 chuỗi, 5 seed, 120 fits. Bắt đầu 15:26:31, kết thúc 16:27:11 giờ Việt Nam:
+1 giờ 00 phút 40,79 giây, nhanh hơn ước lượng thô 2:10:42 trước đó.
+Log `output/huber-full-2026-10-12_152619.log` xác nhận BUILD SUCCESS; exit code shell
+không được lưu riêng nên không khẳng định đã kiểm tra giá trị đó.
+
+So sánh dưới đây hoàn toàn trong cùng run, giữ delta=1 và validation-only selection.
+Std là sample std giữa 12 series means sau bình quân seed.
+
+| Model | MAE mean ± std | RMSE mean ± std | Cải thiện RMSE vs Weekly | vs MSE |
+| --- | ---: | ---: | ---: | ---: |
+| Weekly | 8,7365 ± 2,4252 | 11,1435 ± 3,1713 | 0% | +4,60% |
+| ResidualAR-MSE | 9,216867 ± 2,643995 | 11,680474 ± 3,395809 | -4,82% | 0% |
+| ResidualARHuber | 9,215712 ± 2,645803 | 11,680508 ± 3,395831 | -4,82% | -0,000288% |
+
+Huber tăng RMSE khoảng 0,00003366; MAE giảm 0,001156 (khoảng 0,0125%).
+Theo tiêu chí macro RMSE đây là **CASE C: không cải thiện ResidualAR**, với chênh lệch thực tế rất nhỏ.
+Không có bằng chứng vượt Weekly hoặc lợi thế chất lượng có ý nghĩa thống kê.
+
+| Stratum | Weekly RMSE | MSE RMSE | Huber RMSE | Huber thắng Weekly / MSE |
+| --- | ---: | ---: | ---: | --- |
+| LOW | 7,8359 | 8,107048 | 8,107057 | 0/4 / 1/4 |
+| MEDIUM | 10,9134 | 11,480367 | 11,480410 | 0/4 / 0/4 |
+| HIGH | 14,6811 | 15,454007 | 15,454057 | 0/4 / 0/4 |
+
+Huber không cải thiện RMSE MEDIUM/HIGH. Toàn bộ 12 chuỗi: thắng Weekly 0/12,
+thắng MSE 1/12 theo RMSE sau mean năm seed; strict wins không có ngưỡng ý nghĩa thực tiễn.
+
+| Horizon | Weekly RMSE | MSE RMSE | Huber RMSE |
+| --- | ---: | ---: | ---: |
+| H1 | 11,1447 | 11,5741 | 11,5742 |
+| H2 | 11,1461 | 11,6071 | 11,6070 |
+| H3 | 11,1484 | 11,6476 | 11,6475 |
+| H4 | 11,1431 | 11,6842 | 11,6841 |
+| H5 | 11,1387 | 11,7076 | 11,7077 |
+| H6 | 11,1420 | 11,7450 | 11,7452 |
+| H7 | 11,1411 | 11,7889 | 11,7892 |
+
+Huber nhỉnh hơn rất nhỏ tại H2–H4, kém tại H1/H5–H7; không vượt Weekly ở horizon nào.
+Horizon xa không được cải thiện.
+
+| Seed | MSE macro RMSE | Huber macro RMSE |
+| --- | ---: | ---: |
+| 42 | 11,160289 | 11,160275 |
+| 123 | 12,607123 | 12,607236 |
+| 2026 | 12,081942 | 12,081925 |
+| 7 | 11,279557 | 11,279626 |
+| 99 | 11,273461 | 11,273477 |
+
+Sample std macro RMSE giữa seed đều khoảng 0,6358; min/max MSE 11,160289–12,607123,
+Huber 11,160275–12,607236. Huber tốt hơn MSE rất nhỏ ở 2/5 seed; không seed nào vượt
+macro Weekly. MAE seed std giảm 0,5577 xuống 0,5556, chưa cho thấy thay đổi đáng kể về ổn định.
+
+### Kiểm chứng artifact và learning history
+
+Đối chiếu trực tiếp manifest, summary, seed/epoch/prediction CSV và series-scaling:
+60 seed rows, 1.747 epoch rows, 120 fits và đúng một best flag/fit; 302.400 predictions,
+151.200/model, mỗi fit 2.520, mỗi horizon/fit 360. Khóa prediction duy nhất, mọi giá trị hữu hạn,
+đủ H1–H7. Dataset SHA-256 khớp file hiện tại:
+`038f25690a65149c94f86ddd3deceda20c037a5cfd754cafdfc539a72992f2ed`.
+MAE/RMSE tái tính từ prediction khớp seed CSV trong `5,1e-11`;
+reconstruction `baseline + predicted_residual` khớp trong `1,1e-10`.
+
+MSE chạy 873 epoch, Huber 874; best epoch trung bình 9,55 và 9,5667.
+Cả hai dừng sớm 60/60 fits; chỉ 1/60 cặp seed-series có best epoch khác.
+Không chạy lại training/Maven test trong lượt cập nhật báo cáo này; 39 tests là bằng chứng
+của lượt triển khai trước. Code Java, dependency, dữ liệu và artifact không bị sửa.
+
+### Diễn giải và bước tiếp theo
+
+Kết quả gần trùng phù hợp với giả thuyết delta=1 phần lớn ở vùng quadratic; tuy nhiên artifact
+không lưu phân bố training error/tỷ lệ vượt delta, nên chưa chứng minh cơ chế đó.
+Nhãn train nhỏ hơn 1 không đồng nghĩa mọi prediction error nhỏ hơn 1.
+Huber chuẩn có hệ số 0,5 so MSE trong vùng quadratic; không so trực tiếp hai training loss để
+kết luận model tốt hơn. Không tự đổi delta sau khi xem validation.
+
+Giới hạn vẫn là 12/500 chuỗi, validation vừa chọn epoch vừa báo metric, windows chồng lấn,
+chưa kiểm định/CI và không đánh giá test 2017 để selection. Bước kế tiếp chỉ đề xuất một
+thí nghiệm riêng residual + variance stabilization/log1p với protocol định trước; chưa triển khai.
+
+
 ## Mục tiêu và đối chứng
 
 Chỉ thay objective MSE bằng Huber trong ResidualAR để kiểm tra tác động lên validation 2016,
@@ -117,11 +201,12 @@ manifest SUCCESS và từ chối coverage sai rồi FAILED khi session đóng ch
 
 Review đối chiếu Java 11, dependency hiện tại, delta semantics, tensor/mask, scaler, reconstruction,
 rollout, checkpoint, schema, macro và lifecycle: chưa thấy lỗi chặn trong phạm vi đã kiểm tra.
-Không đổi pom.xml, preprocessing hoặc Direct model. Full nhiều giờ vẫn chưa được kiểm chứng.
+Không đổi pom.xml, preprocessing hoặc Direct model. Ở thời điểm triển khai chưa chạy full;
+kết quả full hoàn tất sau đó được bổ sung ở đầu tài liệu.
 
 ## Giới hạn
 
-Trạng thái: **IMPLEMENTED / TESTED / SMOKE TESTED / FULL EXPERIMENT NOT YET RUN**.
+Trạng thái tại thời điểm smoke (lịch sử): **IMPLEMENTED / TESTED / SMOKE TESTED / FULL EXPERIMENT NOT YET RUN**.
 
 Smoke `2026-10-12_143207_100_gpu` hoàn tất SUCCESS, Java 11.0.32.1, JCublasBackend.
 Lệnh `mvn -B compile exec:java '-Dexec.args=--residual-huber-smoke'` exit 0/BUILD SUCCESS,
@@ -144,8 +229,8 @@ mọi prediction khớp chính xác ở precision CSV; đây là regression chec
 Huber thắng Weekly 0/1 và MSE 0/1 trong smoke; một seed không đánh giá được seed stability,
 một LOW không đại diện MEDIUM/HIGH. Hai model gần bằng nhau không chứng minh Huber vô ích ở full.
 
-Full comparison chưa chạy, nên chưa có bảng chất lượng Huber 12×5 hoặc kết luận vượt Weekly,
-cải thiện MEDIUM/HIGH, horizon xa hay seed stability. Kết quả full MSE lịch sử nằm trong
+Ở thời điểm smoke chưa có bảng chất lượng Huber 12×5; kết quả full mới ở đầu tài liệu
+đã thay thế giới hạn này. Kết quả full MSE lịch sử nằm trong
 [hồ sơ residual](residual-experiment.md), không phải đối chứng được ghép vào run mới.
 
 Smoke chỉ kiểm tra pipeline. Full sau này vẫn chỉ trên 12/500 chuỗi, validation vừa chọn epoch

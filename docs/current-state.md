@@ -1,8 +1,18 @@
 # Trạng thái hiện tại
 
-## ResidualAR Huber — triển khai và smoke ngày 2026-10-12
+## ResidualAR Huber — full hoàn tất ngày 2026-10-12
 
-**IMPLEMENTED / TESTED / SMOKE TESTED / FULL EXPERIMENT NOT YET RUN.**
+**IMPLEMENTED / TESTED / SMOKE TESTED / FULL EXPERIMENT COMPLETED.**
+Run `2026-10-12_152631_034_gpu` SUCCESS trên JCublasBackend, 120 fits trong 1:00:41
+(15:26:31–16:27:11 giờ Việt Nam), log Maven BUILD SUCCESS.
+Macro MAE/RMSE MSE = 9,216867/11,680474; Huber = 9,215712/11,680508;
+Weekly = 8,7365/11,1435. Huber không cải thiện macro RMSE, kém Weekly khoảng 4,82%,
+thắng MSE 1/12 chuỗi và Weekly 0/12. MEDIUM/HIGH RMSE Huber 11,480410/15,454057,
+nhỉnh cao hơn MSE; H5–H7 không cải thiện. Seed RMSE std đều khoảng 0,6358.
+Artifact đủ 60 seed rows, 1.747 epoch rows, 120 best flags, 302.400 predictions;
+hash đúng, keys duy nhất, metric tái tính khớp trong 5,1e-11, reconstruction trong 1,1e-10.
+Không chạy training/test mới trong lượt báo cáo; 39 tests bên dưới thuộc lượt triển khai trước.
+
 Chế độ `--residual-huber` so sánh Weekly, ResidualAR-MSE và ResidualARHuber trong cùng run;
 12 chuỗi × 5 seed × 2 neural model = 120 fits. Không train lại Direct/AR. Chỉ thay loss;
 giữ residual formulation, scaler train-only, features, split, architecture và checkpoint theo
@@ -18,7 +28,7 @@ MSE predictions khớp hoàn toàn smoke MSE trước đó. Maven smoke mất 38
 
 Smoke MAE/RMSE Weekly = 5,376190/6,870861; MSE = 5,635561/7,102983;
 Huber = 5,635588/7,103008. Không dùng smoke kết luận Huber cải thiện hay vượt Weekly.
-Chưa có kết quả Huber full về MEDIUM/HIGH, seed stability hoặc win rate 12 chuỗi.
+Kết quả full và các breakdown đã bổ sung trong hồ sơ Huber; smoke bên trên là bằng chứng lịch sử.
 Schema 3 ghi loss theo model, delta và cột epoch loss trung tính; schema legacy/residual cũ giữ nguyên.
 Chi tiết thiết kế, tests, artifact, lệnh full và ước lượng khoảng 2:11 giờ trong
 [hồ sơ Huber](residual-huber-experiment.md). Không commit/push.
