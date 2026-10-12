@@ -1475,3 +1475,26 @@ Run trước `2026-10-13_024351_527_gpu` vẫn ghi RUNNING dù không còn proce
 không coi đó là kết quả hoàn tất.
 
 **Commit đề xuất:** `docs: record completed RTX 3090 global run`
+
+## 050 - 2026-10-13 - Giải thích vì sao output không xuất hiện trong commit
+
+**Mục tiêu và lý do:** kiểm tra vì sao các artifact của Full run mới nhất không xuất hiện trong commit,
+đối chiếu trạng thái theo dõi của Git và quy tắc ignore; không thay đổi code hoặc ép thêm artifact lớn.
+
+**Phát hiện:** `.gitignore` có quy tắc `/output/**` tại dòng 51 và chỉ mở ngoại lệ cho
+`output/.gitkeep`. `git check-ignore -v` xác nhận `summary.txt`, `run.json` và
+`deployment/model.zip` của run `2026-10-13_025422_624_gpu` đều bị chính quy tắc này loại trừ;
+`git ls-files output` chỉ trả về `output/.gitkeep`. Vì vậy Git không đưa các file sinh ra dưới
+`output/runs/` vào staging hoặc commit theo thao tác `git add` thông thường. Tệp `output.zip` nằm ở
+root hiện là tệp chưa được theo dõi (`??`), không bị quy tắc `/output/**` áp dụng nhưng cũng chưa
+được staging.
+
+**Thay đổi và kiểm tra:** không sửa code, cấu hình ignore hoặc artifact; chỉ bổ sung kết quả điều tra
+vào `docs/change-log.md`. Đã kiểm tra bằng `git status --short`, `git check-ignore -v` và
+`git ls-files output`. Không chạy Maven tests vì không có thay đổi hành vi chương trình.
+
+**Giới hạn:** chưa kiểm tra hoặc thêm nội dung `output.zip` vào Git; chưa dùng `git add -f`, Git LFS,
+release hoặc kho lưu artifact. Việc đưa toàn bộ predictions, model và log vào Git có thể làm repository
+phình lớn, nên cần chọn chính sách lưu trữ trước khi thay đổi `.gitignore`.
+
+**Commit đề xuất:** `docs: explain ignored output artifacts`
