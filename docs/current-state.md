@@ -575,3 +575,29 @@ counter trong lúc job chạy. Dashboard polling hai giây, hiển thị phần 
 processed/total rows và trạng thái từng bước. Run runtime `5` hoàn thành đủ 7/7 stage, raw/gold `3/3`,
 duration `29.731 ms`; backend/frontend đã recreate và đều healthy. IAB vẫn không khả dụng nên chưa có
 visual/keyboard QA; chưa mở lại timeline chi tiết từ một dòng lịch sử.
+
+### Trạng thái sau khi dọn dữ liệu upload mẫu (2026-10-14)
+
+Theo yêu cầu người dùng, PostgreSQL đã xóa ingestion run `4`, `5`, `6`, pipeline `2`, `3`, `4`, toàn
+bộ 14 stage events liên quan và 28 sales rows mẫu trong khoảng 2018-01-01..2018-01-10. Kiểm tra sau
+transaction: các tập mục tiêu đều còn 0 dòng; API pipeline không còn trả ba run này. `sales_records`
+đã trở lại 91.300 dòng và ngày lớn nhất 2017-12-31. File CSV trong repository và object MinIO được giữ
+nguyên vì phạm vi yêu cầu chỉ là database; không thay model, checkpoint hoặc dữ liệu train cục bộ.
+
+### Rà soát luồng triển khai Frontend Docker (2026-10-13)
+
+Đã rà soát chi tiết luồng triển khai container frontend: multi-stage Dockerfile (`node:20-alpine` build static bundle và `nginx:1.27-alpine` runtime), reverse proxy `/api/` tới `backend-api:8084`, memory limit 128 MB và healthcheck qua `127.0.0.1`. Container hiện healthy, phục vụ cổng 3000 và hoàn toàn tách biệt với luồng training model (chỉ gửi request inference tới backend). Mã nguồn và cấu hình container giữ nguyên.
+
+### Dự báo đồng thời 50 sản phẩm (2026-10-14)
+
+Trang Phân tích hiện cho chọn một origin date và dự báo một lượt toàn bộ 50 sản phẩm. Mỗi dòng hiển
+thị tổng dự báo bảy ngày, cùng kỳ tuần trước, chênh lệch và khoảng ngày; bấm sẽ mở đủ bảy ngày chi tiết.
+Runtime thật trả đủ 50 x 7 trong 4,18 giây; forecast-service, backend-api và frontend đều healthy. Không
+retrain, không đổi model, checkpoint, normalization hoặc chronological split. Chưa có browser QA thật.
+
+### Sửa khả năng tìm thấy lựa chọn 50 sản phẩm (2026-10-14)
+
+Màn hình Dự báo hiện có lựa chọn phạm vi rõ ràng và mặc định `Tất cả 50 sản phẩm`; người dùng có thể
+đổi sang `Một sản phẩm`. Kết quả hàng loạt được hiển thị ngay trên cùng màn hình này. Ngày vẫn được giữ
+vì đó là mốc bắt đầu forecast, không phải lựa chọn sản phẩm. Frontend container đã build lại, healthy,
+HTTP 200 và bundle live có đủ nhãn phạm vi, lựa chọn tất cả cùng nút chạy tương ứng.

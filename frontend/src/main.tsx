@@ -20,8 +20,12 @@ function App() {
   const [models, setModels] = useState<Json[]>([]);
   const [bench, setBench] = useState<Json[]>([]);
   const [item, setItem] = useState(1);
+  const [forecastScope, setForecastScope] = useState<"single" | "all">("all");
   const [origin, setOrigin] = useState("2017-06-30");
   const [forecast, setForecast] = useState<Json | null>(null);
+  const [batchForecast, setBatchForecast] = useState<Json | null>(null);
+  const [batchBusy, setBatchBusy] = useState(false);
+  const [expandedForecastItem, setExpandedForecastItem] = useState<number | null>(null);
   const [sales, setSales] = useState<Json[]>([]);
   const [monthlyDemand, setMonthlyDemand] = useState<Json[]>([]);
   const [period, setPeriod] = useState<"day" | "week" | "month">("month");
@@ -80,6 +84,20 @@ function App() {
     } finally {
       setBusy(false);
     }
+  };
+  const runBatch = async () => {
+    setBatchBusy(true); setError(""); setExpandedForecastItem(null);
+    try {
+      const response = await fetch("/api/forecasts/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ originDate: origin }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || "Không thể dự báo 50 sản phẩm");
+      setBatchForecast(result);
+    } catch (e) { setError(String(e)); }
+    finally { setBatchBusy(false); }
   };
   const upload = async () => {
     if (!uploadFile) return;
@@ -218,12 +236,28 @@ function App() {
               rankingMonth={rankingMonth}
               setRankingMonth={setRankingMonth}
             />
+            <BatchForecastPanel
+              origin={origin}
+              setOrigin={setOrigin}
+              result={batchForecast}
+              busy={batchBusy}
+              onRun={runBatch}
+              expandedItem={expandedForecastItem}
+              setExpandedItem={setExpandedForecastItem}
+            />
           </Panel>
         )}
         {tab === "Dự báo" && (
           <Panel title="Dự báo số sản phẩm bán trong 7 ngày">
             <div className="form">
-              <Picker item={item} setItem={setItem} items={items} />
+              <label>
+                Phạm vi sản phẩm
+                <select value={forecastScope} onChange={(event) => setForecastScope(event.target.value as "single" | "all")}>
+                  <option value="all">Tất cả 50 sản phẩm</option>
+                  <option value="single">Một sản phẩm</option>
+                </select>
+              </label>
+              {forecastScope === "single" && <Picker item={item} setItem={setItem} items={items} />}
               <label>
                 Ngày cuối cùng đã có doanh số
                 <input
@@ -232,11 +266,13 @@ function App() {
                   onChange={(e) => setOrigin(e.target.value)}
                 />
               </label>
-              <button className="primary" disabled={busy} onClick={run}>
-                {busy ? "Đang tính…" : "Xem dự báo 7 ngày"}
+              <button className="primary" disabled={forecastScope === "all" ? batchBusy : busy} onClick={forecastScope === "all" ? runBatch : run}>
+                {forecastScope === "all"
+                  ? batchBusy ? "Đang dự báo 50 sản phẩm..." : "Dự báo tất cả 50 sản phẩm"
+                  : busy ? "Đang tính…" : "Xem dự báo 7 ngày"}
               </button>
             </div>
-            {forecast && (
+            {forecastScope === "single" && forecast && (
               <>
                 <ForecastSummary
                   itemId={forecast.itemId}
@@ -244,6 +280,9 @@ function App() {
                 />
                 <ForecastTable rows={forecast.forecasts} />
               </>
+            )}
+            {forecastScope === "all" && batchForecast && (
+              <BatchForecastResults result={batchForecast} expandedItem={expandedForecastItem} setExpandedItem={setExpandedForecastItem} />
             )}
           </Panel>
         )}
@@ -384,6 +423,69 @@ const dateOptions: Intl.DateTimeFormatOptions = {
 const formatDate = (value: string) =>
   new Date(`${value}T00:00:00`).toLocaleDateString("vi-VN", dateOptions);
 const formatUnits = (value: any) => `${Math.round(Number(value))} sản phẩm`;
+const forecastTotals = (rows: Json[]) => {
+  const total = rows.reduce((sum, row) => sum + Number(row.prediction || 0), 0);
+  const previous = rows.reduce((sum, row) => sum + Number(row.weeklyNaive || 0), 0);
+  const difference = total - previous;
+  return { total, previous, difference, percentage: previous > 0 ? (difference / previous) * 100 : null };
+};
+const BatchForecastPanel = ({ origin, setOrigin, result, busy, onRun, expandedItem, setExpandedItem }: {
+  origin: string; setOrigin: (value: string) => void; result: Json | null; busy: boolean;
+  onRun: () => void; expandedItem: number | null; setExpandedItem: (value: number | null) => void;
+}) => (
+  <section className="batch-forecast-panel">
+    <div className="batch-forecast-heading">
+      <div>
+        <h3>Dự báo đồng thời 50 sản phẩm</h3>
+        <p>Mỗi sản phẩm được tổng hợp cho bảy ngày tiếp theo. Chọn một sản phẩm để xem chi tiết từng ngày.</p>
+      </div>
+      <div className="batch-forecast-controls">
+        <label>Ngày cuối cùng đã có doanh số<input type="date" value={origin} onChange={(event) => setOrigin(event.target.value)} /></label>
+        <button className="primary" disabled={busy} onClick={onRun}>{busy ? "Đang dự báo 50 sản phẩm..." : "Dự báo 50 sản phẩm"}</button>
+      </div>
+    </div>
+    {result && <>
+      <p className="batch-forecast-range">Kết quả từ {formatDate(result.items[0].forecasts[0].targetDate)} đến {formatDate(result.items[0].forecasts[6].targetDate)} · {result.itemCount} sản phẩm</p>
+      <div className="batch-forecast-list">
+        {result.items.map((entry: Json) => {
+          const totals = forecastTotals(entry.forecasts);
+          const expanded = expandedItem === entry.itemId;
+          return <article className={expanded ? "expanded" : ""} key={entry.itemId}>
+            <button className="batch-product-summary" onClick={() => setExpandedItem(expanded ? null : entry.itemId)} aria-expanded={expanded}>
+              <span><b>Sản phẩm #{entry.itemId}</b><small>{expanded ? "Ẩn chi tiết 7 ngày" : "Xem chi tiết 7 ngày"}</small></span>
+              <span><small>Tổng nhu cầu dự báo</small><strong>{formatUnits(totals.total)}</strong></span>
+              <span><small>Cùng kỳ tuần trước</small><strong>{formatUnits(totals.previous)}</strong></span>
+              <span className={totals.difference >= 0 ? "demand-up" : "demand-down"}><small>Chênh lệch</small><strong>{totals.difference >= 0 ? "+" : "-"}{formatUnits(Math.abs(totals.difference))}</strong><em>{totals.percentage == null ? "—" : `${totals.percentage >= 0 ? "+" : ""}${totals.percentage.toFixed(1)}%`}</em></span>
+              <span className="batch-date"><small>Khoảng ngày dự báo</small><strong>{formatDate(entry.forecasts[0].targetDate)} – {formatDate(entry.forecasts[6].targetDate)}</strong></span>
+            </button>
+            {expanded && <div className="batch-product-detail"><ForecastTable rows={entry.forecasts} /></div>}
+          </article>;
+        })}
+      </div>
+    </>}
+  </section>
+);
+const BatchForecastResults = ({ result, expandedItem, setExpandedItem }: {
+  result: Json; expandedItem: number | null; setExpandedItem: (value: number | null) => void;
+}) => <div className="batch-forecast-results">
+  <p className="batch-forecast-range">Kết quả từ {formatDate(result.items[0].forecasts[0].targetDate)} đến {formatDate(result.items[0].forecasts[6].targetDate)} · {result.itemCount} sản phẩm</p>
+  <div className="batch-forecast-list">
+    {result.items.map((entry: Json) => {
+      const totals = forecastTotals(entry.forecasts);
+      const expanded = expandedItem === entry.itemId;
+      return <article className={expanded ? "expanded" : ""} key={entry.itemId}>
+        <button className="batch-product-summary" onClick={() => setExpandedItem(expanded ? null : entry.itemId)} aria-expanded={expanded}>
+          <span><b>Sản phẩm #{entry.itemId}</b><small>{expanded ? "Ẩn chi tiết 7 ngày" : "Xem chi tiết 7 ngày"}</small></span>
+          <span><small>Tổng nhu cầu dự báo</small><strong>{formatUnits(totals.total)}</strong></span>
+          <span><small>Cùng kỳ tuần trước</small><strong>{formatUnits(totals.previous)}</strong></span>
+          <span className={totals.difference >= 0 ? "demand-up" : "demand-down"}><small>Chênh lệch</small><strong>{totals.difference >= 0 ? "+" : "-"}{formatUnits(Math.abs(totals.difference))}</strong><em>{totals.percentage == null ? "-" : `${totals.percentage >= 0 ? "+" : ""}${totals.percentage.toFixed(1)}%`}</em></span>
+          <span className="batch-date"><small>Khoảng ngày dự báo</small><strong>{formatDate(entry.forecasts[0].targetDate)} - {formatDate(entry.forecasts[6].targetDate)}</strong></span>
+        </button>
+        {expanded && <div className="batch-product-detail"><ForecastTable rows={entry.forecasts} /></div>}
+      </article>;
+    })}
+  </div>
+</div>;
 const ForecastSummary = ({
   itemId,
   rows,

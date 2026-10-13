@@ -70,3 +70,14 @@ Silver/Gold Snappy Parquet và JSON statistics đều có `_SUCCESS`; pipeline l
 Giới hạn: CSV được kiểm tra trong bộ nhớ và giới hạn multipart 50 MB; executor hiện tuần tự để tránh
 hai lần publish đồng thời trên máy local. Nếu backend dừng đúng lúc job đang chạy, run có thể cần đánh
 dấu lỗi/retry thủ công sau khi dịch vụ lên lại; chưa có cơ chế lease/recovery phân tán.
+
+## API dự báo đồng thời 50 sản phẩm
+
+`POST /api/forecasts/batch` nhận `{"originDate":"2017-06-30"}`. Backend gọi một lần tới
+`/forecast/batch`, nơi DL4J gom đủ 50 mẫu vào cùng một lượt suy luận. Phản hồi có 50 phần tử theo
+`itemId`, mỗi phần tử có đúng bảy ngày. Backend chỉ ghi PostgreSQL sau khi nhận đủ kết quả, tạo 50
+`forecast_requests` cùng 350 `forecast_results` trong một transaction.
+
+Kiểm tra runtime ngày 2026-10-14 hoàn thành trong 4,18 giây, suy luận DL4J mất 1.603,545 ms. Phản hồi
+có đủ 50 sản phẩm, từ 2017-07-01 đến 2017-07-07; PostgreSQL tăng 13 lên 63 request và 91 lên 441
+result, mọi request mới đều có đúng bảy result.

@@ -1060,3 +1060,61 @@ hiện cho upload đang giữ trong phiên; chưa có nút mở lại một pipe
 row counter và elapsed/duration, không phải CPU/network throughput tức thời.
 
 **Commit đề xuất:** `feat: add live ingestion progress tracking`
+
+## 49. Dọn ba ingestion run mẫu khỏi PostgreSQL
+
+**Nhu cầu:** sau khi kiểm tra upload và timeline, loại dữ liệu của ba file mẫu khỏi database để dữ
+liệu ứng dụng trở lại đúng tập nền trước năm 2018.
+
+**Đối chiếu trước khi xóa:** ingestion run `4`, `5`, `6` lần lượt khớp
+`ingestion-sample.csv` (4 dòng), `ingestion-progress-smoke.csv` (3 dòng) và
+`ingestion-upload-sample.csv` (21 dòng); pipeline tương ứng là `2`, `3`, `4`. Tổng đúng 28 sales rows
+từ 2018-01-01 đến 2018-01-10 và không có forecast request nào dùng origin trong khoảng này.
+
+**Thực hiện và kết quả:** một PostgreSQL transaction đã xóa 28 sales rows, ba pipeline rows và ba
+ingestion rows; 14 stage events được xóa theo foreign-key cascade. Kiểm tra sau commit trả 0 run,
+0 pipeline, 0 stage và 0 sales row mẫu. Database còn 91.300 sales rows, ngày lớn nhất 2017-12-31;
+API pipeline không còn hiển thị run `4-6`.
+
+**Giới hạn:** chỉ PostgreSQL được dọn. CSV trong `examples/` và object Bronze/Silver/Gold/statistics
+trên MinIO vẫn được giữ; thao tác không có bản sao lưu riêng nên dữ liệu DB đã xóa chỉ có thể phục hồi
+bằng cách upload/chạy lại các file mẫu hoặc khôi phục backup volume. Không sửa code hay model.
+
+**Commit đề xuất:** `docs: record sample ingestion database cleanup`
+
+## 50. Dự báo một lượt cho toàn bộ 50 sản phẩm
+
+**Nhu cầu:** chọn ngày một lần để nhận danh sách 50 sản phẩm, có tổng dự báo, cùng kỳ, chênh lệch,
+khoảng ngày và chi tiết bảy ngày khi bấm vào từng sản phẩm.
+
+**TDD và triển khai:** backend và frontend test ban đầu RED vì batch API/UI chưa tồn tại. Forecast
+Service thêm `/forecast/batch` để evaluate 50 mẫu một lượt. Spring Boot thêm
+`POST /api/forecasts/batch`, kiểm tra đủ 50 kết quả và ghi 50 request/350 result trong một transaction.
+Trang Phân tích thêm danh sách responsive, mở/thu gọn bảng bảy ngày hiện có.
+
+**Kiểm tra:** backend PASS 14/14; frontend test/build PASS; gói CPU và ba image build thành công. Ba
+container healthy. End-to-end origin 2017-06-30 trả đủ 50 sản phẩm trong 4,18 giây; database tăng đúng
+50 request và 350 result, mỗi request có bảy result. Frontend HTTP 200 và bundle live có nội dung mới.
+
+**Giới hạn:** dataset chỉ có mã ẩn danh 1-50; cùng kỳ dùng Weekly Naive, không phải doanh thu/tồn kho.
+Chưa có visual/keyboard QA bằng browser thật. Không thay model, checkpoint, normalization hoặc split.
+
+**Commit đề xuất:** `feat: add batch forecasts for all products`.
+
+## 51. Đưa lựa chọn tất cả 50 sản phẩm vào biểu mẫu Dự báo
+
+**Nhu cầu:** chức năng batch trước đó nằm thành khối riêng trên trang Phân tích nên người dùng vào màn
+hình Dự báo vẫn chỉ thấy chọn ngày và một mã sản phẩm, không nhận ra có thể chọn toàn bộ.
+
+**TDD và triển khai:** content test RED vì thiếu `Phạm vi sản phẩm`, `Tất cả 50 sản phẩm` và option
+`all`. Biểu mẫu Dự báo được bổ sung lựa chọn `Tất cả 50 sản phẩm` mặc định hoặc `Một sản phẩm`; nút và
+kết quả chuyển đúng theo phạm vi. Chế độ tất cả gọi batch API và hiển thị danh sách có thể mở chi tiết.
+
+**Kiểm tra:** frontend content test PASS, TypeScript/Vite build PASS. Image frontend build/recreate
+thành công, container healthy, HTTP 200; bundle live chứa đủ ba nhãn `Phạm vi sản phẩm`, `Tất cả 50
+sản phẩm` và `Dự báo tất cả 50 sản phẩm`.
+
+**Giới hạn:** ngày vẫn phải chọn vì mô hình cần origin date để xác định bảy ngày dự báo. Chưa có
+visual/keyboard QA bằng browser thật. Không thay backend, model, checkpoint, preprocessing hoặc split.
+
+**Commit đề xuất:** `fix: expose all-products forecast selection`.

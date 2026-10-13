@@ -48,6 +48,7 @@ public final class ForecastServiceMain {
         HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
         server.createContext("/health", service::health);
         server.createContext("/metadata", service::metadata);
+        server.createContext("/forecast/batch", service::batchForecast);
         server.createContext("/forecast", service::forecast);
         server.setExecutor(Executors.newFixedThreadPool(4));
         Runtime.getRuntime().addShutdownHook(new Thread(() -> service.network.close()));
@@ -106,6 +107,46 @@ public final class ForecastServiceMain {
                     "originDate", request.originDate.toString(), "seed", 123,
                     "modelSha256", modelHash, "inferenceMillis", (System.nanoTime() - started) / 1_000_000.0,
                     "forecasts", values));
+        } catch (IllegalArgumentException failure) {
+            send(exchange, 400, Map.of("error", "invalid_request", "message", failure.getMessage()));
+        } catch (Exception failure) {
+            failure.printStackTrace(System.err);
+            send(exchange, 500, Map.of("error", "inference_failed", "message", failure.getMessage()));
+        }
+    }
+
+    private void batchForecast(HttpExchange exchange) throws IOException {
+        if (!"POST".equals(exchange.getRequestMethod())) {
+            send(exchange, 405, Map.of("error", "method_not_allowed"));
+            return;
+        }
+        try (InputStreamReader reader = new InputStreamReader(exchange.getRequestBody(), StandardCharsets.UTF_8)) {
+            JsonObject body = JSON.fromJson(reader, JsonObject.class);
+            LocalDate origin = LocalDate.parse(body.get("originDate").getAsString());
+            List<SingleStoreGlobalDataset.Sample> samples = new ArrayList<>();
+            for (int itemId = 1; itemId <= 50; itemId++) samples.add(findSample(itemId, origin));
+            long started = System.nanoTime();
+            GlobalMetrics metrics;
+            synchronized (network) {
+                metrics = GlobalResidualLstmForecaster.evaluate(network, samples, 50);
+            }
+            List<Map<String,Object>> items = new ArrayList<>();
+            for (int itemId = 1; itemId <= 50; itemId++) {
+                List<Map<String,Object>> values = new ArrayList<>();
+                for (ValidationPrediction prediction : metrics.predictions.get(itemId)) {
+                    Map<String,Object> value = new LinkedHashMap<>();
+                    value.put("horizon", prediction.getHorizon());
+                    value.put("targetDate", prediction.getTargetDate().toString());
+                    value.put("prediction", prediction.getPrediction());
+                    value.put("weeklyNaive", prediction.getWeeklyNaive());
+                    value.put("actual", prediction.getActual());
+                    values.add(value);
+                }
+                items.add(Map.of("itemId", itemId, "forecasts", values));
+            }
+            send(exchange, 200, Map.of("storeId", 1, "originDate", origin.toString(), "seed", 123,
+                    "modelSha256", modelHash, "inferenceMillis", (System.nanoTime() - started) / 1_000_000.0,
+                    "items", items));
         } catch (IllegalArgumentException failure) {
             send(exchange, 400, Map.of("error", "invalid_request", "message", failure.getMessage()));
         } catch (Exception failure) {

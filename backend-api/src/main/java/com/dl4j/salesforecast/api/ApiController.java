@@ -75,6 +75,12 @@ class ApiController {
         return forecasts.create(itemId, body.get("originDate") == null ? null : body.get("originDate").toString());
     }
 
+    @PostMapping("/forecasts/batch") @ResponseStatus(HttpStatus.CREATED)
+    Map<String,Object> createForecastBatch(@RequestBody Map<String,Object> body) {
+        Object origin = body.get("originDate");
+        return forecasts.createBatch(origin == null ? null : origin.toString());
+    }
+
     @GetMapping("/forecasts/{id}") Map<String,Object> forecast(@PathVariable UUID id) { return forecasts.find(id); }
 
     @GetMapping("/models") List<Map<String,Object>> models() {

@@ -38,6 +38,16 @@ const required = [
   "Tạo dữ liệu Silver và Gold",
   "Cập nhật PostgreSQL",
   "progress-meter",
+  "/api/forecasts/batch",
+  "Dự báo đồng thời 50 sản phẩm",
+  "Tổng nhu cầu dự báo",
+  "Cùng kỳ tuần trước",
+  "Chênh lệch",
+  "Xem chi tiết 7 ngày",
+  "batch-forecast-list",
+  "Phạm vi sản phẩm",
+  "Tất cả 50 sản phẩm",
+  'value="all"',
 ];
 const forbidden = [
   "Bước 1",

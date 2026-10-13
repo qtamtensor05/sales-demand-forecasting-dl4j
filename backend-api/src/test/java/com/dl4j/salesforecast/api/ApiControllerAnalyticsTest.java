@@ -4,7 +4,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -48,5 +50,20 @@ class ApiControllerAnalyticsTest {
         mvc.perform(get("/api/analytics/monthly-demand")
                         .param("year", "2017").param("limit", "51"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void createsOneBatchForecastForAllProducts() throws Exception {
+        when(forecasts.createBatch("2017-06-30")).thenReturn(Map.of(
+                "originDate", "2017-06-30",
+                "items", List.of(Map.of("itemId", 1), Map.of("itemId", 2))));
+
+        mvc.perform(post("/api/forecasts/batch")
+                        .contentType("application/json")
+                        .content("{\"originDate\":\"2017-06-30\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.originDate").value("2017-06-30"))
+                .andExpect(jsonPath("$.items.length()").value(2));
+        verify(forecasts).createBatch("2017-06-30");
     }
 }

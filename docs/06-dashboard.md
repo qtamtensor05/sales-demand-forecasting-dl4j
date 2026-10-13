@@ -86,3 +86,22 @@ chờ, đang thực hiện, hoàn thành hoặc thất bại; giao diện tiếp
 Phần trăm được tính từ các stage backend đã ghi nhận và tỷ lệ bản ghi thật trong stage hiện hành, không
 chạy giả theo đồng hồ. Với run đã hoàn thành, tốc độ dùng `goldRows / durationMillis`. Timeline chi tiết
 hiện gắn với file vừa upload trong phiên; danh sách lịch sử chưa có thao tác mở lại chi tiết một run cũ.
+
+## Dự báo một lượt cho 50 sản phẩm trên trang Phân tích
+
+Trang Phân tích có thêm khối `Dự báo đồng thời 50 sản phẩm`. Người dùng chọn ngày bắt đầu một lần rồi
+nhấn `Dự báo 50 sản phẩm`. Mỗi dòng Sản phẩm #1 đến #50 hiển thị tổng nhu cầu dự báo bảy ngày, tổng
+cùng kỳ tuần trước, chênh lệch số lượng/phần trăm và khoảng ngày lịch cụ thể.
+
+Nút `Xem chi tiết 7 ngày` mở ngay bên dưới sản phẩm và tái sử dụng bảng kết quả ngày hiện có. Người dùng
+có thể thu gọn rồi mở sản phẩm khác mà không chạy lại mô hình. Frontend test và build PASS; image mới
+healthy, HTTP 200 và bundle live chứa endpoint batch cùng nhãn mở chi tiết. Chưa có browser automation
+nên chưa xác minh trực quan, bàn phím và responsive bằng trình duyệt thật.
+
+### Lựa chọn tất cả sản phẩm ngay trên màn hình Dự báo
+
+Biểu mẫu `Dự báo` hiện có trường `Phạm vi sản phẩm`, mặc định là `Tất cả 50 sản phẩm`. Nếu giữ lựa
+chọn này, mã sản phẩm đơn được ẩn và nút chính đổi thành `Dự báo tất cả 50 sản phẩm`; kết quả hiển thị
+danh sách tổng hợp 50 sản phẩm và cho mở chi tiết bảy ngày. Chọn `Một sản phẩm` mới hiển thị danh sách
+mã hàng và giữ luồng dự báo đơn trước đây. Ngày cuối cùng có doanh số vẫn cần thiết để xác định chính
+xác bảy ngày tương lai mà mô hình phải dự báo.

@@ -2084,3 +2084,40 @@ là hoàn chỉnh. `git diff --check` và liên kết Markdown được kiểm t
 - **Phạm vi:** Chỉ tạo file mẫu trong repository; chưa upload file, chưa ghi MinIO/PostgreSQL, chưa gọi Spark và không thay model/training.
 - **Giới hạn:** Các giá trị sales là dữ liệu minh họa để kiểm tra kỹ thuật, không đại diện dữ liệu kinh doanh thật. Sau khi upload, checksum sẽ ngăn xử lý lại chính file không thay đổi.
 - **Commit đề xuất:** `test: add ingestion upload sample csv`
+
+## 083 - 2026-10-13 - Phân tích báo cáo luồng triển khai hoạt động của Frontend Docker
+
+- **Mục tiêu:** Phân tích toàn diện luồng triển khai, cấu trúc multi-stage build, cơ chế Nginx reverse proxy, điều phối mạng và luồng tương tác của container frontend Docker trong dự án hiện tại, tách biệt hoàn toàn với luồng huấn luyện mô hình.
+- **Phát hiện và kiến trúc:** Container `sales-demand-forecasting-frontend-1` được build từ `frontend/Dockerfile` theo mô hình multi-stage (Stage 1: `node:20-alpine` biên dịch TypeScript/React/Vite; Stage 2: `nginx:1.27-alpine` phục vụ file tĩnh và proxy `/api/` tới `backend-api:8084`). Frontend độc lập hoàn toàn với quá trình train model: không nạp DL4J, không chứa weights, không trigger training; các thao tác dự báo chỉ là request suy luận (inference) gửi qua API.
+- **Thay đổi và xác minh:** Chỉ điều tra hiện trạng mã nguồn, cấu hình Docker Compose và kiểm tra runtime qua command line; không sửa đổi mã nguồn, cấu hình container hoặc dữ liệu. Container frontend hiện đang hoạt động `Up (healthy)`, cổng host 3000 ánh xạ cổng 80 container, endpoint `http://localhost:3000/` trả HTTP 200 và proxy `http://localhost:3000/api/health` trả HTTP 200 (`UP`).
+- **Giới hạn:** Chưa cấu hình HTTPS/TLS trên Nginx cục bộ; chưa có kiểm thử visual/browser tự động bằng Selenium/Playwright trong CI; container frontend-bootstrap cũ trong `infrastructure/frontend-bootstrap/` vẫn tồn tại như tài liệu tham khảo lịch sử.
+- **Commit đề xuất:** `docs: report frontend docker deployment workflow`
+
+## 084 - 2026-10-14 - Xóa ba lần upload mẫu khỏi PostgreSQL
+
+- **Mục tiêu:** Xóa khỏi database ba mẫu upload hiển thị trên Dashboard: ingestion run `4`, `5`, `6` và pipeline `2`, `3`, `4`.
+- **Kiểm tra trước thao tác:** Ba run đều `COMPLETED`, khớp đúng filename/checksum và lần lượt có 4, 3, 21 dòng. PostgreSQL có đúng 28 sales rows trong khoảng 2018-01-01..2018-01-10; không có forecast request nào dùng origin trong khoảng này; có 14 stage events liên quan.
+- **Thực hiện:** Trong một transaction, xóa đúng 28 `sales_records` của Store 1 trong khoảng ngày mẫu, ba `pipeline_runs`, rồi ba `data_ingestion_runs`; stage events được xóa theo `ON DELETE CASCADE`.
+- **Kết quả xác minh:** Transaction commit thành công với `DELETE 28`, `DELETE 3`, `DELETE 3`. Truy vấn sau xóa trả 0 run, 0 pipeline, 0 stage và 0 sales row mẫu. Database còn đúng 91.300 sales rows, `MAX(sales_date)=2017-12-31`; API còn một pipeline nền và không còn run `4-6`.
+- **Phạm vi:** Không xóa hai file CSV mẫu trong repository, không xóa object Bronze/Silver/Gold/statistics trên MinIO, không sửa code và không tác động model/training.
+- **Khôi phục:** Không tạo backup riêng trước thao tác vì đây là dữ liệu mẫu đã được đối chiếu chính xác; có thể tạo lại DB rows bằng cách upload/chạy lại các CSV còn giữ hoặc khôi phục volume backup nếu có.
+- **Commit đề xuất:** `docs: record sample ingestion database cleanup`
+
+## 085 - 2026-10-14 - Dự báo đồng thời 50 sản phẩm trên trang Phân tích
+
+- **Mục tiêu:** Chọn một ngày và dự báo đủ 50 sản phẩm trong một lượt; từng sản phẩm có tổng dự báo, cùng kỳ, chênh lệch, khoảng ngày và chi tiết bảy ngày.
+- **TDD:** Backend/frontend test ban đầu RED. Sau triển khai backend PASS 14/14; frontend `npm test` và `npm run build` PASS.
+- **Triển khai:** Thêm batch API ở Forecast Service và Spring Boot; DL4J evaluate 50 mẫu một lượt, PostgreSQL ghi 50 request/350 result trong transaction. Dashboard thêm danh sách responsive và mở/thu gọn chi tiết.
+- **Runtime:** Ba image build thành công và container healthy. Origin 2017-06-30 trả đủ 50 sản phẩm trong 4,18 giây; mỗi request có 7 result. Frontend HTTP 200, bundle live chứa chức năng mới.
+- **Giới hạn:** Chưa có browser visual/keyboard QA; sản phẩm dùng mã ẩn danh. Không retrain hoặc thay model/checkpoint/preprocessing/split.
+- **Commit đề xuất:** `feat: add batch forecasts for all products`
+
+## 086 - 2026-10-14 - Hiển thị lựa chọn tất cả sản phẩm ngay trên màn hình Dự báo
+
+- **Mục tiêu:** Sửa việc người dùng vào phần Dự báo nhưng không thấy cách chọn toàn bộ 50 sản phẩm.
+- **Lý do:** Batch forecast trước đó nằm ở khối riêng trên trang Phân tích; biểu mẫu Dự báo vẫn chỉ thể hiện luồng một sản phẩm nên khả năng tìm thấy chức năng không đạt yêu cầu.
+- **TDD:** Frontend content test RED vì thiếu trường phạm vi và option tất cả; sau thay đổi `npm test` PASS `DASHBOARD_RESULT_COPY_OK`, `npm run build` PASS.
+- **Thay đổi:** Thêm `Phạm vi sản phẩm`, mặc định `Tất cả 50 sản phẩm`, tùy chọn `Một sản phẩm`; ẩn mã sản phẩm trong chế độ tất cả, gọi batch API và hiển thị danh sách 50 sản phẩm có drill-down bảy ngày ngay tại màn hình Dự báo.
+- **Runtime:** Frontend image build/recreate thành công, container healthy, HTTP 200; live bundle `index-BA5iD_0e.js` chứa đủ nhãn phạm vi, lựa chọn tất cả và nút chạy tất cả.
+- **Giới hạn:** Vẫn cần origin date vì đó là mốc thời gian của forecast; chưa có visual/keyboard QA bằng browser thật. Không sửa backend/model/training.
+- **Commit đề xuất:** `fix: expose all-products forecast selection`
