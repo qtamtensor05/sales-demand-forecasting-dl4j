@@ -1324,3 +1324,54 @@ sec/epoch, RMSE, runtime full hoặc deployment model. Ngưỡng 1% là policy v
 không phải kết luận thống kê từ nhiều seed.
 
 **Commit đề xuất:** `feat: add calibrated RTX 3090 global training workflow`
+
+## 046 - 2026-10-13 - Xác nhận dữ liệu cần mang sang máy training
+
+**Mục tiêu:** làm rõ sau khi clone source trên máy RTX 3090 có phải chỉ cần bổ sung database hay không.
+
+**Kết luận:** project không dùng SQL/database server. Input thực tế là file CSV cục bộ
+`data/train.csv`; thư mục `data/**` bị Git ignore nên clone repository không mang theo dataset.
+Ngoài source đã clone, cần copy đúng file này và chuẩn bị JDK 11, Maven, NVIDIA driver/CUDA tương
+thích backend `nd4j-cuda-11.6-platform`. Maven tải dependency theo `pom.xml` nếu cache máy mới chưa có.
+`output/`, model, checkpoint và log là artifact sinh ra, không cần copy để bắt đầu training mới.
+
+**Bằng chứng:** `.gitignore` chỉ cho phép `data/.gitkeep`; `git ls-files` xác nhận dataset thật
+không được track. `Main`, preflight và hai script training đều đọc cố định `data/train.csv`.
+`pom.xml` khai báo CUDA backend; README/GPU guide yêu cầu Java 11 và Maven. Không tìm thấy kết nối
+database trong đường chạy global.
+
+**Kiểm tra:** chỉ đọc source/cấu hình và `git status`; không sửa code, không chạy test hoặc training.
+Markdown links và `git diff --check` được kiểm lại sau cập nhật tài liệu.
+
+**Giới hạn:** chưa kiểm tra trực tiếp Java, Maven, CUDA, driver, dung lượng đĩa hoặc dataset trên
+máy khách; preflight trên máy đó vẫn là bằng chứng bắt buộc trước smoke/calibration/full.
+
+**Commit đề xuất:** `docs: clarify GPU machine data requirements`
+
+## 047 - 2026-10-13 - Thêm evaluation-only Test 2017 cho GlobalResidualAR
+
+**Mục tiêu và lý do:** dùng ba best-validation checkpoint seed 42/123/2026 của Full run
+`2026-10-13_025422_624_gpu` để đánh giá Test 2017 ở một bước riêng, bảo đảm test không tham gia
+training, chọn epoch/seed/hyperparameter hoặc thay deployment.
+
+**Đã thay đổi:** `SingleStoreGlobalDataset` expose test; `SalesPreprocessor` nhận scaler artifact mà
+không refit. Thêm `GlobalTestEvaluationRunner`, entry point và script PowerShell riêng. Runner fail-fast
+theo dataset hash, 50 scaler, source metadata, epoch 11/20/13, seed list và deployment seed 123; restore
+checkpoint trực tiếp, kiểm tra weights và SHA-256 trước/sau, dùng rollout causal và cùng keys với Weekly.
+Output mới gồm bảy artifact trong `test-evaluation/`, manifest runtime/status và báo cáo macro/pooled,
+per-seed, 50 items, H1-H7, LOW/MEDIUM/HIGH. Không sửa Full runner, architecture, hyperparameter,
+checkpoint, deployment package hoặc validation artifact.
+
+**Tệp:** thêm `GlobalTestEvaluationMain`, `GlobalTestEvaluationRunner`, focused test và
+`Invoke-GlobalTestEvaluation.ps1`; sửa dataset/preprocessor, `GlobalStoreTest`, README và tài liệu dự án.
+
+**Kiểm tra:** TDD RED compile đúng do thiếu scaler artifact/test samples. Focused evaluation 4/4 PASS;
+full `mvn -B test` 59/59 PASS, 0 failures/errors/skips, BUILD SUCCESS 3:16 trên JCublasBackend.
+PowerShell parser PASS. Full-panel regression xác nhận 359 test origins/item, 17.950 origins tổng;
+synthetic inference xác nhận weights và checkpoint hash không đổi, H1-H7/key coverage khớp Weekly.
+`git diff --check` và liên kết Markdown được kiểm tra sau cập nhật.
+
+**Giới hạn:** chưa chạy Test 2017 trên checkpoint thật và chưa tạo `test-evaluation/`, đúng yêu cầu dừng
+chờ xác nhận command. Do đó chưa có metric, runtime hay kiểm chứng 376.950 rows thực tế. Không commit/push.
+
+**Commit đề xuất:** `feat: add checkpoint-only global test evaluation`

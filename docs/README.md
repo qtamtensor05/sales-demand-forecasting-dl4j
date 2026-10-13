@@ -12,6 +12,10 @@
 6. [Một store, global model nhiều items](single-store-global-experiment.md): benchmark GPU50items, checkpoint/deployment package, preflight, script GPU và lệnh full 3 seed; full 3 seed chưa chạy.
 7. [Hướng dẫn training trên máy GPU mới](gpu-training-guide.md): prerequisites, preflight, một lệnh full, artifact và audit.
 
+Evaluation-only cho checkpoint GlobalResidualAR được gọi bằng
+`scripts/Invoke-GlobalTestEvaluation.ps1 -SourceRun <full-run>`. Runner tạo thư mục
+`test-evaluation/` riêng, không train, không thay deployment selection và không overwrite kết quả cũ.
+
 Hướng dẫn cài đặt/chạy nằm ở [README gốc](../README.md).
 Các số liệu hiện tại lấy từ dataset cục bộ `data/train.csv`; file dữ liệu và báo cáo sinh ra không được phân phối cùng tài liệu.
 

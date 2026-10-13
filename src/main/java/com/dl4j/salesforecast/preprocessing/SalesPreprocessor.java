@@ -39,6 +39,22 @@ public final class SalesPreprocessor {
                                                 LocalDate trainEnd, LocalDate validationEnd,
                                                 int inputDays, int forecastDays,
                                                 com.dl4j.salesforecast.performance.GlobalPerformanceProfile profile) {
+        return preprocess(series,trainEnd,validationEnd,inputDays,forecastDays,profile,null);
+    }
+
+    /** Rebuild windows with an immutable scaler loaded from a prior training artifact. */
+    public static PreprocessingResult preprocessWithScaler(TimeSeriesResult series,
+                                                LocalDate trainEnd, LocalDate validationEnd,
+                                                int inputDays, int forecastDays, MinMaxScaler scaler) {
+        return preprocess(series,trainEnd,validationEnd,inputDays,forecastDays,null,
+                Objects.requireNonNull(scaler,"scaler"));
+    }
+
+    private static PreprocessingResult preprocess(TimeSeriesResult series,
+                                                LocalDate trainEnd, LocalDate validationEnd,
+                                                int inputDays, int forecastDays,
+                                                com.dl4j.salesforecast.performance.GlobalPerformanceProfile profile,
+                                                MinMaxScaler artifactScaler) {
         Objects.requireNonNull(series, "series");
         Objects.requireNonNull(trainEnd, "trainEnd");
         Objects.requireNonNull(validationEnd, "validationEnd");
@@ -74,7 +90,7 @@ public final class SalesPreprocessor {
             min = Math.min(min, raw.get(i));
             max = Math.max(max, raw.get(i));
         }
-        MinMaxScaler scaler = new MinMaxScaler(min, max);
+        MinMaxScaler scaler = artifactScaler==null ? new MinMaxScaler(min,max) : artifactScaler;
         if (profile != null) { profile.record("data.scalers", started); }
         started = System.nanoTime();
         List<Double> normalized = new ArrayList<>();
@@ -185,6 +201,7 @@ public final class SalesPreprocessor {
             // Constant training series maps to zero, with a reversible unit scale.
             this.scale = max == min ? 1.0 : max - min;
         }
+        public static MinMaxScaler fromTrainBounds(double min,double max) { return new MinMaxScaler(min,max); }
         public double transform(double value) { return (value - min) / scale; }
         public double inverseTransform(double value) { return value * scale + min; }
         public double getMin() { return min; }

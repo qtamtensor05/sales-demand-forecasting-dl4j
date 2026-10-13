@@ -741,3 +741,25 @@ PASS. Chỉ dùng fixture synthetic, không chạy smoke/calibration/full thật
 deployment model vẫn chưa biết.
 
 **Commit đề xuất:** `feat: add calibrated RTX 3090 global training workflow`.
+
+## 33. Thêm Global Test 2017 evaluation-only từ checkpoint
+
+**Yêu cầu:** đánh giá ba best-validation checkpoint của Full GlobalResidualAR trên Test 2017 mà không
+train lại, không thay weights/checkpoint/deployment và không dùng test để chọn seed hay hyperparameter.
+
+**Triển khai:** dataset global expose test samples; preprocessing có đường tạo window bằng scaler artifact
+bất biến. Runner riêng kiểm tra dataset SHA-256, 50 scaler, metadata, best epoch 11/20/13 và deployment
+seed 123 trước khi restore trực tiếp `model.zip`. Inference tái sử dụng rollout causal H1-H7 và cùng test
+keys cho Weekly Naive. Kết quả được ghi mới dưới `test-evaluation/`, có metrics seed/item/horizon, toàn bộ
+predictions, summary, HTML và manifest hash/runtime; thư mục đã tồn tại bị từ chối để tránh overwrite.
+
+**Kiểm chứng:** TDD RED ban đầu do thiếu factory scaler artifact và test collection. Focused evaluation
+4/4 PASS; full Maven 59/59 PASS, không failure/error/skip, BUILD SUCCESS 3:16. Regression kiểm tra split
+2017 có 359 windows/item và 17.950 origins, weights/hash checkpoint synthetic bất biến, key Weekly/model
+khớp, không duplicate và source runner không có API training/mutation. PowerShell parser PASS.
+
+**Giới hạn:** chưa chạy command trên ba checkpoint thật theo yêu cầu dừng chờ xác nhận, nên chưa có
+376.950 prediction hoặc Test metrics thực tế. Test synthetic chứng minh đường inference; lần chạy GPU
+thật vẫn phải hoàn tất để xác nhận runtime và artifact đầu ra trên Full run.
+
+**Commit đề xuất:** `feat: add checkpoint-only global test evaluation`.

@@ -356,6 +356,23 @@ Ba skill dùng lại quy tắc log huấn luyện dài của `sales-project-prog
 120 fits, nâng dependency, commit hay push. Đây là thay đổi workflow agent; code Java, pipeline dữ
 liệu, normalization và split hiện tại không đổi.
 
+## Evaluation-only GlobalResidualAR trên Test 2017
+
+Project có entry point riêng `GlobalTestEvaluationMain`, runner `GlobalTestEvaluationRunner` và script
+`Invoke-GlobalTestEvaluation.ps1`. Đường chạy này chỉ restore ba checkpoint seed 42/123/2026 bằng
+`GlobalModelArtifacts.loadCheckpoint`, gọi `network.output(input, false)` qua rollout causal hiện có,
+và tuyệt đối không gọi `fit`, `setParams`, save checkpoint hoặc deployment finalization.
+
+`SingleStoreGlobalDataset` hiện expose cả test samples. Với protocol đầy đủ 2013-2017, code kiểm chứng
+359 origins/item, 17.950 origins cho 50 items và suy ra số prediction từ dữ liệu thay vì hard-code.
+Scaler inference được đọc từ `global-series-scaling.csv`; scaler tính lại từ train chỉ dùng làm integrity
+check. Runner kiểm tra SHA-256 dataset, metadata, epoch 11/20/13, deployment seed 123, coverage item,
+Test targets chỉ thuộc 2017, key Weekly/model, duplicate và hash checkpoint trước/sau.
+
+Output riêng gồm seed/item/horizon metrics, predictions, TXT, HTML và manifest runtime. Trạng thái hiện
+tại là **IMPLEMENTED / TESTED / TEST 2017 NOT RUN**: chưa có test metrics trong lượt triển khai này và
+không có thay đổi đối với Full runner, checkpoint, validation result hoặc deployment package.
+
 ## Run GPU Direct/AR trước Residual: 2026-10-10_184201_989_gpu
 
 Manifest xác nhận trạng thái `SUCCESS`, backend `JCublasBackend`, Java 11.0.32.1, dataset SHA-256

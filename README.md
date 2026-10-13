@@ -364,6 +364,20 @@ nên không còn là holdout hoàn toàn chưa từng xem.
 
 Chạy kiểm thử với `mvn test`.
 
+### Đánh giá checkpoint GlobalResidualAR trên Test 2017
+
+Sau khi một Full run đã hoàn tất và có đủ ba checkpoint seed 42/123/2026, chạy riêng evaluation-only:
+
+```powershell
+.\scripts\Invoke-GlobalTestEvaluation.ps1 `
+  -SourceRun "output/runs/2026-10-13_025422_624_gpu"
+```
+
+Lệnh này đọc trực tiếp `model.zip`, scaler của Full run và `data/train.csv`; nó không gọi training,
+không chọn lại seed và không sửa checkpoint/deployment. Runner fail-fast nếu dataset hash, scaler,
+metadata hoặc best epoch không khớp, hoặc nếu `test-evaluation/` đã tồn tại. Kết quả chỉ được ghi vào
+`<source-run>/test-evaluation/`. Test 2017 chỉ dùng để đánh giá; cần xác nhận riêng trước khi chạy lệnh.
+
 ## Dữ liệu và giấy phép
 
 Dữ liệu thực tế trong `data/` không được phân phối cùng repository. Người sử dụng

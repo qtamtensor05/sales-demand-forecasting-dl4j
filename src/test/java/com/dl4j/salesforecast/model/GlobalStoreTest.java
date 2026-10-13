@@ -100,13 +100,14 @@ class GlobalStoreTest {
         }
         var config=ExperimentConfiguration.fromArgs(new String[]{"--global-store=2","--batch-size=32"});
         var data=SingleStoreGlobalDataset.load(file.toString(),config);
-        assertEquals(50,data.items.size());assertEquals(52300,data.train.size());assertEquals(18000,data.validation.size());
+        assertEquals(50,data.items.size());assertEquals(52300,data.train.size());assertEquals(18000,data.validation.size());assertEquals(17950,data.test.size());
         assertEquals(3,config.getFitCount());assertEquals(32,config.getBatchSize());
         for(var item:data.items) {
             assertEquals(item.id*10,item.scaler.getMin());assertEquals(6,item.scaler.getScale());
-            assertEquals(1046,item.train.getWindows().size());assertEquals(360,item.validation.getWindows().size());
+            assertEquals(1046,item.train.getWindows().size());assertEquals(360,item.validation.getWindows().size());assertEquals(359,item.test.getWindows().size());
             assertTrue(item.train.getWindows().stream().allMatch(w->w.getTargetDates().get(6).getYear()<=2015));
             assertTrue(item.validation.getWindows().stream().allMatch(w->w.getTargetDates().get(0).getYear()==2016&&w.getTargetDates().get(6).getYear()==2016));
+            assertTrue(item.test.getWindows().stream().allMatch(w->w.getTargetDates().get(0).getYear()==2017&&w.getTargetDates().get(6).getYear()==2017));
         }
         assertThrows(IllegalArgumentException.class,()->SingleStoreGlobalDataset.load(file.toString(),ExperimentConfiguration.fromArgs(new String[]{"--global-store=1"})));
         assertThrows(IllegalArgumentException.class,()->ExperimentConfiguration.fromArgs(new String[]{"--global-store=0"}));

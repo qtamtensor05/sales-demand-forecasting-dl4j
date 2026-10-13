@@ -12,6 +12,7 @@ public final class SingleStoreGlobalDataset {
     public final List<Item> items;
     public final List<Sample> train;
     public final List<Sample> validation;
+    public final List<Sample> test;
 
     public static SingleStoreGlobalDataset load(String path, ExperimentConfiguration config) {
         return load(path, config, new com.dl4j.salesforecast.performance.GlobalPerformanceProfile());
@@ -55,12 +56,13 @@ public final class SingleStoreGlobalDataset {
             list.add(new Item(p));
         }
         list.sort(Comparator.comparingInt(i -> i.id)); items = List.copyOf(list);
-        List<Sample> t = new ArrayList<>(), v = new ArrayList<>();
+        List<Sample> t = new ArrayList<>(), v = new ArrayList<>(), x = new ArrayList<>();
         for (Item i : items) {
             for (Window w : i.train.getWindows()) { t.add(new Sample(i,w)); }
             for (Window w : i.validation.getWindows()) { v.add(new Sample(i,w)); }
+            for (Window w : i.test.getWindows()) { x.add(new Sample(i,w)); }
         }
-        train = List.copyOf(t); validation = List.copyOf(v);
+        train = List.copyOf(t); validation = List.copyOf(v); test = List.copyOf(x);
     }
 
     public List<Sample> trainingOrder(long seed, int epoch) {
@@ -72,10 +74,10 @@ public final class SingleStoreGlobalDataset {
     public static final class Item {
         public final int id;
         public final MinMaxScaler scaler;
-        public final Split train, validation;
+        public final Split train, validation, test;
         public final double trainMean;
         private Item(PreprocessingResult p) {
-            id = p.getItemId(); scaler = p.getScaler(); train = p.getTrain(); validation = p.getValidation();
+            id = p.getItemId(); scaler = p.getScaler(); train = p.getTrain(); validation = p.getValidation(); test=p.getTest();
             trainMean = train.getRawSales().stream().mapToDouble(Double::doubleValue).average().orElseThrow();
         }
     }
