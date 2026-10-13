@@ -833,3 +833,18 @@ prefix có đủ sáu file deployment. Restart MinIO/PostgreSQL không làm mấ
 Silver/Gold Parquet hoặc preprocessing parity. Quality gate chỉ là code/test cho bước fail-fast kế tiếp.
 
 **Commit đề xuất:** `feat: verify docker stack and bootstrap data lake`.
+
+## 38. Đối chiếu checklist triển khai tổng thể
+
+**Nhu cầu:** trong lúc Maven tải phụ thuộc CUDA cho full test, đối chiếu yêu cầu gốc với code, artifact
+và container đang chạy để xác định chính xác hệ thống đã tới đâu.
+
+**Kết quả:** tạo checklist riêng theo chín giai đoạn, các thành phần đích và 12 tiêu chí nghiệm thu.
+Không xem health endpoint bootstrap là Forecast Service/API/React đã hoàn thành; không xem prefix rỗng
+là Silver/Gold đã được xử lý; không xem constant trong quality rule là kết quả Spark runtime.
+
+**Trạng thái:** Docker topology và Spark cluster đã chạy; Bronze/artifact/persistence đã có bằng chứng.
+Luồng Spark Silver/Gold, DL4J serving, schema/API, dashboard, parity/E2E và benchmark còn phải triển khai.
+Tổng hợp hiện tại là 3 tiêu chí đạt, 3 đạt một phần và 6 chưa đạt.
+
+**Commit đề xuất:** `docs: add big data implementation checklist`.

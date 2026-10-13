@@ -1476,3 +1476,55 @@ feature parity, window/origin count hoặc benchmark; Giai đoạn 3 chưa hoàn
 ghi nhận là full-suite PASS hay FAIL.
 
 **Commit đề xuất:** `feat: verify docker stack and bootstrap data lake`
+
+## 052 - 2026-10-13 - Kiểm tra trạng thái tải Docker và CUDA Maven
+
+**Mục tiêu và lý do:** làm rõ thành phần nào đã tải xong sau lần triển khai Docker và liệu người dùng
+có phải tải phụ thuộc thủ công hay không.
+
+**Kết quả kiểm tra:** các image Spark 3.5.9 Java 11, MinIO, MinIO Client và PostgreSQL đều đã có trong
+Docker image store; các service dài hạn của Compose vẫn đang chạy, trong đó các service có healthcheck
+đều healthy. Maven cache đã có CUDA classifier Windows thường nhưng chưa có
+`cuda-11.6-8.3-1.5.7-windows-x86_64-redist.jar`; chỉ còn file tải tạm 0 byte từ lần test bị dừng.
+
+**Kết luận:** không cần tải thủ công. Maven Central sẽ tự tải artifact redist còn thiếu khi chạy lại
+`mvn -B test`; cần giữ mạng ổn định và không dừng tiến trình trong lúc tải. Không sửa code, cấu hình,
+model, scaler hay checkpoint và không chạy training.
+
+**Giới hạn:** lượt kiểm tra này chỉ xác nhận trạng thái cache/image hiện tại; chưa chạy lại full test để
+tải hoàn tất artifact lớn và chưa có kết quả full-suite mới.
+
+**Commit đề xuất:** `docs: record docker and cuda download status`
+
+## 053 - 2026-10-13 - Xác nhận lệnh chạy full test tại terminal
+
+**Mục tiêu:** xác nhận cách tiếp tục tải phụ thuộc và chạy bộ test gốc.
+
+**Hướng dẫn:** tại terminal đang đứng ở thư mục gốc repository
+`C:\Users\quangTam\Documents\DL4j\sales-demand-forecasting-dl4j`, chạy `mvn -B test` và giữ cửa sổ,
+kết nối mạng hoạt động cho đến khi Maven kết thúc. Maven sẽ tự tải artifact CUDA còn thiếu; không cần
+tải hoặc chép JAR thủ công. Docker có thể tiếp tục chạy nhưng không phải điều kiện của bộ unit test gốc.
+
+**Thay đổi và kiểm tra:** không sửa code/cấu hình và không chạy test trong lượt trả lời hướng dẫn này.
+Liên kết Markdown và `git diff --check` được kiểm tra. Kết quả chỉ được xem là PASS khi terminal in
+`BUILD SUCCESS`; nếu dừng lúc tải dependency thì chưa phải kết quả test.
+
+**Commit đề xuất:** `docs: clarify full test command`
+
+## 054 - 2026-10-13 - Cập nhật checklist tiến độ triển khai
+
+**Mục tiêu và lý do:** đối chiếu toàn bộ yêu cầu Big Data ban đầu trong lúc người dùng chờ Maven tải
+phụ thuộc, cung cấp trạng thái thực tế thay vì chỉ liệt kê kế hoạch.
+
+**Thay đổi:** thêm `docs/11-implementation-checklist.md`, liên kết từ mục lục và cập nhật lịch sử/trạng
+thái hiện tại. Checklist phân biệt đã đạt, đạt một phần và chưa đạt cho từng phase, thành phần đích và
+12 acceptance criteria; đồng thời ghi đường găng triển khai tiếp theo.
+
+**Kết quả:** 3/12 tiêu chí đã có bằng chứng đạt, 3/12 đạt một phần và 6/12 chưa đạt. Docker/Spark
+topology và persistence đã được chứng minh; Spark Silver/Gold, DL4J serving, API, dashboard, parity/E2E
+và benchmark chưa hoàn thành. Không sửa code, model, scaler, checkpoint hoặc artifact thực nghiệm.
+
+**Kiểm tra:** đối chiếu file thực tế và `docker compose ps`; kiểm tra liên kết Markdown và
+`git diff --check`. Không chạy thêm Maven test để tránh cạnh tranh với lượt tải/test của người dùng.
+
+**Commit đề xuất:** `docs: add big data implementation checklist`

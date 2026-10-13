@@ -497,3 +497,7 @@ Bronze đã có `train.csv` 16 MiB cùng ingestion metadata; deployment package 
 `artifacts/models/global-residual-ar/seed-123`. Restart MinIO/PostgreSQL vẫn giữ object và probe row.
 Module `spark-etl` có Store 1 quality gate, focused test 1/1 PASS. Silver/Gold và Spark runtime ETL vẫn
 chưa chạy, nên Giai đoạn 3 chưa hoàn thành.
+
+Checklist đối chiếu đầy đủ yêu cầu triển khai nằm tại `docs/11-implementation-checklist.md`. Tại lần
+cập nhật 2026-10-13, 3/12 tiêu chí nghiệm thu đã đạt, 3/12 đạt một phần và 6/12 chưa đạt. Đường găng
+hiện tại là Spark ETL/Parquet và preprocessing parity trước khi tích hợp Forecast Service thật.
