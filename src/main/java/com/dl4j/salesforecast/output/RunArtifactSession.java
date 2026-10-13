@@ -178,12 +178,15 @@ public final class RunArtifactSession implements AutoCloseable {
         java.util.Map<String, Object> values = new java.util.LinkedHashMap<>();
         values.put("schemaVersion", configuration.isHuberComparison() ? 3 : configuration.includesResidual() ? 2 : 1);
         values.put("runId", runId);
+        values.put("runType", ProjectPaths.fromEnvironment().runType(configuration));
         values.put("status", status);
         values.put("startedAt", startedAt.toString());
         values.put("updatedAt", Instant.now().toString());
+        if ("SUCCESS".equals(status) || "FAILED".equals(status)) { values.put("finishedAt", Instant.now().toString()); }
         values.put("javaVersion", System.getProperty("java.version"));
         values.put("backend", backend);
         values.put("datasetPath", datasetPath);
+        values.put("outputPath", portablePath(directory));
         values.put("datasetSha256", datasetSha256);
         values.put("smoke", configuration.isSmoke());
         values.put("series", configuration.getSeriesCount());

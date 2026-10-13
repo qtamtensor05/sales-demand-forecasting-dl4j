@@ -7,7 +7,7 @@ Số thứ tự phản ánh thứ tự triển khai, không khẳng định mỗ
 
 **Nhu cầu và lý do:** xây dựng đồ án bằng Java 11, có dependency và điểm chạy thống nhất trước khi phân tích dữ liệu.
 
-**Thành phần:** [pom.xml](../pom.xml), [Main.java](../src/main/java/com/dl4j/salesforecast/Main.java).
+**Thành phần:** [pom.xml](../../../pom.xml), [Main.java](../../../src/main/java/com/dl4j/salesforecast/Main.java).
 Maven cấu hình Java 11, DL4J/ND4J 1.0.0-M2.1, DataVec, Apache Commons CSV,
 logging, JUnit Jupiter và exec plugin. `Main` dùng đường dẫn tương đối từ thư mục gốc dự án.
 
@@ -18,7 +18,7 @@ nhưng chưa có mô hình được huấn luyện. IntelliJ mở dự án dư�
 
 **Nhu cầu và lý do:** hiểu quy mô và chất lượng dữ liệu trước khi chọn chuỗi để dự báo.
 
-**Thành phần:** [SalesDataAnalyzer.java](../src/main/java/com/dl4j/salesforecast/analysis/SalesDataAnalyzer.java).
+**Thành phần:** [SalesDataAnalyzer.java](../../../src/main/java/com/dl4j/salesforecast/analysis/SalesDataAnalyzer.java).
 Đọc CSV, tổng hợp bản ghi, ngày, cửa hàng, sản phẩm, tổng/trung bình/min/max sales.
 Bổ sung tổng sales theo cửa hàng, top 10 sản phẩm, số bản ghi/ngày sales bằng 0,
 ngày thiếu và bản ghi trùng cho từng kết hợp store + item.
@@ -68,7 +68,7 @@ giấy phép bởi LICENSE của dự án. Các file có sẵn trên máy không
 
 **Nhu cầu và lý do:** chọn store 1 + item 1 để hiểu phân phối, chu kỳ thời gian và chuẩn bị giao diện cho preprocessing.
 
-**Thành phần:** [TimeSeriesAnalyzer.java](../src/main/java/com/dl4j/salesforecast/analysis/TimeSeriesAnalyzer.java).
+**Thành phần:** [TimeSeriesAnalyzer.java](../../../src/main/java/com/dl4j/salesforecast/analysis/TimeSeriesAnalyzer.java).
 `analyze(filePath, storeId, itemId)` lọc CSV, sắp xếp ngày tăng dần;
 tính mean, median, độ lệch chuẩn tổng thể (chia N), ngày zero/thiếu/trùng;
 in trung bình theo thứ/tháng/năm và 10 bản ghi đầu/cuối.
@@ -86,7 +86,7 @@ không thiếu/trùng/khoảng trống; trạng thái `OK`.
 
 **Nhu cầu và lý do:** chuyển chuỗi đã kiểm tra thành cặp input/target, tránh normalization dùng thông tin tương lai.
 
-**Thành phần:** [SalesPreprocessor.java](../src/main/java/com/dl4j/salesforecast/preprocessing/SalesPreprocessor.java).
+**Thành phần:** [SalesPreprocessor.java](../../../src/main/java/com/dl4j/salesforecast/preprocessing/SalesPreprocessor.java).
 Nhận `TimeSeriesResult`, từ chối chuỗi không hoàn chỉnh; chia train/validation/test theo ngày;
 fit Min–Max trên train; tạo sliding window với 30 ngày input và 7 ngày target.
 Có overload cấu hình ngày chia và độ dài cửa sổ.
@@ -123,14 +123,14 @@ Sau đó lịch sử Git quan sát được có commit `133f904` cho analysis/pr
 Mỗi yêu cầu hoàn tất có mục nhật ký và tên commit đề xuất; thay đổi chức năng cập nhật trạng thái/lịch sử tương ứng.
 
 **Kết quả:** có điểm đọc tài liệu chung và quy trình áp dụng trong các phiên agent tiếp theo.
-Chi tiết kiểm tra của yêu cầu này nằm trong [nhật ký](change-log.md).
+Chi tiết kiểm tra của yêu cầu này nằm trong [nhật ký](../../project-management/change-log.md).
 Quy trình không tự commit/push và không phải Git hook.
 
 ## 10. Baseline cùng thứ tuần trước
 
 **Nhu cầu và lý do:** cần một mốc đơn giản để xác định LSTM có cải thiện so với dự báo theo tính mùa vụ hàng tuần.
 
-**Thành phần:** [WeeklyNaiveBaseline.java](../src/main/java/com/dl4j/salesforecast/evaluation/WeeklyNaiveBaseline.java).
+**Thành phần:** [WeeklyNaiveBaseline.java](../../../src/main/java/com/dl4j/salesforecast/evaluation/WeeklyNaiveBaseline.java).
 Đánh giá mỗi target bằng quan sát sales thật trước đó 7 ngày (`t - 7`), trên raw sales;
 tính MAE, RMSE theo từng horizon và toàn bộ các dự báo. `Main` chạy đánh giá trên test của preprocessing.
 
@@ -148,14 +148,14 @@ thành công, đọc đủ 913.000 dòng dataset và in kết quả theo horizon
 **Giới hạn:** mốc mới áp dụng cho store 1 + item 1; protocol là đánh giá cuốn chiếu,
 không tương đương dự báo toàn bộ 7 ngày một lần từ một origin cố định.
 
-Chi tiết hiện hành ở [trạng thái dự án](current-state.md); nhật ký yêu cầu ở [change-log.md](change-log.md).
+Chi tiết hiện hành ở [trạng thái dự án](../../project-management/current-state.md); nhật ký yêu cầu ở [change-log.md](../../project-management/change-log.md).
 
 ## 11. Tensor ND4J và LSTM dự báo trực tiếp 7 ngày
 
 **Nhu cầu và lý do:** chạy thử mô hình học sâu trên cửa sổ đã chuẩn bị, đồng thời kiểm chứng
 shape tensor, fit và suy luận với phiên bản DL4J đang dùng.
 
-**Thành phần:** [SalesLstmForecaster.java](../src/main/java/com/dl4j/salesforecast/model/SalesLstmForecaster.java).
+**Thành phần:** [SalesLstmForecaster.java](../../../src/main/java/com/dl4j/salesforecast/model/SalesLstmForecaster.java).
 Đổi batch thành features `[batch, 1, 30]`, labels `[batch, 7, 30]`, mask `[batch, 30]`.
 LSTM 32 hidden units nối `RnnOutputLayer` identity/MSE 7 units; mask chỉ bật bước cuối,
 nơi network phát vector dự báo 7 ngày.
@@ -178,7 +178,7 @@ in metric weekly naive lẫn LSTM.
 **Giới hạn:** cấu hình mô hình chỉ là điểm khởi đầu; chưa có tuning, lưu model/scaler,
 dự báo model đã nạp lại, hoặc huấn luyện nhiều chuỗi. Kết quả xấu hơn baseline cần được giữ nguyên báo cáo.
 
-Chi tiết metric và kế hoạch tiếp theo trong [trạng thái hiện tại](current-state.md).
+Chi tiết metric và kế hoạch tiếp theo trong [trạng thái hiện tại](../../project-management/current-state.md).
 
 ## 12. Tìm cấu hình LSTM bằng validation và gia cố kiểm tra
 
@@ -528,7 +528,7 @@ leakage, future mutation, mask/shape, finite rollout, checkpoint, metric, runner
 Smoke thực tế hoàn tất exit 0/BUILD SUCCESS trong 38,900 giây; run `2026-10-12_002237_861_gpu`
 ghi SUCCESS với 1 LOW (7/34), seed 42, 6 epoch, 3 best flags và 7.560 prediction. Recompute metric
 khớp CSV trong `2e-9`, reconstruction trong `2e-10`; Java 11.0.32.1/CUDA. Chi tiết và tệp thay đổi
-trong [hồ sơ residual](residual-experiment.md).
+trong [hồ sơ residual](../../05-evaluation/residual-experiment.md).
 
 **Trạng thái và giới hạn:** IMPLEMENTED / TESTED / SMOKE TESTED / FULL EXPERIMENT NOT YET RUN.
 Chưa kết luận residual vượt Weekly macro RMSE 11,1435 hoặc cải thiện MEDIUM/HIGH. Full 180 fits
@@ -586,7 +586,7 @@ reconstruction dưới `4e-15`. MSE smoke predictions khớp smoke cũ. Review c
 **Giới hạn:** IMPLEMENTED / TESTED / SMOKE TESTED / FULL EXPERIMENT NOT YET RUN.
 Smoke Huber RMSE 7,103008 và MSE 7,102983, Weekly 6,870861; không kết luận từ một LOW/seed.
 Full 120 fits ước khoảng 2:11 giờ từ run trước 3:16:03; chưa có kết luận MEDIUM/HIGH, horizon xa
-hoặc seed stability. Chi tiết/tệp/lệnh tại [hồ sơ Huber](residual-huber-experiment.md).
+hoặc seed stability. Chi tiết/tệp/lệnh tại [hồ sơ Huber](../../05-evaluation/residual-huber-experiment.md).
 Không test selection năm 2017, không log1p, không commit/push.
 
 **Commit đề xuất:** `feat: add Huber loss experiment for residual LSTM`
@@ -612,7 +612,7 @@ cả hai dừng sớm 60/60; chỉ một cặp có best epoch khác. Kiểm tra 
 
 **Tệp cập nhật:** README.md, docs/README.md, docs/current-state.md,
 docs/residual-huber-experiment.md, docs/implementation-history.md, docs/change-log.md.
-Chi tiết bảng macro/stratum/horizon/seed trong [hồ sơ Huber](residual-huber-experiment.md).
+Chi tiết bảng macro/stratum/horizon/seed trong [hồ sơ Huber](../../05-evaluation/residual-huber-experiment.md).
 Không sửa code, dependency, dữ liệu hoặc artifact; không commit/push.
 
 **Giới hạn và hướng tiếp:** FULL EXPERIMENT COMPLETED nhưng Huber delta 1 chưa có lợi thế.
@@ -638,7 +638,7 @@ reuse immutable run lifecycle; không thay schema/behavior legacy.
 GlobalExperimentRunner/Report, GlobalArtifactExporter và GlobalStoreTest. Sửa Main,
 ExperimentConfiguration, TimeSeriesAnalyzer (panel reader), AR (visibility helper causal),
 RunArtifactSession; cập nhật README/docs index/current-state/history/change-log và
-[single-store-global-experiment.md](single-store-global-experiment.md).
+[global-model-results.md](../../05-evaluation/global-model-results.md).
 
 **Kiểm chứng:** TDD RED 2 failures/0 errors vì thiếu global CLI/dataset; preprocessing 3/3,
 focused 6/6; sau thêm full-panel fixture, suite 46/46, không failures/errors/skips, exit0,
@@ -686,7 +686,7 @@ không diễn giải validationtotal2,01× là inferencekernel2×. AFTERmean8,77
 150epochước21,93giờ, biến thiên tốc độ hai epoch cho15,1–28,75giờ; earlystop chưa biết.
 Cache thêm một snapshotCPU, không cacheGPU/alltraintensors. RunbaselineđầuFAILED do class
 mismatch giữ làm evidence, không dùng vào phép so sánh. Chưa full5seeds/testselection2017.
-Automation10phút đã dừng theo yêu cầu. Chi tiết tại [hồ sơ global](single-store-global-experiment.md).
+Automation10phút đã dừng theo yêu cầu. Chi tiết tại [hồ sơ global](../../05-evaluation/global-model-results.md).
 
 **Tệp:** profile/fingerprint/tests/oracle mới; configuration/globalrunner/forecaster/report,
 panel reader/preprocessor overload, artifactexport/session/Main; scripts audit và Invoke-GlobalRun;
@@ -1118,3 +1118,22 @@ sản phẩm` và `Dự báo tất cả 50 sản phẩm`.
 visual/keyboard QA bằng browser thật. Không thay backend, model, checkpoint, preprocessing hoặc split.
 
 **Commit đề xuất:** `fix: expose all-products forecast selection`.
+
+## 52. Tái cấu trúc README theo hướng chạy và triển khai
+
+**Nhu cầu:** README cũ dài và trộn hướng dẫn vận hành với thuật toán, cấu trúc source, protocol cùng
+kết quả thực nghiệm, khiến người đọc khó tìm lệnh chạy và triển khai chính.
+
+**Triển khai:** README được viết lại thành điểm bắt đầu ngắn gọn, chỉ giữ yêu cầu môi trường, cách
+khởi động Docker, địa chỉ dịch vụ, chạy Java trực tiếp, huấn luyện và thay deployment package. Tạo
+`docs/run-and-deployment.md` để giữ hướng dẫn vận hành chi tiết hơn; cập nhật mục lục `docs/README.md`
+và sửa mô tả stale về full global 3 seed.
+
+**Kết quả:** thông tin kiến trúc, thành phần, ingestion, model serving và kết quả thực nghiệm không bị
+xóa mà tiếp tục nằm trong các tài liệu chuyên biệt. README không còn chứa phần diễn giải dài về tensor,
+feature, preprocessing, từng biến thể mô hình hoặc bảng kết quả.
+
+**Giới hạn:** đây là thay đổi tài liệu, không thay code, container, dữ liệu, model, normalization hoặc
+chronological split. Các tài liệu lịch sử vẫn giữ nguyên bằng chứng kỹ thuật và số liệu của từng thời điểm.
+
+**Commit đề xuất:** `docs: streamline project run and deployment guide`.

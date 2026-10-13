@@ -67,7 +67,7 @@ Weekly, per-item/epoch/macro/pooled metrics giống nhau, max/mean prediction di
 Suite mới 51/51 PASS, 0 failures/errors/skips; focused 12/12. Smoke qua script build cô lập
 `2026-10-13_005123_869_gpu` SUCCESS, predictions CSV khớp smoke lịch sử cùng cấu hình.
 Kiểm tra 47 liên kết local và git diff --check đạt. Chi tiết, giới hạn nhiễu timing,
-profile và lệnh build cô lập tại [runtime optimization](single-store-global-experiment.md#runtime-optimization-ngày-2026-10-13).
+profile và lệnh build cô lập tại [runtime optimization](../../05-evaluation/global-model-results.md#runtime-optimization-ngày-2026-10-13).
 Pipeline nghiên cứu 12 chuỗi bên dưới được giữ nguyên. CLI mới `--global-store=1` dùng toàn bộ
 50 items, một Global ResidualAR-MSE mỗi seed: chỉ 3 global fits. Window 30→7, 6 dynamic +
 50 one-hot channels, scaler train-only riêng item, train/validation batch do calibration chọn,
@@ -87,7 +87,7 @@ keys duy nhất, finite, hash đúng, metric recompute trong 4,9e-11, reconstruc
 Không dùng test 2017 selection; không tuning Huber/log1p/embedding hoặc thay pipeline cũ.
 Full có thể dài: benchmark AFTER 50 items đo trung bình 8,772 phút/epoch; 150 epochs ước 21,93 giờ,
 biến thiên theo hai epoch cho 15,1–28,75 giờ; early stopping chưa biết. Đây là ước lượng,
-thay ngoại suy smoke 3 items trước đây. Xem [hồ sơ global](single-store-global-experiment.md)
+thay ngoại suy smoke 3 items trước đây. Xem [hồ sơ global](../../05-evaluation/global-model-results.md)
 cho thiết kế, tệp, tests, lệnh và giới hạn. Không commit/push.
 
 ## ResidualAR Huber — full hoàn tất ngày 2026-10-12
@@ -121,7 +121,7 @@ Huber = 5,635588/7,103008. Không dùng smoke kết luận Huber cải thiện h
 Kết quả full và các breakdown đã bổ sung trong hồ sơ Huber; smoke bên trên là bằng chứng lịch sử.
 Schema 3 ghi loss theo model, delta và cột epoch loss trung tính; schema legacy/residual cũ giữ nguyên.
 Chi tiết thiết kế, tests, artifact, lệnh full và ước lượng khoảng 2:11 giờ trong
-[hồ sơ Huber](residual-huber-experiment.md). Không commit/push.
+[hồ sơ Huber](../../05-evaluation/residual-huber-experiment.md). Không commit/push.
 
 ## Residual AR — full experiment ngày 2026-10-12
 
@@ -137,7 +137,7 @@ RMSE finalPrediction ở sales gốc trên validation, không dùng test 2017 đ
 Báo cáo mới có đủ bốn model, macro hai tầng, stratum, horizon, seed và win rate so ba đối chứng.
 Schema residual v2 thêm cột ở cuối CSV, lưu config thật và min/max/scale từng chuỗi; giữ nguyên run
 cũ. Chi tiết thiết kế, tệp thay đổi, kiểm thử, lệnh và giới hạn tại
-[thí nghiệm residual](residual-experiment.md).
+[thí nghiệm residual](../../05-evaluation/residual-experiment.md).
 
 **IMPLEMENTED / TESTED / SMOKE TESTED / FULL EXPERIMENT COMPLETED.** `mvn -B test` trước full run
 đạt 33/33. Run `2026-10-12_092618_825_gpu` hoàn tất 180 fits trên CUDA, giữ nguyên dataset hash,
@@ -354,7 +354,7 @@ Các kiểm thử bao gồm chia cửa sổ, kiểm tra analyzer, weekly baselin
 sample standard deviation và chọn tertile đại diện. `mvn test` đạt 15 tests; `mvn -B compile
 exec:java` chạy 12 chuỗi × 5 seed × 2 mô hình (120 lượt huấn luyện), `BUILD SUCCESS` sau 2:05 giờ;
 không tính metric test.
-Kết quả chi tiết trong [nhật ký](change-log.md).
+Kết quả chi tiết trong [nhật ký](../../project-management/change-log.md).
 
 Thí nghiệm mới chỉ lấy 12/500 chuỗi, dùng cùng cấu hình được chọn trước, và validation chọn epoch
 ở từng seed nên vẫn là dữ liệu tuning. Macro std đo phân tán giữa các chuỗi, không phải độ bất định
@@ -601,3 +601,13 @@ Màn hình Dự báo hiện có lựa chọn phạm vi rõ ràng và mặc đị
 đổi sang `Một sản phẩm`. Kết quả hàng loạt được hiển thị ngay trên cùng màn hình này. Ngày vẫn được giữ
 vì đó là mốc bắt đầu forecast, không phải lựa chọn sản phẩm. Frontend container đã build lại, healthy,
 HTTP 200 và bundle live có đủ nhãn phạm vi, lựa chọn tất cả cùng nút chạy tương ứng.
+
+### Tài liệu chạy và triển khai (2026-10-14)
+
+README hiện là hướng dẫn ngắn gọn để chuẩn bị môi trường, chạy Docker stack, mở các dịch vụ, vận hành
+container, chạy pipeline Java và triển khai deployment package. Nội dung thuật toán và kết quả thực
+nghiệm được dẫn sang `docs/` thay vì trình bày dàn trải tại trang đầu.
+
+Hướng dẫn vận hành chi tiết nằm tại `docs/run-and-deployment.md`; mục lục `docs/README.md` phân tách
+rõ kiến trúc, Data Lake, Spark, serving, API, Dashboard, trạng thái và hồ sơ thực nghiệm. Thay đổi này
+không tác động runtime, dữ liệu, model, normalization hoặc chronological split.

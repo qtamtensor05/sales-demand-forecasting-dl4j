@@ -64,7 +64,7 @@ services:
     volumes:
       - ./infrastructure/minio/init-minio.sh:/bootstrap/init-minio.sh:ro
       - ./data:/bootstrap/input:ro
-      - ./output/runs/2026-10-13_025422_624_gpu/deployment:/bootstrap/model:ro
+      - ${MODEL_ARTIFACT_DIR:-./output/runs/2026-10-13_025422_624_gpu/deployment}:/bootstrap/model:ro
     networks: [forecast-network]
 
   postgres:
@@ -165,7 +165,7 @@ services:
     ports:
       - "${FORECAST_SERVICE_PORT:-8083}:8083"
     volumes:
-      - ./output/runs/2026-10-13_025422_624_gpu/deployment:/opt/model:ro
+      - ${MODEL_ARTIFACT_DIR:-./output/runs/2026-10-13_025422_624_gpu/deployment}:/opt/model:ro
       - ./data:/opt/data:ro
     healthcheck:
       <<: *app-healthcheck

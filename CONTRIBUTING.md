@@ -21,5 +21,5 @@ Không đưa mật khẩu, token hoặc dữ liệu bán hàng riêng tư vào i
 Kiểm thử `TimeSeriesAnalyzer` và `SalesPreprocessor` dùng CSV tự tạo, không cần dataset cục bộ.
 Không commit thư mục build, dataset cục bộ, báo cáo sinh ra hoặc model đã huấn luyện.
 
-Sau mỗi yêu cầu hoàn tất, cập nhật [nhật ký](docs/change-log.md), các tài liệu tiến trình
+Sau mỗi yêu cầu hoàn tất, cập nhật [nhật ký](docs/project-management/change-log.md), các tài liệu tiến trình
 liên quan và tên commit đề xuất theo [quy trình dự án](AGENTS.md).

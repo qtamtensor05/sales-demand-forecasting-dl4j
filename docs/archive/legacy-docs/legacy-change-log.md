@@ -1,6 +1,6 @@
 # Nhật ký yêu cầu
 
-Các bước trước khi có nhật ký được tổng hợp tại [lịch sử triển khai](implementation-history.md).
+Các bước trước khi có nhật ký được tổng hợp tại [lịch sử triển khai](../../project-management/implementation-history.md).
 Mục dưới đây bắt đầu quy trình ghi nhận sau từng yêu cầu; không dựng lại ngày/commit chưa biết.
 
 ## 001 — 2026-09-27 — Tài liệu tiến trình và skill hoàn tất yêu cầu
@@ -1037,7 +1037,7 @@ config thật, báo cáo overall/stratum/horizon/seed/consistency/win rate; khô
 **Tệp ảnh hưởng:** Main, AR forecaster, ExperimentRunner, MultiSeriesExperimentRunner,
 TrainingProgress, ba exporter CSV, RunArtifactSession; ba class mới nêu trên; hai test residual
 mới và RunArtifactSessionTest; README, current-state, implementation-history, change-log và
-[residual-experiment.md](residual-experiment.md) (có liên kết từng tệp cụ thể). Không sửa
+[residual-experiment.md](../../05-evaluation/residual-experiment.md) (có liên kết từng tệp cụ thể). Không sửa
 SalesPreprocessor, Direct model, Weekly Naive hoặc dependency.
 
 **Kiểm tra:** red test chạy và thất bại đúng tại assertion vì thiếu class residual (1 failure).
@@ -1143,7 +1143,7 @@ reconstruction `3,553e-15`. MSE predictions khớp hoàn toàn smoke lịch sử
 Weekly/MSE/Huber RMSE 6,870861/7,102983/7,103008; không kết luận chất lượng từ smoke.
 
 **Trạng thái và giới hạn:** IMPLEMENTED / TESTED / SMOKE TESTED / FULL EXPERIMENT NOT YET RUN.
-Full 120 fits ước thô 2:10:42, lệnh lưu log trong [hồ sơ Huber](residual-huber-experiment.md).
+Full 120 fits ước thô 2:10:42, lệnh lưu log trong [hồ sơ Huber](../../05-evaluation/residual-huber-experiment.md).
 Chưa đánh giá MEDIUM/HIGH, seed stability hoặc thắng Weekly trên 12×5. Không sử dụng test 2017
 để chọn model/delta; không triển khai log1p, không commit/push. Kiểm tra local Markdown links và
 `git diff --check` đạt; logs nằm dưới output/huber-*.log.
@@ -1171,7 +1171,7 @@ cả hai dừng sớm 60/60; chỉ một cặp có best epoch khác. Kiểm tra 
 
 **Tệp cập nhật:** README.md, docs/README.md, docs/current-state.md,
 docs/residual-huber-experiment.md, docs/implementation-history.md, docs/change-log.md.
-Chi tiết bảng macro/stratum/horizon/seed trong [hồ sơ Huber](residual-huber-experiment.md).
+Chi tiết bảng macro/stratum/horizon/seed trong [hồ sơ Huber](../../05-evaluation/residual-huber-experiment.md).
 Không sửa code, dependency, dữ liệu hoặc artifact; không commit/push.
 
 **Giới hạn và hướng tiếp:** FULL EXPERIMENT COMPLETED nhưng Huber delta 1 chưa có lợi thế.
@@ -1197,7 +1197,7 @@ reuse immutable run lifecycle; không thay schema/behavior legacy.
 GlobalExperimentRunner/Report, GlobalArtifactExporter và GlobalStoreTest. Sửa Main,
 ExperimentConfiguration, TimeSeriesAnalyzer (panel reader), AR (visibility helper causal),
 RunArtifactSession; cập nhật README/docs index/current-state/history/change-log và
-[single-store-global-experiment.md](single-store-global-experiment.md).
+[global-model-results.md](../../05-evaluation/global-model-results.md).
 
 **Kiểm chứng:** TDD RED 2 failures/0 errors vì thiếu global CLI/dataset; preprocessing 3/3,
 focused 6/6; sau thêm full-panel fixture, suite 46/46, không failures/errors/skips, exit0,
@@ -1249,7 +1249,7 @@ lỗi chặn trong scope kiểm tra. AFTERmean8,772phút/epoch; full150epochư�
 tốc độhai epoch cho15,1–28,75giờ, chưa biết earlystop. FULL GLOBAL EXPERIMENT NOT RUN.
 Runđầu195613FAILED/classmismatch không dùng làmbaseline. Automation10phút PAUSED theo yêu cầu.
 
-**Tệp và evidence:** xem [hồ sơ global](single-store-global-experiment.md#runtime-optimization-ngày-2026-10-13)
+**Tệp và evidence:** xem [hồ sơ global](../../05-evaluation/global-model-results.md#runtime-optimization-ngày-2026-10-13)
 cho danh sách source/tests/scripts, profile/logs hai run, bảngphase, hashes, memory, command và
 giới hạn. Cập nhật README/docs index/current-state/history/change-log/global; giữ lịch sử cũ.
 Không commit/push.
@@ -2121,3 +2121,14 @@ là hoàn chỉnh. `git diff --check` và liên kết Markdown được kiểm t
 - **Runtime:** Frontend image build/recreate thành công, container healthy, HTTP 200; live bundle `index-BA5iD_0e.js` chứa đủ nhãn phạm vi, lựa chọn tất cả và nút chạy tất cả.
 - **Giới hạn:** Vẫn cần origin date vì đó là mốc thời gian của forecast; chưa có visual/keyboard QA bằng browser thật. Không sửa backend/model/training.
 - **Commit đề xuất:** `fix: expose all-products forecast selection`
+
+## 087 - 2026-10-14 - Rút gọn README và hệ thống hóa tài liệu triển khai
+
+- **Mục tiêu:** Làm README ngắn gọn, đúng hiện trạng dự án và tập trung vào cách chạy/triển khai; bảo toàn chi tiết kỹ thuật và kết quả thực nghiệm trong `docs/`.
+- **Lý do:** README cũ dài, lặp nhiều nội dung về thuật toán, preprocessing, protocol và số liệu nên che khuất luồng vận hành chính.
+- **Thay đổi:** Viết lại `README.md`; thêm `docs/run-and-deployment.md`; cập nhật mục lục `docs/README.md`; ghi nhận thay đổi trong lịch sử triển khai và trạng thái hiện tại.
+- **File ảnh hưởng:** `README.md`, `docs/README.md`, `docs/run-and-deployment.md`, `docs/implementation-history.md`, `docs/current-state.md`, `docs/change-log.md`.
+- **Kết quả:** README giữ các yêu cầu, lệnh Docker, địa chỉ dịch vụ, Java pipeline, training và promotion deployment package; tài liệu chuyên biệt tiếp tục giữ kiến trúc, luồng triển khai và kết quả thực nghiệm.
+- **Kiểm tra:** Đã đối chiếu lệnh, port, profile Maven, đường dẫn deployment và script với source/cấu hình hiện tại; kiểm tra liên kết Markdown nội bộ và `git diff --check`.
+- **Giới hạn:** Không chạy build hoặc chức năng vì yêu cầu chỉ thay tài liệu; không sửa code, container, dữ liệu, checkpoint, normalization hoặc chronological split.
+- **Commit đề xuất:** `docs: streamline project run and deployment guide`

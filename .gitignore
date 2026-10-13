@@ -66,6 +66,9 @@ Desktop.ini
 /models/**
 !/models/.gitkeep
 /checkpoints/
+/artifacts/**
+!/artifacts/manifests/
+!/artifacts/manifests/*.json
 
 ### Logs and JVM crash dumps ###
 *.log

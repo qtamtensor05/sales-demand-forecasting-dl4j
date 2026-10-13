@@ -1,49 +1,36 @@
-# Tài liệu quá trình thực hiện đồ án
+# Tài liệu dự án
 
-Đồ án: **Dự báo nhu cầu bán hàng bằng DeepLearning4J**.
+Tài liệu được phân theo chức năng. `docs/` chỉ chứa Markdown, sơ đồ và chỉ mục; log, metrics,
+checkpoint và kết quả chạy thực tế không được sao chép vào đây.
 
-Đọc theo thứ tự:
+## Tra cứu nhanh
 
-1. [Audit repository Big Data](00-repository-audit.md): bằng chứng nền tảng, artifact và blocker trước tích hợp.
-2. [Kiến trúc Big Data](01-architecture.md): topology Docker/Spark/MinIO/PostgreSQL và ranh giới từng phase.
-3. [Data Lake và pipeline](02-data-pipeline.md): Bronze ingest, artifact model, persistence và quality gate.
-4. [Spark ETL](03-spark-etl.md): Silver/Gold Parquet, quality gate, count và runtime parity.
-5. [DL4J Forecast Service](04-model-serving.md): CPU checkpoint serving, HTTP contract và forecast parity.
-6. [PostgreSQL và Spring Boot API](05-api.md): migration, endpoint, timeout, idempotency và bằng chứng runtime.
-7. [React Dashboard](06-dashboard.md): bảy màn hình gồm nhập CSV, API proxy và giới hạn browser QA.
-8. [Checklist triển khai Big Data](11-implementation-checklist.md): trạng thái từng giai đoạn và 12 tiêu chí nghiệm thu.
-9. [Lịch sử triển khai](implementation-history.md): từng bước, nhu cầu, thay đổi và kết quả.
-10. [Trạng thái hiện tại](current-state.md): pipeline, giao diện các lớp, số liệu và giới hạn.
-11. [Nhật ký yêu cầu](change-log.md): cập nhật sau mỗi yêu cầu, bằng chứng kiểm tra và tên commit đề xuất.
-12. [Thí nghiệm Residual AR](residual-experiment.md): thiết kế, protocol, artifact và kết quả full 180 fits.
-13. [Thí nghiệm ResidualAR Huber](residual-huber-experiment.md): full 120 fits đã hoàn tất; Huber gần bằng MSE, chưa vượt Weekly.
-14. [Một store, global model nhiều items](single-store-global-experiment.md): benchmark GPU50items, checkpoint/deployment package, preflight, script GPU và lệnh full 3 seed; full 3 seed chưa chạy.
-15. [Hướng dẫn training trên máy GPU mới](gpu-training-guide.md): prerequisites, preflight, một lệnh full, artifact và audit.
+| Nhu cầu | Tài liệu |
+| --- | --- |
+| Cài đặt và chạy lần đầu | [Quick start](01-getting-started/quick-start.md) |
+| Hiểu kiến trúc | [System overview](02-architecture/system-overview.md) và [sơ đồ](02-architecture/architecture-diagrams.md) |
+| Hiểu dữ liệu/Data Lake | [Bronze–Silver–Gold](03-data/bronze-silver-gold.md) |
+| Huấn luyện model | [Training guide](04-training/training-guide.md) |
+| Xem protocol/kết quả | [Evaluation](05-evaluation/evaluation-protocol.md) và [results index](10-results/results-index.md) |
+| Triển khai Docker | [Docker deployment](06-deployment/docker-deployment.md) |
+| Chạy kiểm thử | [Testing overview](07-testing/testing-overview.md) |
+| Chạy benchmark | [Benchmark methodology](08-benchmarks/benchmark-methodology.md) |
+| Tìm lệnh vận hành | [Command reference](09-operations/command-reference.md) |
+| Xem tiến độ/audit | [Project management](project-management/current-state.md) |
 
-Evaluation-only cho checkpoint GlobalResidualAR được gọi bằng
-`scripts/Invoke-GlobalTestEvaluation.ps1 -SourceRun <full-run>`. Runner tạo thư mục
-`test-evaluation/` riêng, không train, không thay deployment selection và không overwrite kết quả cũ.
+## Cấu trúc
 
-Hướng dẫn cài đặt/chạy nằm ở [README gốc](../README.md).
-Các số liệu hiện tại lấy từ dataset cục bộ `data/train.csv`; file dữ liệu và báo cáo sinh ra không được phân phối cùng tài liệu.
+- `01-getting-started/`: prerequisites, quick start, configuration, troubleshooting.
+- `02-architecture/`: kiến trúc và Mermaid diagrams.
+- `03-data/`: dataset, hợp đồng dữ liệu và Data Lake.
+- `04-training/`: training, GPU, checkpoint và reproducibility.
+- `05-evaluation/`: protocol và hồ sơ thực nghiệm.
+- `06-deployment/`: Docker, Spark, MinIO, PostgreSQL, Forecast Service, API, Frontend.
+- `07-testing/`: phạm vi và điều kiện của từng loại kiểm thử.
+- `08-benchmarks/`: phương pháp benchmark; không chứa số liệu giả.
+- `09-operations/`: CLI, run management, log và recovery.
+- `10-results/`: chỉ mục trỏ tới artifact thực tế.
+- `project-management/`: audit, migration, lịch sử, trạng thái và change log.
 
-## Quy tắc cập nhật
-
-Sau mỗi yêu cầu hoàn tất, cập nhật nhật ký; khi có thay đổi chức năng hoặc quyết định kỹ thuật,
-cập nhật thêm lịch sử triển khai và trạng thái hiện tại. Không ghi kết quả chưa kiểm chứng là thành công.
-Tên commit trong tài liệu là đề xuất, không đồng nghĩa đã commit/push.
-
-Quy trình cho trợ lý được khai báo tại [AGENTS.md](../AGENTS.md) và
-[skill sales-project-progress](../.agents/skills/sales-project-progress/SKILL.md).
-Đây là hướng dẫn cho agent khi làm việc trong repository, không phải chương trình tự chạy sau thao tác IDE/Git.
-Với tác vụ huấn luyện dài, skill yêu cầu lưu đầy đủ log nhưng chỉ đọc và tổng hợp sau khi tiến trình kết thúc;
-agent không liên tục đọc kết quả của từng epoch khi tiến trình vẫn hoạt động bình thường.
-
-Các workflow kỹ thuật project-native được tách thành ba skill tự khám phá:
-
-- [debugging-and-error-recovery](../.agents/skills/debugging-and-error-recovery/SKILL.md) cho chẩn đoán nguyên nhân gốc;
-- [test-driven-development](../.agents/skills/test-driven-development/SKILL.md) cho thay đổi hành vi có regression test;
-- [code-review-and-quality](../.agents/skills/code-review-and-quality/SKILL.md) cho review trước merge.
-
-Các skill này được điều chỉnh cho Java 11, Maven, DL4J và các bất biến dữ liệu của dự án; chúng không tự cấp quyền
-sửa code, chạy thí nghiệm dài, nâng dependency, commit hoặc push ngoài phạm vi yêu cầu của người dùng.
+Output lịch sử vẫn ở `output/runs/`. Cấu trúc mới chỉ áp dụng cho run mới; xem
+[migration mapping](project-management/migration-mapping.md).
