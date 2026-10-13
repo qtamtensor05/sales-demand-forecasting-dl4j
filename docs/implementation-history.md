@@ -763,3 +763,33 @@ khớp, không duplicate và source runner không có API training/mutation. Pow
 thật vẫn phải hoàn tất để xác nhận runtime và artifact đầu ra trên Full run.
 
 **Commit đề xuất:** `feat: add checkpoint-only global test evaluation`.
+
+## 34. Sửa Maven launcher cho Global Test evaluation-only
+
+**Nguyên nhân:** `exec-maven-plugin` hard-code `com.dl4j.salesforecast.Main`; stack trace tái hiện
+an toàn bằng `--invalid` đi vào `Main` và `ExperimentConfiguration.fromArgs` thay vì evaluation main.
+
+**Sửa tối thiểu:** thêm property `exec.mainClass` mặc định là `Main`, cho plugin tham chiếu property,
+và truyền override trước Maven goals bằng PowerShell argument array. Các command cũ không truyền
+override vẫn chạy `Main`. Đồng thời bỏ lời gọi `ExperimentConfiguration.fromArgs` không dùng khỏi runner.
+
+**Kiểm chứng:** TDD RED 1 failure đúng do POM chưa parameterize. Sau sửa, focused 5/5 và full 60/60
+PASS; probe explicit main với `--invalid` dừng tại `GlobalTestEvaluationMain.java:10`; PowerShell parser
+và `git diff --check` PASS. Không chạy Test 2017, không tạo output, không train và không sửa model.
+
+**Commit đề xuất:** `fix: route test evaluation to its dedicated main class`.
+
+## 35. Sửa lỗi HIGH bị nhận nhầm là horizon trong test report
+
+**Nguyên nhân:** helper `Group` dùng `startsWith("H")` để nhận diện horizon. Tên demand tier `HIGH`
+cũng bắt đầu bằng H, nên code gọi `Integer.parseInt("IGH")` sau khi ba checkpoint đã inference xong.
+
+**Sửa:** chỉ parse ID khi tên khớp `H[1-7]`; LOW/MEDIUM/HIGH giữ ID horizon bằng 0. Thêm regression
+test tái hiện chính xác lỗi `IGH` và xác nhận `H7` vẫn được nhận diện đúng. Không thay inference,
+metrics, model, scaler, split hoặc checkpoint.
+
+**Kiểm chứng:** RED 1 failure với `NumberFormatException: IGH`; focused 6/6 và full 61/61 PASS,
+BUILD SUCCESS 1:59. Không chạy lại Test 2017. Partial FAILED manifest được archive có thể phục hồi,
+không xóa; thư mục output chuẩn đã sẵn sàng cho command kế tiếp.
+
+**Commit đề xuất:** `fix: distinguish HIGH tier from horizon labels`.

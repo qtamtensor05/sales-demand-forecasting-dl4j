@@ -11,5 +11,12 @@ if (!(Test-Path -LiteralPath 'data/train.csv' -PathType Leaf)) { throw 'Missing 
 if (Test-Path -LiteralPath (Join-Path $resolvedRun 'test-evaluation')) { throw 'Refusing to overwrite existing test-evaluation directory.' }
 
 Write-Host 'Evaluation-only: no training, calibration, smoke, benchmark, or deployment update.'
-mvn -B compile exec:java '-Dexec.mainClass=com.dl4j.salesforecast.GlobalTestEvaluationMain' "-Dexec.args=--source-run `"$resolvedRun`""
+$mavenArguments = @(
+    '-B'
+    '-Dexec.mainClass=com.dl4j.salesforecast.GlobalTestEvaluationMain'
+    "-Dexec.args=--source-run `"$resolvedRun`""
+    'compile'
+    'exec:java'
+)
+& mvn @mavenArguments
 if ($LASTEXITCODE -ne 0) { throw "Global test evaluation failed with exit code $LASTEXITCODE." }

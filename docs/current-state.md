@@ -419,3 +419,19 @@ Kết quả cho thấy residual cải thiện Direct/AR tại MEDIUM/HIGH nhưng
 Giới hạn: chỉ 12/500 chuỗi được chọn đại diện; validation vừa chọn epoch vừa đánh giá cấu hình cố
 định; forecast windows chồng lấn; sample std phản ánh phân tán giữa chuỗi, không phải confidence
 interval. Run không đánh giá test 2017 và chưa chứng minh khả năng tổng quát ngoài validation.
+
+## Sửa launcher evaluation-only ngày 2026-10-13
+
+POM dùng property `${exec.mainClass}` với giá trị mặc định vẫn là
+`com.dl4j.salesforecast.Main`; riêng script evaluation truyền explicit
+`com.dl4j.salesforecast.GlobalTestEvaluationMain`. Command training hiện có giữ hành vi cũ, còn
+evaluation không route qua `Main`. Lời gọi `ExperimentConfiguration.fromArgs` thừa trong runner
+evaluation cũng đã bỏ. Probe bằng argument `--invalid` dừng đúng tại usage của
+`GlobalTestEvaluationMain` trước khi đọc dataset hoặc checkpoint. Trạng thái vẫn là
+**IMPLEMENTED / TESTED / TEST 2017 NOT RUN**.
+
+Lỗi report tier của lần chạy đầu đã được sửa: tên group chỉ được parse như horizon khi khớp chính xác
+`H1` đến `H7`, vì vậy `HIGH` không còn bị parse chuỗi `IGH` thành số. Regression kiểm tra cả `HIGH`
+và `H7`. Lần evaluation thất bại đã chạy inference nhưng không train; manifest xác nhận hashes trước/sau
+khớp. Partial directory được giữ nguyên bằng cách archive thành
+`test-evaluation-failed-2026-10-13_075006`; vị trí `test-evaluation/` sẵn sàng cho lần chạy lại.

@@ -1375,3 +1375,49 @@ synthetic inference xác nhận weights và checkpoint hash không đổi, H1-H7
 chờ xác nhận command. Do đó chưa có metric, runtime hay kiểm chứng 376.950 rows thực tế. Không commit/push.
 
 **Commit đề xuất:** `feat: add checkpoint-only global test evaluation`
+
+## 048 - 2026-10-13 - Sửa launcher evaluation-only gọi sai Main
+
+**Mục tiêu và nguyên nhân:** sửa script Test 2017 đang in evaluation-only nhưng Maven thực tế gọi
+`com.dl4j.salesforecast.Main`. Inspection và probe `--invalid` xác nhận `pom.xml` hard-code Main;
+stack trace đi vào `ExperimentConfiguration.fromArgs` và fail trước evaluation.
+
+**Thay đổi:** parameterize `<mainClass>${exec.mainClass}</mainClass>` và đặt default property vẫn là
+`com.dl4j.salesforecast.Main`. Script dùng PowerShell argument array, đặt explicit
+`GlobalTestEvaluationMain` và `--source-run` trước goals `compile exec:java`. Bỏ lời gọi
+`ExperimentConfiguration.fromArgs` thừa khỏi evaluation runner. Không thêm mode vào Main và không sửa
+model, hyperparameter, split, scaler, checkpoint hay deployment.
+
+**Kiểm tra:** TDD RED 1/1 failure đúng vì POM chưa parameterize. Sau sửa, test launcher 1/1 PASS,
+focused evaluation 5/5 PASS và full Maven 60/60 PASS, 0 failure/error/skip, BUILD SUCCESS 2:06.
+Probe Maven với `-Dexec.args=--invalid` đi đúng vào `GlobalTestEvaluationMain.java:10`, không đọc dataset
+hoặc checkpoint. PowerShell parser và `git diff --check` PASS.
+
+**An toàn và giới hạn:** không chạy training hay Test 2017; `test-evaluation/` vẫn không tồn tại.
+SHA-256 ba checkpoint và deployment model giữ nguyên so với trước sửa. Chưa chạy command thật; người
+dùng phải xác nhận riêng trước evaluation. Không commit/push.
+
+**Commit đề xuất:** `fix: route test evaluation to its dedicated main class`
+
+## 049 - 2026-10-13 - Sửa lỗi HIGH bị parse thành horizon
+
+**Mục tiêu và nguyên nhân:** khắc phục lần evaluation-only đã load đúng ba checkpoint và hoàn tất inference
+nhưng fail khi tạo summary. `Group` dùng `startsWith("H")`; tier `HIGH` vì vậy bị cắt thành `IGH` rồi
+đưa vào `Integer.parseInt`, gây `NumberFormatException`.
+
+**Thay đổi:** điều kiện horizon chỉ chấp nhận regex `H[1-7]`. Thêm test cho `HIGH` không phát sinh lỗi,
+ID horizon bằng 0, đồng thời `H7` vẫn có ID 7. Không sửa công thức metric, aggregation, inference,
+scaler, split, model, checkpoint hoặc deployment.
+
+**Kiểm tra:** TDD RED 1/1 failure tái hiện đúng `For input string: "IGH"`. Sau sửa, focused evaluation
+6/6 PASS; full Maven 61/61 PASS, 0 failure/error/skip, BUILD SUCCESS 1:59. `git diff --check` và parser
+PowerShell được kiểm tra sau cập nhật. Không chạy lại Test 2017 và không training.
+
+**Artifact:** lần FAILED trước có manifest xác nhận `trainingPerformed=false`, `weightsUpdated=false`
+và SHA-256 checkpoint trước/sau giống nhau. Thư mục partial chỉ chứa manifest, được di chuyển bảo toàn sang
+`test-evaluation-failed-2026-10-13_075006`; không xóa dữ liệu và `test-evaluation/` hiện chưa tồn tại.
+
+**Giới hạn:** chưa có evaluation SUCCESS hoặc metrics/report cuối; cần người dùng chạy lại command riêng.
+Không commit/push.
+
+**Commit đề xuất:** `fix: distinguish HIGH tier from horizon labels`

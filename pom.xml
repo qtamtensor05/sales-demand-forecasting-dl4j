@@ -27,6 +27,7 @@
         <maven.compiler.source>11</maven.compiler.source>
         <maven.compiler.target>11</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <exec.mainClass>com.dl4j.salesforecast.Main</exec.mainClass>
 
         <!-- DL4J -->
         <dl4j.version>1.0.0-M2.1</dl4j.version>
@@ -153,9 +154,7 @@
                 <version>3.3.0</version>
 
                 <configuration>
-                    <mainClass>
-                        com.dl4j.salesforecast.Main
-                    </mainClass>
+                    <mainClass>${exec.mainClass}</mainClass>
                 </configuration>
 
             </plugin>

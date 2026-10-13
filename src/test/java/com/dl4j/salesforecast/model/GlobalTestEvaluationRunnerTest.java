@@ -74,6 +74,23 @@ class GlobalTestEvaluationRunnerTest {
         assertFalse(source.contains("finalizeArtifacts("));
     }
 
+    @Test void launcherOverridesPomMainAndBypassesTrainingConfiguration() throws Exception {
+        String pom=Files.readString(Path.of("pom.xml"));
+        String script=Files.readString(Path.of("scripts/Invoke-GlobalTestEvaluation.ps1"));
+        String runner=Files.readString(Path.of("src/main/java/com/dl4j/salesforecast/model/GlobalTestEvaluationRunner.java"));
+        assertTrue(pom.contains("<exec.mainClass>com.dl4j.salesforecast.Main</exec.mainClass>"));
+        assertTrue(pom.contains("<mainClass>${exec.mainClass}</mainClass>"));
+        assertTrue(script.contains("-Dexec.mainClass=com.dl4j.salesforecast.GlobalTestEvaluationMain"));
+        assertFalse(runner.contains("ExperimentConfiguration.fromArgs"));
+    }
+
+    @Test void highDemandTierIsNotParsedAsAHorizon() {
+        var high=assertDoesNotThrow(()->new GlobalTestEvaluationRunner.Group("HIGH",17,10,9));
+        assertEquals(0,high.id);assertEquals(17,high.count);
+        var horizon=new GlobalTestEvaluationRunner.Group("H7",7,10,9);
+        assertEquals(7,horizon.id);
+    }
+
     private SingleStoreGlobalDataset smallDataset() throws Exception {
         LocalDate start=LocalDate.of(2020,1,1); Path csv=directory.resolve("small.csv");StringBuilder text=new StringBuilder("date,store,item,sales\n");
         for(int item:List.of(1,25,50))for(int day=0;day<100;day++)text.append(start.plusDays(day)).append(",1,").append(item).append(',').append(item+day%9).append('\n');Files.writeString(csv,text);
