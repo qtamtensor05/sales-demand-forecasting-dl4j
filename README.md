@@ -7,6 +7,27 @@ Phiên bản hiện tại phân tích dữ liệu bán hàng CSV và xuất báo
 
 Xem [tài liệu quá trình thực hiện](docs/README.md) để theo dõi từng bước, lý do và kết quả.
 
+## Docker Big Data foundation (Giai đoạn 0-1)
+
+Yêu cầu Docker Desktop dùng Linux containers và WSL2. Sao chép `.env.example` thành `.env`, đổi hai
+mật khẩu mẫu, rồi kiểm tra và khởi động topology:
+
+```powershell
+Copy-Item .env.example .env
+docker compose config --quiet
+docker compose up --build -d
+docker compose ps
+```
+
+Topology gồm MinIO, PostgreSQL, Spark master + 2 workers + job runner, Forecast, Backend và Frontend.
+Ở Giai đoạn 1, ba service ứng dụng chỉ là bootstrap health endpoint; chưa phải DL4J serving, Spring Boot
+API hoặc React Dashboard hoàn chỉnh. Xem [audit](docs/00-repository-audit.md) và
+[kiến trúc](docs/01-architecture.md) trước khi chạy.
+
+Sau lần khởi động đầu, kiểm tra Spark tại `http://localhost:8080` (phải có 2 worker ALIVE), MinIO
+Console tại `http://localhost:9001`, frontend bootstrap tại `http://localhost:3000` và chi tiết ingest
+tại [Data Lake pipeline](docs/02-data-pipeline.md). Không dùng mật khẩu mẫu ngoài máy local.
+
 ## Chức năng
 
 - Tổng số bản ghi, khoảng ngày, số cửa hàng và sản phẩm.

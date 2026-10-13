@@ -471,3 +471,29 @@ Lỗi report tier của lần chạy đầu đã được sửa: tên group ch�
 và `H7`. Lần evaluation thất bại đã chạy inference nhưng không train; manifest xác nhận hashes trước/sau
 khớp. Partial directory được giữ nguyên bằng cách archive thành
 `test-evaluation-failed-2026-10-13_075006`; vị trí `test-evaluation/` sẵn sàng cho lần chạy lại.
+
+## Nền tảng Big Data Docker (Giai đoạn 0-1)
+
+Repository hiện có `compose.yaml` và `.env.example` cho MinIO, MinIO init, PostgreSQL, Spark master,
+hai Spark worker, Spark job runner, Forecast Service, Backend API và Frontend. Dữ liệu MinIO/PostgreSQL
+dùng named volume; toàn bộ service ở một bridge network. Cấu hình Compose đã parse thành công.
+
+Forecast/API/Frontend hiện chỉ là bootstrap health endpoint để kiểm tra dependency và container lifecycle,
+chưa chứa DL4J inference, Spring Boot REST hoặc React. Spark ETL, migration, API nghiệp vụ, dashboard,
+benchmark và E2E chưa triển khai. Docker Desktop Linux engine đang tắt tại thời điểm kiểm tra, do đó
+chưa có bằng chứng container thực chạy, Spark nhận hai worker hay checkpoint seed 123 restore trên CPU.
+
+Audit hiện hành nằm tại `docs/00-repository-audit.md`. Run GPU `2026-10-13_025422_624_gpu` và deployment
+package vẫn bất biến; test-evaluation manifest hiện có trạng thái `SUCCESS`, 17.950 Test origins,
+376.950 forecast points cho ba seed, không training và hash checkpoint trước/sau giống nhau.
+
+### Xác minh live sau khi bật Docker Desktop
+
+Docker engine 29.8.2 và Compose 5.6.0 đã chạy. `docker compose up --build -d` thành công với 10 service.
+Spark 3.5.9 Master ghi nhận hai worker `ALIVE`, mỗi worker 1 core và 1.024 MiB. MinIO init exit 0;
+PostgreSQL, MinIO và ba HTTP bootstrap đều healthy. Frontend trả HTTP 200.
+
+Bronze đã có `train.csv` 16 MiB cùng ingestion metadata; deployment package seed 123 đã có trong
+`artifacts/models/global-residual-ar/seed-123`. Restart MinIO/PostgreSQL vẫn giữ object và probe row.
+Module `spark-etl` có Store 1 quality gate, focused test 1/1 PASS. Silver/Gold và Spark runtime ETL vẫn
+chưa chạy, nên Giai đoạn 3 chưa hoàn thành.

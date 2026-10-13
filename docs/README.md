@@ -4,7 +4,10 @@
 
 Đọc theo thứ tự:
 
-1. [Lịch sử triển khai](implementation-history.md): từng bước, nhu cầu, thay đổi và kết quả.
+1. [Audit repository Big Data](00-repository-audit.md): bằng chứng nền tảng, artifact và blocker trước tích hợp.
+2. [Kiến trúc Big Data](01-architecture.md): topology Docker/Spark/MinIO/PostgreSQL và ranh giới từng phase.
+3. [Data Lake và pipeline](02-data-pipeline.md): Bronze ingest, artifact model, persistence và quality gate.
+4. [Lịch sử triển khai](implementation-history.md): từng bước, nhu cầu, thay đổi và kết quả.
 2. [Trạng thái hiện tại](current-state.md): pipeline, giao diện các lớp, số liệu và giới hạn.
 3. [Nhật ký yêu cầu](change-log.md): cập nhật sau mỗi yêu cầu, bằng chứng kiểm tra và tên commit đề xuất.
 4. [Thí nghiệm Residual AR](residual-experiment.md): thiết kế, protocol, artifact và kết quả full 180 fits.

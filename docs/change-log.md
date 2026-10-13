@@ -1421,3 +1421,58 @@ và SHA-256 checkpoint trước/sau giống nhau. Thư mục partial chỉ chứ
 Không commit/push.
 
 **Commit đề xuất:** `fix: distinguish HIGH tier from horizon labels`
+
+## 050 - 2026-10-13 - Audit repository và triển khai Docker foundation
+
+**Mục tiêu và lý do:** bắt đầu hệ thống Big Data Sales Demand Forecasting bằng Giai đoạn 0-1 trên
+repository thật, xác minh baseline/artifact trước khi sửa và tạo hạ tầng Docker Compose phù hợp Windows 11.
+
+**Đã thay đổi:** tạo `docs/00-repository-audit.md`, `docs/01-architecture.md`, `compose.yaml`,
+`.env.example`, hướng dẫn nhanh trong `README.md`, MinIO init script, Java 11 bootstrap health service, frontend bootstrap và thư mục
+`spark-etl`. Cập nhật mục lục, lịch sử triển khai và trạng thái hiện tại. Compose định nghĩa MinIO,
+PostgreSQL, Spark master + 2 workers + job runner, Forecast, Backend và Frontend; có network, volumes,
+healthchecks, restart policy, port qua env và resource limits.
+
+**Bằng chứng audit:** Java 11.0.32.1, Maven 3.9.16, DL4J/ND4J 1.0.0-M2.1; `data/train.csv` và run
+`2026-10-13_025422_624_gpu` tồn tại. Deployment package có seed 123 model, 50 scaler và schema 56 kênh.
+Test manifest `SUCCESS` ghi 17.950 origins, 376.950 points, không training/đổi weights và checkpoint
+seed 123 SHA-256 `f9d2dee2d3fcfb31ed61e08cd7b9b5f92d8ca9a7f1b0a95e5447afa477c7a482`.
+
+**Kiểm tra:** `docker compose --env-file .env.example config --quiet` PASS; `javac` Java 11 cho
+bootstrap service PASS; `git diff --check` và liên kết Markdown được kiểm tra sau cập nhật. Không chạy
+training, không sửa model/scaler/checkpoint và không commit/push.
+
+**Giới hạn:** Docker Desktop Linux engine chưa chạy dù CLI 29.8.2/Compose 5.5.1 có mặt, nên chưa thể
+pull/build/start và chưa xác minh health thực, Spark đăng ký hai worker, MinIO bucket, persistence hoặc
+CPU checkpoint restore. Ba application service mới chỉ là bootstrap; Giai đoạn 2-9 chưa hoàn thành.
+
+**Commit đề xuất:** `feat: add audited big data docker foundation`
+
+## 051 - 2026-10-13 - Chạy thật Docker stack và tiếp tục Data Lake
+
+**Mục tiêu và lý do:** người dùng đã bật Docker Desktop, yêu cầu kiểm tra lại Giai đoạn 1 và tiếp tục
+triển khai. Cần sửa image pull lỗi, chứng minh cluster thật và đưa dữ liệu/artifact vào MinIO.
+
+**Thay đổi:** đổi sang Bitnami legacy MinIO/Client có manifest pull được và Spark 3.5.9 Java 11;
+mount dataset/deployment read-only cho init job; ingest Bronze cùng metadata và mirror sáu artifact seed
+123. Thêm `docs/02-data-pipeline.md` và module `spark-etl` với quality gate fail-fast cho các count Store 1.
+
+**TDD:** focused test ban đầu RED 1/1 vì `UnsupportedOperationException: not implemented`. Sau khi triển
+khai rule, focused test GREEN 1/1, 0 failure/error. Rule từ chối sai row/split hoặc duplicate.
+
+**Kết quả live:** Compose build/start exit 0; 10 service được tạo. MinIO/PostgreSQL/Forecast/Backend/
+Frontend healthy; frontend HTTP 200. Spark Master 3.5.9 đăng ký đúng hai worker ALIVE, mỗi worker
+1 core/1.024 MiB. MinIO init exit 0, tạo năm bucket; Bronze có CSV 16 MiB và metadata, artifact prefix
+có sáu file. Sau restart, MinIO vẫn giữ CSV và PostgreSQL vẫn trả probe count 1.
+
+**Giới hạn:** image pull đầu tiên rất lâu nhưng đã cache. Forecast/API/Frontend vẫn là bootstrap.
+Spark dependency download cho runtime job được dừng sau khi RED test bị kéo theo dependency không cần
+thiết; POM tách chúng vào profile `spark-runtime`. Chưa build/chạy profile đó, chưa có Silver/Gold,
+feature parity, window/origin count hoặc benchmark; Giai đoạn 3 chưa hoàn thành.
+
+**Kiểm tra cuối:** `mvn -B -f spark-etl/pom.xml test` PASS 1/1; `docker compose config --quiet`,
+`git diff --check`, liên kết Markdown và các HTTP health check đều PASS. Full root `mvn -B test`
+được khởi động nhưng phải dừng trong lúc Maven còn tải gói CUDA Windows lớn, nên lượt này không được
+ghi nhận là full-suite PASS hay FAIL.
+
+**Commit đề xuất:** `feat: verify docker stack and bootstrap data lake`

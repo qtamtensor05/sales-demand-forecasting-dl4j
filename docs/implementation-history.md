@@ -793,3 +793,43 @@ BUILD SUCCESS 1:59. Không chạy lại Test 2017. Partial FAILED manifest đư�
 không xóa; thư mục output chuẩn đã sẵn sàng cho command kế tiếp.
 
 **Commit đề xuất:** `fix: distinguish HIGH tier from horizon labels`.
+
+## 36. Audit và dựng nền Docker cho hệ thống Big Data
+
+**Nhu cầu và lý do:** kiểm tra repository/artifact thật trước khi tích hợp, sau đó tạo topology MinIO,
+PostgreSQL, Spark Standalone hai worker và ba điểm triển khai ứng dụng trên Windows 11 + Docker Desktop.
+
+**Triển khai:** thêm audit có đường dẫn dữ liệu/checkpoint/scaler, hash và ranh giới kiểm chứng; thêm
+`compose.yaml`, `.env.example`, init MinIO, named volumes, network chung, healthcheck, restart policy và
+resource limit. MinIO tạo năm bucket `bronze`, `silver`, `gold`, `artifacts`, `benchmarks` cùng các prefix
+Store 1/model. Spark gồm một master, hai worker 1 core/1 GiB và một submit client. Forecast/API dùng
+Java 11 health server tối thiểu; frontend dùng trang Nginx tối thiểu để chỉ kiểm tra orchestration.
+
+**Quyết định:** các bootstrap endpoint không được xem là Forecast Service, Spring Boot API hay React
+Dashboard đã hoàn thành. Artifact deployment được mount read-only; không huấn luyện lại, không thay
+scaler/checkpoint, không thay feature/split/tensor. Gold về sau do Spark xuất Parquet, còn Java giữ
+tensorization để giảm nguy cơ lệch công thức hiện hữu.
+
+**Kiểm tra:** `docker compose --env-file .env.example config --quiet` PASS; bootstrap Java biên dịch
+bằng JDK 11 PASS. Docker CLI và Compose có mặt nhưng Linux engine chưa chạy, nên image build/pull,
+container health, hai worker đăng ký, volume persistence và CPU checkpoint restore chưa được xác minh.
+
+**Commit đề xuất:** `feat: add audited big data docker foundation`.
+
+## 37. Chạy thật Docker foundation và khởi tạo Data Lake
+
+**Nhu cầu:** sau khi Docker Desktop được bật, kiểm chứng cấu hình Giai đoạn 1 và tiếp tục Giai đoạn 2
+thay vì chỉ dựa trên parse tĩnh.
+
+**Triển khai:** sửa image không còn pull được sang Bitnami legacy MinIO/Client và Spark 3.5.9 Java 11.
+MinIO init ingest bản CSV cục bộ vào Bronze, sinh metadata và mirror deployment package seed 123 vào
+artifact bucket. Thêm module `spark-etl` cùng quality gate Store 1 và focused JUnit theo TDD.
+
+**Kết quả thực tế:** 10 service khởi động; MinIO/PostgreSQL/Forecast/Backend/Frontend healthy. Spark
+Master nhận đúng hai worker ALIVE, mỗi worker 1 core/1 GiB. Bronze có CSV 16 MiB và metadata; artifact
+prefix có đủ sáu file deployment. Restart MinIO/PostgreSQL không làm mất object/probe row.
+
+**Giới hạn:** application service vẫn là bootstrap. Spark ETL runtime chưa build/chạy; chưa có
+Silver/Gold Parquet hoặc preprocessing parity. Quality gate chỉ là code/test cho bước fail-fast kế tiếp.
+
+**Commit đề xuất:** `feat: verify docker stack and bootstrap data lake`.
