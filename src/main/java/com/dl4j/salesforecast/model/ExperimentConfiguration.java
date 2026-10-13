@@ -17,6 +17,8 @@ public final class ExperimentConfiguration {
     public static final int ITEM_IDENTITY_COUNT = 50;
     public static final int INPUT_DAYS = 30;
     public static final int HORIZON = 7;
+    public static final int GLOBAL_FULL_MAX_EPOCHS = 20;
+    public static final int GLOBAL_FULL_PATIENCE = 3;
 
     private ExperimentConfiguration(boolean residual, boolean smoke) {
         this(residual, smoke, false);
@@ -89,8 +91,11 @@ public final class ExperimentConfiguration {
         return smoke ? List.of(1, 25, 50) : java.util.stream.IntStream.rangeClosed(1, ITEM_IDENTITY_COUNT)
                 .boxed().collect(java.util.stream.Collectors.toUnmodifiableList());
     }
-    public int getMaxEpochs() { return calibration ? 1 : smoke || benchmark ? 2 : isGlobalStore() ? 10 : SalesLstmForecaster.DEFAULT_SEARCH_EPOCHS; }
-    public int getPatience() { return SalesLstmForecaster.DEFAULT_EARLY_STOPPING_PATIENCE; }
+    public int getMaxEpochs() { return calibration ? 1 : smoke || benchmark ? 2 : isGlobalFullTraining()
+            ? GLOBAL_FULL_MAX_EPOCHS : isGlobalStore() ? 10 : SalesLstmForecaster.DEFAULT_SEARCH_EPOCHS; }
+    public int getPatience() { return isGlobalFullTraining()
+            ? GLOBAL_FULL_PATIENCE : SalesLstmForecaster.DEFAULT_EARLY_STOPPING_PATIENCE; }
+    private boolean isGlobalFullTraining() { return isGlobalStore() && !smoke && !benchmark && !preflight && !calibration; }
     public int getSeriesCount() { return isGlobalStore() ? getItemIds().size() : smoke ? 1 : 12; }
     public List<Long> getSeeds() { return isGlobalStore() ? globalSeeds : smoke ? List.of(42L) : ExperimentRunner.DEFAULT_SEEDS; }
     public List<String> getModels() { return isGlobalStore() ? List.of("GlobalResidualAR") : huber ? List.of("ResidualAR", "ResidualARHuber")

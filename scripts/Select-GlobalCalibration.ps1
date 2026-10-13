@@ -7,16 +7,26 @@ $ErrorActionPreference='Stop'
 if($MaxRmseRegressionPercent -lt 0){throw 'MaxRmseRegressionPercent must be non-negative.'}
 $candidates=@()
 foreach($directory in $RunDirectory){
-    $manifest=Get-Content -LiteralPath (Join-Path $directory 'run.json') -Raw | ConvertFrom-Json
-    if($manifest.status -ne 'SUCCESS' -or !$manifest.calibration){throw "Not a successful calibration run: $directory"}
-    $epochs=Import-Csv -LiteralPath (Join-Path $directory 'global-epoch-history.csv')
+    if(!(Test-Path -LiteralPath $directory -PathType Container)){throw "Calibration run directory does not exist: $directory"}
+    $manifestPath=Join-Path $directory 'run.json'
+    if(!(Test-Path -LiteralPath $manifestPath -PathType Leaf)){throw "Calibration manifest does not exist: $manifestPath"}
+    $manifest=Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+    if($manifest.status -ne 'SUCCESS' -or $manifest.calibration -ne $true){throw "Not a successful calibration run: $directory"}
+    $epochPath=Join-Path $directory 'global-epoch-history.csv'
+    if(!(Test-Path -LiteralPath $epochPath -PathType Leaf)){throw "Calibration epoch history does not exist: $epochPath"}
+    $epochs=@(Import-Csv -LiteralPath $epochPath)
     if($epochs.Count -ne 1){throw "Calibration must contain exactly one epoch: $directory"}
     $row=$epochs[0]
+    $validationMacroRmse=[double]::Parse($row.validation_macro_rmse,[Globalization.CultureInfo]::InvariantCulture)
+    $trainSeconds=[double]::Parse($row.train_seconds,[Globalization.CultureInfo]::InvariantCulture)
+    $validationSeconds=[double]::Parse($row.validation_seconds,[Globalization.CultureInfo]::InvariantCulture)
     $candidates += [pscustomobject]@{
         runDirectory=($directory -replace '\\','/');trainBatchSize=[int]$manifest.batchSize
         validationBatchSize=[int]$manifest.validationBatchSize
-        validationMacroRmse=[double]::Parse($row.validation_macro_rmse,[Globalization.CultureInfo]::InvariantCulture)
-        secondsPerEpoch=[double]::Parse($row.train_seconds,[Globalization.CultureInfo]::InvariantCulture)+[double]::Parse($row.validation_seconds,[Globalization.CultureInfo]::InvariantCulture)
+        validationMacroRmse=$validationMacroRmse
+        trainSeconds=$trainSeconds
+        validationSeconds=$validationSeconds
+        secondsPerEpoch=$trainSeconds+$validationSeconds
     }
 }
 $baseline=$candidates|Where-Object {$_.trainBatchSize -eq 64 -and $_.validationBatchSize -eq 256}|Select-Object -First 1
