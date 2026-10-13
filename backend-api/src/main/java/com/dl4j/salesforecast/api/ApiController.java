@@ -7,17 +7,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api")
 class ApiController {
     private final JdbcTemplate jdbc;
     private final ForecastGateway forecasts;
+    private final IngestionService ingestions;
 
-    ApiController(JdbcTemplate jdbc, ForecastGateway forecasts) {
-        this.jdbc = jdbc; this.forecasts = forecasts;
+    ApiController(JdbcTemplate jdbc, ForecastGateway forecasts, IngestionService ingestions) {
+        this.jdbc = jdbc; this.forecasts = forecasts; this.ingestions = ingestions;
     }
 
     @GetMapping("/health") Map<String, Object> health() {
@@ -83,17 +86,23 @@ class ApiController {
     }
 
     @GetMapping("/pipelines") List<Map<String,Object>> pipelines() {
-        return jdbc.queryForList("SELECT id,ingestion_run_id AS \"ingestionRunId\",status,raw_rows AS \"rawRows\",gold_rows AS \"goldRows\",duration_ms AS \"durationMillis\",created_at AS \"createdAt\" FROM pipeline_runs ORDER BY id DESC");
+        return jdbc.queryForList("SELECT p.id,p.ingestion_run_id AS \"ingestionRunId\",p.status,p.raw_rows AS \"rawRows\",p.gold_rows AS \"goldRows\",p.duration_ms AS \"durationMillis\","
+                + "i.original_filename AS \"fileName\",i.error_message AS error,i.attempt_count AS attempts,p.created_at AS \"createdAt\" "
+                + "FROM pipeline_runs p JOIN data_ingestion_runs i ON i.id=p.ingestion_run_id ORDER BY p.id DESC");
     }
 
     @GetMapping("/benchmarks") List<Map<String,Object>> benchmarks() {
         return jdbc.queryForList("SELECT id,worker_count AS \"workerCount\",input_rows AS \"inputRows\",duration_ms AS \"durationMillis\",throughput_rows_second AS \"throughputRowsSecond\",measured_at AS \"measuredAt\" FROM benchmark_runs ORDER BY id DESC");
     }
 
-    @PostMapping("/pipelines/ingest") @ResponseStatus(HttpStatus.ACCEPTED)
-    Map<String,Object> ingest(@RequestHeader(value="Idempotency-Key", required=false) String key) {
-        if (key == null || key.isBlank() || key.length() > 100) throw new IllegalArgumentException("Idempotency-Key header is required (1..100 chars)");
-        jdbc.update("INSERT INTO data_ingestion_runs(idempotency_key,status,source_uri) VALUES (?,'ACCEPTED','s3a://bronze/store-1/train.csv') ON CONFLICT (idempotency_key) DO NOTHING", key);
-        return jdbc.queryForMap("SELECT id,idempotency_key AS \"idempotencyKey\",status,source_uri AS \"sourceUri\",started_at AS \"startedAt\" FROM data_ingestion_runs WHERE idempotency_key=?", key);
+    @PostMapping(value="/pipelines/ingest", consumes=MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    Map<String,Object> ingest(@RequestPart("file") MultipartFile file) { return ingestions.accept(file); }
+
+    @GetMapping("/pipelines/ingest/{id}") Map<String,Object> ingestion(@PathVariable long id) {
+        return ingestions.find(id);
     }
+
+    @PostMapping("/pipelines/ingest/{id}/retry") @ResponseStatus(HttpStatus.ACCEPTED)
+    Map<String,Object> retryIngestion(@PathVariable long id) { return ingestions.retry(id); }
 }

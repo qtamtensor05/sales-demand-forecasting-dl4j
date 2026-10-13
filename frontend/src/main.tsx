@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import "./style.css";
 import "./forecast.css";
 import "./analysis.css";
+import "./ingestion.css";
 
 type Json = Record<string, any>;
 const get = async (url: string) => {
@@ -27,6 +28,9 @@ function App() {
   const [rankingMonth, setRankingMonth] = useState("2017-01");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadRun, setUploadRun] = useState<Json | null>(null);
+  const [uploading, setUploading] = useState(false);
   const load = () =>
     Promise.all([
       get("/api/health").then(setHealth),
@@ -38,6 +42,16 @@ function App() {
   useEffect(() => {
     load();
   }, []);
+  useEffect(() => {
+    if (!uploadRun?.id || ["COMPLETED", "FAILED"].includes(uploadRun.status)) return;
+    const timer = window.setInterval(() => {
+      get(`/api/pipelines/ingest/${uploadRun.id}`).then((run) => {
+        setUploadRun(run);
+        if (["COMPLETED", "FAILED"].includes(run.status)) load();
+      }).catch((e) => setError(String(e)));
+    }, 2000);
+    return () => window.clearInterval(timer);
+  }, [uploadRun?.id, uploadRun?.status]);
   useEffect(() => {
     if (tab === "Phân tích")
       Promise.all([
@@ -67,9 +81,29 @@ function App() {
       setBusy(false);
     }
   };
+  const upload = async () => {
+    if (!uploadFile) return;
+    setUploading(true); setError("");
+    try {
+      const body = new FormData(); body.append("file", uploadFile);
+      const response = await fetch("/api/pipelines/ingest", { method: "POST", body });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || "Không thể tải file");
+      setUploadRun(result); load();
+    } catch (e) { setError(String(e)); }
+    finally { setUploading(false); }
+  };
+  const retryUpload = async () => {
+    if (!uploadRun?.id) return;
+    const response = await fetch(`/api/pipelines/ingest/${uploadRun.id}/retry`, { method: "POST" });
+    const result = await response.json();
+    if (!response.ok) { setError(result.message || "Không thể thử lại"); return; }
+    setUploadRun({ ...result, status: "ACCEPTED" });
+  };
   const tabs = [
     "Tổng quan",
     "Data Lake",
+    "Nhập dữ liệu",
     "Phân tích",
     "Dự báo",
     "Đánh giá",
@@ -148,6 +182,25 @@ function App() {
             </Panel>
           </>
         )}
+        {tab === "Nhập dữ liệu" && (
+          <Panel title="Tải dữ liệu bán hàng mới">
+            <div className="upload-layout">
+              <section className="upload-box">
+                <label>
+                  File CSV bán hàng
+                  <input type="file" accept=".csv,text/csv" onChange={(event) => setUploadFile(event.target.files?.[0] || null)} />
+                </label>
+                <p>File phải có đúng bốn cột: <code>date, store, item, sales</code>. Phiên bản hiện tại nhận Cửa hàng 1 và mã sản phẩm 1–50; hệ thống kiểm tra ngày, giá trị âm và bản ghi trùng.</p>
+                <button className="primary" disabled={!uploadFile || uploading} onClick={upload}>
+                  {uploading ? "Đang tải lên…" : "Tải lên và xử lý"}
+                </button>
+              </section>
+              <IngestionProgress run={uploadRun} onRetry={retryUpload} />
+            </div>
+            <h3 className="recent-title">Các lần xử lý gần đây</h3>
+            <Table rows={pipes} />
+          </Panel>
+        )}
         {tab === "Phân tích" && (
           <Panel title="Phân tích xu hướng và nhu cầu bán hàng năm 2017">
             <div className="help">
@@ -221,6 +274,68 @@ function App() {
     </div>
   );
 }
+const ingestionLabels: Record<string, string> = {
+  ACCEPTED: "Đã tiếp nhận",
+  RUNNING: "Đang xử lý bằng Spark",
+  COMPLETED: "Hoàn thành",
+  FAILED: "Thất bại",
+};
+const ingestionStageLabels: Record<string, string> = {
+  UPLOAD: "Tải file lên",
+  VALIDATE: "Kiểm tra dữ liệu",
+  STORE_BRONZE: "Lưu bản gốc vào MinIO",
+  SPARK_READ: "Spark đọc và kiểm tra dữ liệu",
+  WRITE_SILVER_GOLD: "Tạo dữ liệu Silver và Gold",
+  PUBLISH_POSTGRESQL: "Cập nhật PostgreSQL",
+  REFRESH_DASHBOARD: "Làm mới Dashboard",
+};
+const ingestionStageOrder = Object.keys(ingestionStageLabels);
+const formatDuration = (milliseconds: number) => {
+  const seconds = Math.max(0, Math.floor(milliseconds / 1000));
+  const minutes = Math.floor(seconds / 60);
+  return minutes ? `${minutes} phút ${seconds % 60} giây` : `${seconds} giây`;
+};
+const IngestionProgress = ({ run, onRetry }: { run: Json | null; onRetry: () => void }) => {
+  if (!run) return <section className="upload-status empty">Chưa có file nào được tải lên trong phiên này.</section>;
+  const stageRows: Json[] = Array.isArray(run.stages) ? run.stages : [];
+  const byName = new Map(stageRows.map((stage) => [stage.stage, stage]));
+  const completed = ingestionStageOrder.filter((name) => byName.get(name)?.status === "COMPLETED").length;
+  const current = byName.get(run.currentStage);
+  const partial = current?.status === "RUNNING" && Number(current.totalRows) > 0
+    ? Math.min(1, Number(current.completedRows) / Number(current.totalRows)) : 0;
+  const percent = run.status === "COMPLETED" ? 100 : Math.round(((completed + partial) / ingestionStageOrder.length) * 100);
+  const elapsedMs = Number(run.durationMillis || (Date.now() - new Date(run.startedAt).getTime()));
+  const processed = Number(run.goldRows || run.processedRows || 0);
+  const speed = elapsedMs > 0 ? processed / (elapsedMs / 1000) : 0;
+  return (
+    <section className={`upload-status status-${String(run.status).toLowerCase()}`}>
+      <span>Trạng thái file</span>
+      <strong>{ingestionLabels[run.status] || run.status}</strong>
+      <small>{run.fileName} · {Number(run.recordCount || 0).toLocaleString("vi-VN")} bản ghi</small>
+      {run.duplicate && <p>{run.message}</p>}
+      <div className="progress-summary">
+        <div><span>Tiến độ tổng</span><strong>{percent}%</strong></div>
+        <div><span>Thời gian đã chạy</span><strong>{formatDuration(elapsedMs)}</strong></div>
+        <div><span>Tốc độ xử lý</span><strong>{speed > 0 ? `${Math.round(speed).toLocaleString("vi-VN")} bản ghi/giây` : "Đang đo"}</strong></div>
+      </div>
+      <div className="progress-meter" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}>
+        <span style={{ width: `${percent}%` }} />
+      </div>
+      <p className="row-progress">Đã xử lý: <b>{processed.toLocaleString("vi-VN")}</b> / {Number(run.recordCount || 0).toLocaleString("vi-VN")} bản ghi</p>
+      <ol className="progress-timeline">
+        {ingestionStageOrder.map((name) => {
+          const stage = byName.get(name);
+          const status = stage?.status || (name === run.currentStage ? "RUNNING" : "WAITING");
+          return <li key={name} className={`stage-${String(status).toLowerCase()}`}>
+            <i aria-hidden="true" /><div><b>{ingestionStageLabels[name]}</b><small>{status === "COMPLETED" ? "Hoàn thành" : status === "RUNNING" ? "Đang thực hiện" : status === "FAILED" ? "Thất bại" : "Đang chờ"}</small></div>
+          </li>;
+        })}
+      </ol>
+      {run.status === "FAILED" && <><p className="failure-detail">{run.error || "Spark xử lý thất bại."}</p><button onClick={onRetry}>Thử xử lý lại</button></>}
+      {run.status === "COMPLETED" && <p>Dữ liệu mới đã được cập nhật vào PostgreSQL và Dashboard.</p>}
+    </section>
+  );
+};
 const Card = ({ label, value }: { label: string; value: string }) => (
   <article className="card">
     <span>{label}</span>

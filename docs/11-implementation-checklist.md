@@ -15,9 +15,9 @@ Quy ước:
 | 0. Audit repository | `[x]` | Có `00-repository-audit.md`; đã đối chiếu source/artifact và Forecast Service Docker đã load checkpoint seed 123 bằng CPU | Không còn blocker audit cho luồng MVP |
 | 1. Docker infrastructure | `[x]` | Compose đã build/start; MinIO, PostgreSQL, Forecast, Spring Boot API và React/Nginx healthy; Spark Master nhận 2 Workers | Không còn bootstrap ứng dụng trong luồng MVP |
 | 2. MinIO Data Lake | `[x]` | Bronze nguyên trạng; Silver và Gold Snappy Parquet; artifacts seed 123; benchmark stats; persistence đã kiểm tra | S3A committer hiện còn cảnh báo FileOutputCommitter |
-| 3. Spark ETL | `[-]` | ETL chạy trên 2 workers, đúng toàn bộ count, feature và parity; có Silver/Gold/statistics | Chưa có benchmark lặp 1 Worker/2 Workers và retry orchestration riêng |
+| 3. Spark ETL | `[-]` | ETL batch và ingestion run-scoped chạy trên 2 workers; có Silver/Gold/statistics, trạng thái và retry | Chưa có benchmark lặp 1 Worker/2 Workers |
 | 4. DL4J Forecast Service | `[x]` | CPU backend load đúng hash seed 123, health/metadata/forecast H1-H7, Weekly Naive, validation lỗi và parity 21 điểm PASS | Fat JAR đa nền tảng 1,45 GB cần tối ưu Linux-only |
-| 5. PostgreSQL + Spring Boot API | `[x]` | Flyway tạo schema, nhập 91.300 sales rows; endpoint tối thiểu, OpenAPI, pagination, timeout và idempotency chạy thật | Ingest mới ghi ACCEPTED, chưa tự orchestration Spark |
+| 5. PostgreSQL + Spring Boot API | `[x]` | Upload/validation/checksum/MinIO/Spark/status/retry và publish transaction chạy thật; run 4 tăng dữ liệu lên 91.304 rows | Chưa có recovery tự động nếu backend dừng giữa job |
 | 6. React Dashboard | `[-]` | React/TypeScript/Vite có sáu màn hình; frontend gọi API và chạy forecast thật | Chưa browser QA; biểu đồ Actual/model/baseline và metric chi tiết còn cần hoàn thiện |
 | 7. Integration và kiểm thử | `[-]` | Có unit, Compose/runtime migration, API/forecast HTTP end-to-end, Spark/forecast parity và root 64/64 | Chưa có automated PostgreSQL/API integration suite và browser E2E |
 | 8. Benchmark Big Data | `[ ]` | Chưa có benchmark runtime | Cần chạy lặp 1 Worker/2 Workers, cùng input/logic/resource policy và lưu số đo thật |
@@ -27,10 +27,10 @@ Quy ước:
 
 - [x] Data Lake MinIO: Bronze, Silver/Gold Parquet, artifact và runtime stats đã có.
 - [x] Spark Standalone: một Master và hai Workers đã đăng ký `ALIVE`.
-- [-] Spark ETL Store 1: ingestion/validation/feature/Parquet/statistics/parity đã có; benchmark job còn thiếu.
+- [-] Spark ETL Store 1: batch và upload run-scoped, validation/Parquet/statistics/parity/retry đã có; benchmark còn thiếu.
 - [x] Forecast Service DL4J thực hiện inference CPU thật.
 - [x] Spring Boot REST API nghiệp vụ và OpenAPI.
-- [x] PostgreSQL: Flyway schema, 91.300 sales rows, model/pipeline/forecast persistence.
+- [x] PostgreSQL: Flyway schema, 91.304 sales rows sau smoke ingestion, model/pipeline/forecast persistence.
 - [-] React + TypeScript dashboard: chạy thật và lấy dữ liệu qua API; còn browser QA/biểu đồ nâng cao.
 - [x] Docker Compose khởi động toàn bộ topology nền tảng.
 - [-] Bộ test: mới có smoke/persistence/quality-rule test; các lớp kiểm thử bắt buộc khác còn thiếu.

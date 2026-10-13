@@ -13,3 +13,8 @@ infrastructure/*
 !backend-api/src/
 !backend-api/src/**
 backend-api/target/
+!spark-etl/
+!spark-etl/pom.xml
+!spark-etl/src/
+!spark-etl/src/**
+spark-etl/target/

@@ -1006,3 +1006,57 @@ các nhãn mới. `git check-ignore` xác nhận node_modules, dist và Maven ta
 visual/keyboard QA bằng browser thật. Không sửa model, scaler, checkpoint hoặc preprocessing.
 
 **Commit đề xuất:** `feat: compare forecast total with prior week demand`.
+
+## 47. Hoàn thiện luồng upload CSV qua MinIO, Spark và PostgreSQL
+
+**Nhu cầu:** bổ sung màn hình tải CSV, kiểm tra dữ liệu, checksum chống xử lý trùng, tự gọi Spark,
+theo dõi bốn trạng thái, chỉ publish PostgreSQL sau thành công, hỗ trợ retry và tuyệt đối không tự
+huấn luyện lại model.
+
+**TDD:** `SalesUploadValidatorTest` ban đầu RED do lớp validator chưa tồn tại. Sau triển khai, backend
+PASS 11/11 test, gồm schema/file rỗng/ngày sai/sales âm/bản ghi trùng, phạm vi Store 1/item 1-50,
+checksum idempotency, Spark lỗi
+không publish và retry chỉ dành cho run thất bại. Spark module PASS 3/3; frontend content test và
+TypeScript/Vite build PASS.
+
+**Triển khai:** Flyway V2 bổ sung checksum, filename, error, attempt và index; Spring Boot nhận multipart,
+lưu Bronze bằng MinIO SDK, chạy worker tuần tự và `spark-submit` job run-scoped. Job ghi Silver/Gold
+Parquet cùng statistics; repository publish sales bằng transaction chỉ sau Spark exit `0`. Dashboard
+có màn hình nhập liệu, polling hai giây, trạng thái tiếng Việt, lỗi và retry. Docker backend đóng gói
+Spark CLI cùng ETL JAR; model serving và training không bị gọi hoặc thay đổi.
+
+**Bằng chứng runtime:** build hai image thành công, backend/frontend healthy. File mẫu 4 dòng tạo run
+`4`, đi qua `ACCEPTED/RUNNING/COMPLETED`, attempts `1`, raw/gold `4/4`; MinIO có object Bronze,
+Silver/Gold `_SUCCESS` + Parquet và statistics `_SUCCESS` + JSON. PostgreSQL tăng từ 91.300 lên 91.304
+dòng, max date `2018-01-02`. Upload lại cùng byte trả `duplicate=true`, ID vẫn `4`, không chạy lại.
+
+**Giới hạn:** chưa có browser visual/keyboard QA do Chrome/IAB không khả dụng; chưa có lease/recovery
+tự động khi backend chết giữa job và chưa benchmark 1/2 Workers. CSV tối đa 50 MB được parse trong
+bộ nhớ. Không chạy training, không đổi model/scaler/checkpoint hoặc split lịch sử.
+
+**Commit đề xuất:** `feat: complete csv ingestion pipeline`
+
+## 48. Theo dõi tiến độ ingestion theo từng công đoạn
+
+**Nhu cầu:** người dùng cần biết file đang xử lý đến đâu, bao nhiêu bản ghi đã hoàn thành, thời gian và
+tốc độ thay vì chỉ thấy một trạng thái Spark tổng quát.
+
+**TDD:** thêm kiểm tra parser marker tiến độ và các nhãn/chỉ số Dashboard trước khi triển khai. RED đúng
+do `SparkSubmitter.Progress`, `parseProgress` và nội dung giao diện chưa tồn tại. Sau triển khai, focused
+backend PASS 5/5, full backend PASS 13/13, Spark PASS 3/3, frontend content test và build đều PASS.
+
+**Triển khai:** Flyway V3 thêm stage event bền vững theo run/attempt. Spark job phát marker thật sau đọc
+và quality gate, ghi Silver và ghi Gold; backend đọc stdout đồng thời, lưu counters/timestamp và không
+làm mất timeout. API run trả timeline cùng raw/gold/duration. Dashboard hiển thị bảy bước, phần trăm,
+thời gian, số dòng, throughput và trạng thái chờ/đang chạy/hoàn thành/thất bại; responsive một cột trên
+màn hình hẹp.
+
+**Runtime:** build và recreate backend/frontend thành công, hai container healthy, HTTP Dashboard 200.
+Run `5` đi qua đủ bảy stage, hoàn thành 3/3 raw/gold rows trong `29.731 ms`; API giữa chừng đã trả
+`SPARK_READ/RUNNING`, cuối cùng trả `REFRESH_DASHBOARD/COMPLETED` và đầy đủ timestamp từng bước.
+
+**Giới hạn:** IAB không khả dụng nên chưa có visual/keyboard QA bằng trình duyệt. Timeline chi tiết chỉ
+hiện cho upload đang giữ trong phiên; chưa có nút mở lại một pipeline lịch sử. Tốc độ là trung bình từ
+row counter và elapsed/duration, không phải CPU/network throughput tức thời.
+
+**Commit đề xuất:** `feat: add live ingestion progress tracking`

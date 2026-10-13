@@ -550,3 +550,28 @@ hiển thị chênh lệch sản phẩm và tỷ lệ tăng/giảm; trường h�
 live Item #1, origin 2017-06-30 trả tổng dự báo `209,051`, cùng kỳ `215`, chênh `-5,949`, tương đương
 nhu cầu giảm `2,8%`. Frontend container đã được build lại và healthy. `.gitignore` cũng đã bổ sung
 artifact Node/frontend, output archive, PID/tmp và thư mục trạng thái container/Data Lake cục bộ.
+
+### Ingestion CSV tự động
+
+Hệ thống hiện có luồng hoàn chỉnh `Dashboard -> Spring Boot validation/checksum -> MinIO Bronze ->
+spark-submit -> Silver/Gold/statistics -> PostgreSQL -> Dashboard`. Trạng thái lưu bền gồm `ACCEPTED`,
+`RUNNING`, `COMPLETED`, `FAILED`; file cùng SHA-256 không được xử lý lại và run thất bại có endpoint
+retry. PostgreSQL chỉ được cập nhật trong transaction sau khi Spark trả exit `0`; ingestion không gọi
+training hoặc thay đổi model đang phục vụ.
+
+Run smoke `4` đã hoàn thành với 4/4 raw/gold rows. MinIO có đủ object Bronze, Silver/Gold Parquet và
+statistics JSON; PostgreSQL hiện có 91.304 sales rows với ngày lớn nhất `2018-01-02`. Upload lặp trả
+run `4`, `duplicate=true`, attempts vẫn `1`. Backend/frontend đang healthy và frontend HTTP 200.
+
+Kiểm thử hiện tại: backend 11/11 PASS, Spark 3/3 PASS, frontend test/build PASS. Chưa có visual QA do
+Chrome và IAB không khả dụng; chưa có distributed lease/recovery khi backend dừng giữa job, CSV parse
+trong RAM với giới hạn 50 MB và benchmark Spark 1/2 Workers vẫn chưa hoàn thành.
+
+### Tiến độ ingestion chi tiết
+
+Flyway V3 và API hiện lưu timeline theo attempt gồm `UPLOAD`, `VALIDATE`, `STORE_BRONZE`, `SPARK_READ`,
+`WRITE_SILVER_GOLD`, `PUBLISH_POSTGRESQL`, `REFRESH_DASHBOARD`. Marker stdout của Spark cập nhật row
+counter trong lúc job chạy. Dashboard polling hai giây, hiển thị phần trăm, elapsed time, throughput,
+processed/total rows và trạng thái từng bước. Run runtime `5` hoàn thành đủ 7/7 stage, raw/gold `3/3`,
+duration `29.731 ms`; backend/frontend đã recreate và đều healthy. IAB vẫn không khả dụng nên chưa có
+visual/keyboard QA; chưa mở lại timeline chi tiết từ một dòng lịch sử.

@@ -64,3 +64,25 @@ bảy ngày tương ứng của tuần trước (`Weekly Naive`). Chênh lệch 
 phần trăm: `(tổng dự báo - tổng tuần trước) / tổng tuần trước × 100`. Giao diện ghi rõ nhu cầu tăng,
 giảm hoặc không đổi. Nếu tổng tuần trước bằng 0, giao diện không tính phần trăm để tránh chia cho 0 và
 hiển thị lý do; số chênh lệch tuyệt đối vẫn được giữ.
+
+## Màn hình nhập dữ liệu
+
+Dashboard hiện có bảy màn hình, bổ sung `Nhập dữ liệu`. Người dùng chọn một file `.csv`, thấy rõ bốn
+cột bắt buộc và gửi multipart tới API. Sau khi tiếp nhận, giao diện tự hỏi trạng thái mỗi hai giây và
+trình bày `Đã tiếp nhận`, `Đang xử lý bằng Spark`, `Hoàn thành` hoặc `Thất bại`. Nếu thất bại, giao diện
+hiện lỗi và nút thử lại; khi hoàn thành, bảng pipeline được làm mới và dữ liệu PostgreSQL đã sẵn sàng.
+
+`npm test` và `npm run build` đều PASS; image frontend đã recreate và HTTP `localhost:3000` trả 200.
+Công cụ Chrome và trình duyệt tích hợp đều báo không khả dụng trong phiên nên chưa có visual,
+responsive hoặc keyboard QA thực tế cho màn hình mới.
+
+### Theo dõi tiến độ xử lý chi tiết
+
+Màn hình nhập dữ liệu hiện trình bày timeline bảy công đoạn từ upload đến làm mới Dashboard. Phía trên
+có phần trăm tổng, thời gian đã chạy, tốc độ trung bình theo bản ghi/giây, số bản ghi đã xử lý/tổng số
+bản ghi và thanh tiến độ có thuộc tính accessibility `progressbar`. Từng công đoạn có trạng thái đang
+chờ, đang thực hiện, hoàn thành hoặc thất bại; giao diện tiếp tục polling hai giây một lần.
+
+Phần trăm được tính từ các stage backend đã ghi nhận và tỷ lệ bản ghi thật trong stage hiện hành, không
+chạy giả theo đồng hồ. Với run đã hoàn thành, tốc độ dùng `goldRows / durationMillis`. Timeline chi tiết
+hiện gắn với file vừa upload trong phiên; danh sách lịch sử chưa có thao tác mở lại chi tiết một run cũ.

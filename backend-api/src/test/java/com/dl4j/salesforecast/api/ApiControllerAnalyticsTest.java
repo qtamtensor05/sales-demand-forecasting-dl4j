@@ -22,6 +22,7 @@ class ApiControllerAnalyticsTest {
     @Autowired private MockMvc mvc;
     @MockBean private JdbcTemplate jdbc;
     @MockBean private ForecastGateway forecasts;
+    @MockBean private IngestionService ingestions;
 
     @Test
     void returnsRankedMonthlyProductDemand() throws Exception {

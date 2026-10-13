@@ -1832,3 +1832,255 @@ là so sánh mức nhu cầu, không giải thích nguyên nhân và không thay
 `output.zip` vẫn đang tracked cho đến khi người dùng chủ động bỏ nó khỏi Git index.
 
 **Commit đề xuất:** `feat: compare forecast total with prior week demand`
+
+## 068 - 2026-10-13 - Giải thích mục Spark Benchmark
+
+**Mục tiêu và lý do:** làm rõ màn hình Spark Benchmark dùng để đo gì, khác gì với biểu đồ bán hàng và
+benchmark huấn luyện mô hình, cũng như trạng thái triển khai thực tế hiện tại.
+
+**Kết quả kiểm tra:** mục này được thiết kế để chạy cùng một Spark ETL Store 1 trên cùng input và cùng
+cấu hình logic, lần lượt với 1 Worker và 2 Workers. Các trường dự kiến gồm số worker, số dòng input,
+thời gian xử lý, thông lượng dòng/giây và thời điểm đo. Mục đích là chứng minh việc tăng worker có cải
+thiện tốc độ xử lý dữ liệu hay không; nó không đo độ chính xác dự báo và không phải biểu đồ doanh số.
+
+**Trạng thái live:** Spark Master, hai Worker và job runner đều đang chạy, nhưng
+`GET /api/benchmarks` trả mảng rỗng. Chưa có lượt benchmark lặp 1-vs-2 với cùng resource policy được
+thực hiện và ghi vào `benchmark_runs`, nên Dashboard chủ động hiển thị `Chưa có số đo benchmark` thay
+vì tạo số liệu giả. Lượt ETL hai worker 64.695 ms trước đây chỉ là một lần chạy đơn, không đủ để so sánh.
+
+**Phân biệt:** benchmark GPU GlobalResidualAR đã có trong tài liệu nghiên cứu là phép đo huấn luyện mô
+hình DL4J, hoàn toàn khác Spark Benchmark đang nói đến ở Dashboard. Không được dùng kết quả GPU đó để
+điền bảng Spark.
+
+**Thay đổi và giới hạn:** không sửa code/cấu hình/dữ liệu và không chạy benchmark nặng trong lượt giải
+thích này. Đã kiểm tra read-only API, trạng thái container, mã Dashboard và checklist. Tiêu chí benchmark
+Big Data vẫn chưa đạt cho tới khi có protocol lặp lại, kết quả thật và bản ghi database.
+
+**Commit đề xuất:** `docs: explain spark benchmark purpose and status`
+
+## 069 - 2026-10-13 - Giải thích giá trị sử dụng của Spark Benchmark
+
+**Mục tiêu và lý do:** trả lời ngắn gọn Spark Benchmark mang lại lợi ích thực tế gì cho dự án, thay vì
+chỉ mô tả các cột và cấu hình kỹ thuật.
+
+**Kết luận:** phần này dùng để quyết định số lượng Spark Worker phù hợp khi xử lý dữ liệu. Nếu 2 Worker
+nhanh hơn đáng kể so với 1 Worker trên cùng dữ liệu và tài nguyên kiểm soát, hệ thống có bằng chứng để
+mở rộng xử lý song song; nếu chênh lệch nhỏ hoặc chậm hơn, không nên tốn thêm CPU/RAM. Kết quả còn là
+bằng chứng đồ án rằng nền tảng Big Data đã đo khả năng scale, hỗ trợ ước lượng thời gian ETL và phát
+hiện bottleneck. Nó không hỗ trợ người bán đọc nhu cầu sản phẩm hằng ngày và không đánh giá độ chính
+xác của mô hình dự báo.
+
+**Thay đổi và kiểm tra:** không sửa code/cấu hình/dữ liệu, không chạy benchmark. Đối chiếu checklist,
+mã API và Dashboard hiện tại; benchmark_runs vẫn chưa có kết quả đo thật như đã ghi ở mục 068.
+`git diff --check` và liên kết Markdown được kiểm tra sau khi ghi nhật ký.
+
+**Giới hạn:** lợi ích trên chỉ trở thành bằng chứng định lượng sau khi benchmark 1-vs-2 Worker được
+chạy lặp, cùng input/logic/resource policy và lưu kết quả thật.
+
+**Commit đề xuất:** `docs: explain practical value of spark benchmark`
+
+## 070 - 2026-10-13 - Minh họa luồng Spark Master và Worker
+
+**Mục tiêu và lý do:** giải thích “số máy xử lý dữ liệu” bằng một luồng cụ thể, phù hợp người chưa quen
+Spark, và liên hệ trực tiếp với kiến trúc Docker Compose của dự án.
+
+**Diễn giải:** Master giống người quản lý công việc, không tự xử lý toàn bộ dữ liệu. Job runner gửi yêu
+cầu ETL; Master chia các partition/task và giao cho Worker. Mỗi Worker là một tiến trình/container có
+CPU và RAM riêng; trong production có thể đặt trên máy vật lý/VM khác nhau, còn dự án local hiện chạy
+hai container Worker trên cùng một máy Windows. Cả hai đọc các phần dữ liệu từ MinIO, lọc Store 1,
+kiểm tra và tạo feature; Spark gom kết quả rồi ghi Silver/Gold về MinIO.
+
+**Ví dụ:** với 91.300 dòng Store 1, một Worker thực hiện tuần tự các task được giao. Khi có hai Worker,
+Master có thể giao các partition khác nhau cho hai Worker xử lý đồng thời, chẳng hạn Worker 1 xử lý một
+nhóm item và Worker 2 xử lý nhóm còn lại; đây chỉ là minh họa vì Spark quyết định partition/task thực
+tế, không đảm bảo chia đúng 25 item mỗi bên. PostgreSQL/Dashboard chỉ nhận thống kê sau khi job hoàn tất.
+
+**Thay đổi và kiểm tra:** không sửa code/cấu hình/dữ liệu, không chạy ETL hoặc benchmark. Đối chiếu
+Compose và `Store1EtlJob`; `git diff --check` và liên kết Markdown được kiểm tra sau khi ghi nhật ký.
+
+**Giới hạn:** hai Worker local không đồng nghĩa hai máy tính vật lý. Hiệu quả song song còn phụ thuộc
+CPU/RAM máy chủ, số partition, đọc/ghi MinIO, shuffle và overhead; phải benchmark mới biết nhanh hơn bao
+nhiêu.
+
+**Commit đề xuất:** `docs: illustrate spark master worker data flow`
+
+## 071 - 2026-10-13 - Làm rõ luồng nhập dữ liệu mới qua MinIO và Spark
+
+**Mục tiêu và lý do:** xác nhận cách hiểu “dữ liệu mới vào MinIO rồi Spark đọc” và phân biệt kiến trúc
+mục tiêu với chức năng thực sự đã tự động hóa trong MVP hiện tại.
+
+**Kết luận kiến trúc:** đúng, trong luồng batch mong muốn, hệ thống nguồn/POS xuất dữ liệu bán hàng mới
+thành file có version hoặc partition ngày, dịch vụ ingestion kiểm tra sơ bộ rồi lưu nguyên trạng vào
+Bronze trên MinIO. Sau đó orchestration submit Spark ETL; Spark đọc các object Bronze chưa xử lý, kiểm
+tra/lọc/chuẩn hóa/tạo feature, ghi Silver/Gold và cập nhật PostgreSQL để API/Dashboard sử dụng. Dữ liệu
+Bronze nên bất biến và có metadata/idempotency để không xử lý trùng.
+
+**Trạng thái dự án hiện tại:** chưa có màn hình nhập bán hàng mới hoặc upload API. `minio-init` chỉ sao
+chép file local `data/train.csv` vào `bronze/store-1/train.csv` khi bootstrap. Spark ETL phải được submit
+thủ công. `POST /api/pipelines/ingest` hiện chỉ ghi một bản ghi trạng thái `ACCEPTED` vào PostgreSQL;
+không upload file, không gọi Spark và không cập nhật dashboard. Backend còn nhập Store 1 từ file CSV
+mount trực tiếp khi bảng `sales_records` trống, nên luồng runtime chưa hoàn toàn lấy Gold từ MinIO.
+
+**Thay đổi và kiểm tra:** không sửa code/cấu hình/dữ liệu, không upload hoặc chạy Spark. Đối chiếu
+`init-minio.sh`, Compose, API ingest và tài liệu pipeline; `git diff --check` cùng liên kết Markdown được
+kiểm tra sau khi ghi nhật ký.
+
+**Giới hạn:** muốn nhập liệu mới tự động cần triển khai upload/connector, naming/versioning, schema
+validation, idempotency, Spark orchestration, incremental ETL và bước publish/upsert PostgreSQL; các
+thành phần này chưa được chứng minh hoạt động trong MVP.
+
+**Commit đề xuất:** `docs: clarify minio ingestion and spark processing flow`
+
+## 072 - 2026-10-13 - Xác minh trạng thái tự động ingestion MinIO-Spark
+
+**Mục tiêu và lý do:** trả lời liệu luồng “nhập dữ liệu mới → MinIO → Spark → Dashboard” đã được triển
+khai hoàn chỉnh và tự động trong hệ thống hiện tại hay chưa.
+
+**Kết luận:** chưa hoàn chỉnh. Hạ tầng và xử lý lõi đã có: MinIO healthy, Spark Master/hai Worker/job
+runner đang chạy; file bootstrap được lưu vào Bronze; Spark ETL đã từng đọc Bronze và hoàn tất một
+lượt 91.300 raw/Gold rows trong 64.695 ms; backend/frontend healthy. Tuy nhiên chỉ file local
+`data/train.csv` được `minio-init` sao chép khi bootstrap và ETL được submit thủ công.
+
+**Phần còn thiếu:** chưa có form/API upload dữ liệu bán hàng mới, chưa có connector POS, chưa quản lý
+file mới theo ngày/version, chưa có trigger/orchestrator tự chạy Spark và chưa có bước tự động publish
+Gold mới vào PostgreSQL. `POST /api/pipelines/ingest` hiện chỉ ghi trạng thái `ACCEPTED` cùng source URI
+vào database, không upload file và không gọi `spark-submit`. Backend khi database trống vẫn import CSV
+mount tại `/opt/data/train.csv`.
+
+**Phạm vi xác minh:** kiểm tra read-only mã init MinIO, API ingest, Compose, container health và pipeline
+record live; không gửi ingest request, không chạy Spark và không sửa code/cấu hình/dữ liệu.
+
+**Giới hạn:** một pipeline record `COMPLETED` chứng minh lượt ETL trước đã chạy thành công, không chứng
+minh hệ thống tự nhận và xử lý file mới. Tự động hóa end-to-end vẫn là hạng mục triển khai tiếp theo.
+
+**Commit đề xuất:** `docs: verify current ingestion automation status`
+
+## 073 - 2026-10-13 - Đánh giá khả thi luồng ingestion tự động hoàn chỉnh
+
+**Mục tiêu và lý do:** xác định có thể triển khai ngay luồng upload dữ liệu mới → MinIO Bronze → Spark
+ETL → Silver/Gold → PostgreSQL → Dashboard trên kiến trúc local miễn phí hiện tại hay không.
+
+**Kết luận:** có thể triển khai, không cần dịch vụ trả phí và không có blocker hạ tầng cơ bản. MinIO,
+Spark Standalone, PostgreSQL, Spring Boot API, React Dashboard và Docker network đều đã có. Cách phù
+hợp cho MVP là upload CSV multipart vào backend, backend kiểm tra schema/kích thước và lưu object bất
+biến theo run ID trong Bronze; một orchestration service nội bộ submit `spark-submit`, theo dõi exit
+code/trạng thái; Spark ghi Silver/Gold theo run; sau thành công backend transactionally upsert dữ liệu
+đã kiểm chứng vào PostgreSQL và Dashboard polling trạng thái run.
+
+**Yêu cầu an toàn/chất lượng:** cần khóa idempotency bằng checksum/run ID; không overwrite Bronze; giới
+hạn file và chống path traversal; trạng thái `ACCEPTED/RUNNING/COMPLETED/FAILED`; log lỗi; chỉ publish
+sau quality gate; retry không tạo trùng; một job active hoặc cơ chế queue để tránh hai ETL ghi đè cùng
+prefix; giữ train-only normalization và split thời gian nếu dữ liệu mới đi vào luồng model.
+
+**Phạm vi nên triển khai:** API upload/status, MinIO client, bảng/file metadata, Spark launcher/worker,
+incremental hoặc run-scoped ETL, Gold-to-PostgreSQL publisher, giao diện upload/progress và automated
+tests cho upload sai schema, idempotency, lỗi Spark, retry và publish atomic. Không cần retrain model để
+hoàn thành ingestion; retraining tự động là hạng mục riêng và không nên ngầm kích hoạt.
+
+**Thay đổi và giới hạn lượt này:** đây là đánh giá khả thi, chưa sửa code hay chạy pipeline. Việc triển
+khai là thay đổi lớn có ghi external state và cần test end-to-end; không nên coi API `ACCEPTED` hiện tại
+là hoàn chỉnh. `git diff --check` và liên kết Markdown được kiểm tra sau khi ghi nhật ký.
+
+**Commit đề xuất:** `docs: assess automated ingestion implementation scope`
+
+## 074 - 2026-10-13 - Làm rõ ranh giới model và quy trình cập nhật checkpoint
+
+- **Mục tiêu:** Xác định luồng hiện tại có tách biệt model hay không và khả năng huấn luyện, cập nhật model mới vào hệ thống.
+- **Lý do:** Cần phân biệt rõ dữ liệu bán hàng mới, Spark ETL, quá trình huấn luyện và model đang phục vụ để tránh tự động ghi đè model ổn định.
+- **Kết quả kiểm tra:** Luồng ingestion/ETL/analytics được tách khỏi huấn luyện và phục vụ dự báo. `forecast-service` hiện chỉ suy luận, nạp gói triển khai seed `123` qua volume chỉ đọc tại `/opt/model`; dữ liệu mới đi qua MinIO/Spark không tự làm thay đổi trọng số model.
+- **Khả năng cập nhật:** Có thể huấn luyện model mới trong thư mục run riêng, chọn ứng viên bằng Validation 2016, kiểm tra đầy đủ checkpoint, scaler, ánh xạ mặt hàng, schema đặc trưng và metadata, sau đó đổi đường dẫn gói deployment trong Docker Compose và chỉ tạo lại `forecast-service`. Có thể rollback bằng cách khôi phục đường dẫn gói model trước đó.
+- **Ranh giới hiện tại:** Các script huấn luyện vẫn đọc dữ liệu cục bộ `data/train.csv`; chưa có bước tự động xuất dữ liệu Gold từ MinIO/PostgreSQL thành tập huấn luyện. Vì vậy, muốn dữ liệu nhập mới đi thẳng vào lần train kế tiếp thì cần bổ sung cầu nối dữ liệu hoặc adapter huấn luyện.
+- **Quy tắc an toàn:** Giữ chia tập theo thời gian, chỉ fit chuẩn hóa trên tập train, không dùng Test 2017 để chọn model, không ghi đè artifact đang phục vụ và không chỉ thay riêng `model.zip` khi các scaler/schema đi kèm đã thay đổi.
+- **Xác minh:** Đã đối chiếu cấu hình Docker Compose, tài liệu model serving và các script huấn luyện hiện có. Lượt này chỉ điều tra và cập nhật tài liệu; không chạy huấn luyện, không thay checkpoint và không khởi động lại dịch vụ.
+- **Hạn chế:** Chưa thực hiện một lần promotion model mới thực tế nên trạng thái cập nhật model chỉ được xác minh ở mức kiến trúc và cấu hình nguồn.
+- **Commit đề xuất:** `docs: clarify model isolation and update workflow`
+
+## 075 - 2026-10-13 - Hoàn thiện ingestion CSV tự động end-to-end
+
+- **Mục tiêu:** Triển khai màn hình upload CSV, MinIO Bronze, validation, checksum, tự gọi Spark, theo dõi trạng thái, publish PostgreSQL sau thành công, Dashboard refresh và retry/lỗi/trùng.
+- **Lý do:** Endpoint cũ chỉ tạo bản ghi `ACCEPTED`; chưa có luồng vận hành hoàn chỉnh để người dùng nhập và phân tích dữ liệu mới.
+- **Thay đổi backend:** Thêm MinIO SDK, Apache Commons CSV, validator cho header/file rỗng/ngày/số/sales âm/bản ghi trùng; SHA-256 idempotency; API multipart upload, status và retry; async worker tuần tự; `SparkSubmitter` có timeout/log; repository publish transaction sau Spark thành công. Flyway V2 bổ sung checksum, filename, error, attempt, timestamps và index.
+- **Thay đổi Spark/Docker:** Thêm `IncrementalSalesEtlJob` ghi Silver/Gold/statistics theo run ID, kiểm tra quality gate và hỗ trợ overwrite an toàn khi retry. Backend image đóng gói Spark CLI cùng ETL JAR; Compose truyền MinIO/Spark config và dependency startup. `.dockerignore` cho phép build context của `spark-etl` nhưng tiếp tục loại `target`.
+- **Thay đổi Dashboard:** Thêm màn hình `Nhập dữ liệu`, chọn `.csv`, mô tả schema, polling hai giây, bốn trạng thái tiếng Việt, thông báo duplicate/error, nút retry và bảng các pipeline gần đây.
+- **TDD:** Check validator ban đầu RED do `SalesUploadValidator` chưa tồn tại. Sau triển khai, backend `mvn -B test` PASS 11/11; Spark `mvn -B -P spark-runtime test package` PASS 3/3; frontend `npm test` và `npm run build` PASS.
+- **Xác minh runtime:** Docker build/recreate backend và frontend thành công, cả hai healthy; frontend HTTP 200. File mẫu 4 dòng tạo run `4`, đi qua `ACCEPTED -> RUNNING -> COMPLETED`, raw/gold `4/4`, attempts `1`. MinIO có Bronze CSV, Silver/Gold Parquet và statistics JSON với `_SUCCESS`; PostgreSQL tăng từ 91.300 lên 91.304 rows, max date `2018-01-02`. Upload lặp trả `duplicate=true`, cùng run `4`, không tăng attempts.
+- **Ranh giới model:** Luồng ingestion không gọi training, không sửa model/scaler/checkpoint và không thay nguyên tắc split/normalization hiện có.
+- **Giới hạn:** Chrome và IAB đều không khả dụng nên chưa có visual/responsive/keyboard QA. Chưa có distributed lease/recovery khi backend chết giữa Spark job; CSV tối đa 50 MB được parse trong RAM; benchmark Spark 1/2 Workers vẫn ngoài phạm vi này.
+- **Tệp chính:** `backend-api/`, `spark-etl/`, `frontend/src/main.tsx`, `frontend/src/ingestion.css`, `infrastructure/backend-api/Dockerfile`, `compose.yaml`, `.dockerignore`, `.env.example`, `examples/ingestion-sample.csv` và tài liệu `docs/`.
+- **Commit đề xuất:** `feat: complete csv ingestion pipeline`
+
+## 076 - 2026-10-13 - Làm rõ khả năng xóa dữ liệu hoặc gỡ PostgreSQL
+
+- **Mục tiêu:** Giải thích hệ thống hiện tại có thể xóa dữ liệu bán hàng hoặc gỡ database hay không, đồng thời tránh nhầm giữa xóa bản ghi, reset PostgreSQL và xóa toàn bộ volume Compose.
+- **Kết luận:** Có thể reset hoặc gỡ PostgreSQL bằng thao tác Docker, nhưng hiện chưa có API/màn hình xóa dữ liệu ingestion. Không thể xóa chính xác toàn bộ dữ liệu của một run một cách an toàn vì `sales_records` chưa lưu `ingestion_run_id`; các bản ghi upload được upsert theo khóa `store_id,item_id,sales_date` và có thể đã ghi đè giá trị trước đó.
+- **Ranh giới vận hành:** Xóa riêng volume PostgreSQL làm mất schema, lịch sử pipeline, forecast và sales trong database; khi container được tạo lại, Flyway tạo schema và `SalesCsvImporter` có thể tự nhập lại `data/train.csv` nếu bảng rỗng. `docker compose down -v` rộng hơn và còn xóa cả named volume MinIO, nên không phù hợp nếu chỉ muốn reset DB.
+- **Ảnh hưởng nếu gỡ service:** Backend, Dashboard analytics, lịch sử ingestion và lưu forecast phụ thuộc PostgreSQL; xóa service khỏi Compose sẽ làm các phần đó ngừng hoạt động, dù MinIO và Spark vẫn có thể còn dữ liệu object.
+- **Thay đổi và xác minh:** Chỉ kiểm tra read-only `compose.yaml`, schema/API và tài liệu trạng thái; không chạy lệnh xóa, không sửa code/cấu hình/dữ liệu và không dừng container.
+- **Giới hạn:** Muốn có chức năng “hoàn tác file đã nhập” đúng nghĩa cần bổ sung provenance theo run và quy tắc khôi phục giá trị bị upsert; không nên triển khai bằng một lệnh `DELETE` chung.
+- **Commit đề xuất:** `docs: clarify database removal boundaries`
+
+## 077 - 2026-10-13 - Làm rõ cách loại dữ liệu mẫu trước khi dùng dữ liệu khách hàng
+
+- **Mục tiêu:** Xác định có thể xóa file ingestion mẫu và dữ liệu `train.csv` hay không khi chuyển hệ thống từ demo sang vận hành bằng dữ liệu thật của khách hàng.
+- **Kết luận file mẫu:** Có thể loại run `4` vì bốn dòng mẫu nằm ở ngày `2018-01-01..02`, ngoài dữ liệu nền kết thúc `2017-12-31`, nên trong trường hợp cụ thể này có thể xác định chính xác bốn khóa sales cần xóa. Cần đồng bộ xóa hoặc đánh dấu ở PostgreSQL, Bronze upload, Silver/Gold và statistics; chỉ xóa `examples/ingestion-sample.csv` trong repository không làm mất dữ liệu đã publish.
+- **Kết luận dữ liệu train:** Có thể purge dữ liệu demo trước khi go-live, nhưng không được xóa riêng `data/train.csv` ngay trong cấu hình hiện tại. MinIO init dùng file này để tạo Bronze, backend dùng nó để bootstrap khi bảng sales rỗng và Forecast Service đọc `/opt/data/train.csv` làm lịch sử đầu vào. Checkpoint seed 123 cũng được huấn luyện/scaled/mapped theo dataset demo 50 item Store 1.
+- **Ranh giới production:** Dữ liệu khách hàng cần thay toàn bộ lớp nghiệp vụ demo bằng một cutover có kiểm soát: backup, dừng ghi, reset PostgreSQL và các prefix Data Lake demo, tắt bootstrap CSV, ingest dữ liệu khách hàng, xác minh schema/chất lượng/item mapping, sau đó retrain/validate/promote model riêng. Không nên trộn dữ liệu Kaggle demo với dữ liệu khách hàng hoặc dùng checkpoint cũ như thể đã học dữ liệu mới.
+- **Bằng chứng hiện tại:** PostgreSQL có `91.304` sales rows từ `2013-01-01` đến `2018-01-02`; run `1` là 91.300 dòng nền, run `4` là 4 dòng sample. Source/Compose xác nhận `train.csv` được mount cho backend và Forecast Service, đồng thời được `minio-init` sao chép vào Bronze.
+- **Thay đổi:** Chỉ điều tra và cập nhật tài liệu; chưa xóa file, object, row, volume hoặc model, chưa dừng container và chưa chạy training.
+- **Giới hạn:** Cơ chế rollback tổng quát theo từng upload vẫn thiếu provenance/value history; chỉ riêng sample run `4` có thể xóa chính xác vì các khóa ngày-item không chồng dữ liệu nền.
+- **Commit đề xuất:** `docs: define demo-to-customer data cutover`
+
+## 078 - 2026-10-13 - Phân biệt suy luận dữ liệu mới và huấn luyện lại model
+
+- **Mục tiêu:** Làm rõ dữ liệu khách hàng mới có bắt buộc phải huấn luyện lại model sau mỗi lần upload hay không.
+- **Kết luận:** Không huấn luyện lại sau mỗi file hoặc mỗi ngày bán hàng mới. Với đúng cửa hàng, mặt hàng và miền dữ liệu mà model đã được phê duyệt, dữ liệu mới chỉ bổ sung lịch sử đầu vào; model giữ nguyên trọng số và thực hiện suy luận để tạo dự báo mới. Huấn luyện lại là quy trình riêng theo lịch hoặc được kích hoạt khi độ chính xác suy giảm/data drift, có Validation gate, bước phê duyệt, promotion và rollback.
+- **Trường hợp khách hàng hoàn toàn mới:** Cần một lần onboarding, huấn luyện hoặc hiệu chỉnh và đánh giá model trên dữ liệu lịch sử của khách hàng. Đây không phải huấn luyện lại cho từng file. Checkpoint hiện tại chỉ học Store 1, 50 item, kèm mapping và scaler train-only của chính tập demo nên không có bằng chứng để dùng trực tiếp cho doanh nghiệp, mã hàng hoặc thang nhu cầu khác.
+- **Khoảng trống triển khai hiện tại:** Luồng upload đã đưa dữ liệu mới qua MinIO, Spark và PostgreSQL cho phân tích, nhưng `ForecastServiceMain` vẫn đọc lịch sử tĩnh từ `DATASET_PATH` mặc định `/opt/data/train.csv` rồi tìm window đã dựng sẵn. Vì vậy dữ liệu upload mới hiện chưa trở thành lịch sử đầu vào của lần dự báo kế tiếp; ingestion và inference mới chỉ tách biệt, chưa nối end-to-end.
+- **Kiến trúc đúng hướng:** Vận hành hằng ngày theo luồng upload → kiểm tra/ETL → cập nhật lịch sử → suy luận bằng model đang được phê duyệt, không train. Quy trình định kỳ hoặc khi drift mới tạo model ứng viên → đánh giá theo thời gian và baseline → phê duyệt → thay model. Mặt hàng mới chưa có đủ lịch sử phải dùng chiến lược cold-start/baseline thay vì tự động train toàn hệ thống.
+- **Lựa chọn mở rộng:** Nếu muốn một model dùng ngay cho nhiều khách hàng, cần xây dựng global model thật sự trên nhiều cửa hàng/khách hàng với đặc trưng định danh và chiến lược cold-start. Global model hiện tại chỉ global giữa 50 item của một Store 1, không phải global giữa các khách hàng.
+- **Thay đổi và xác minh:** Chỉ điều tra source và cập nhật tài liệu; không sửa code, dữ liệu, scaler hoặc checkpoint, không chạy training. Đã đối chiếu `ForecastServiceMain`, cấu hình backend CSV và tài liệu trạng thái/model serving.
+- **Giới hạn:** Chưa triển khai adapter để Forecast Service lấy chuỗi lịch sử mới nhất từ PostgreSQL hoặc Gold; chưa có drift monitor và quy trình retraining/promotion tự động có kiểm soát.
+- **Commit đề xuất:** `docs: clarify inference and retraining lifecycle`
+
+## 079 - 2026-10-13 - Làm rõ phạm vi một model cho cửa hàng và khách hàng
+
+- **Mục tiêu:** Trả lời việc mỗi khách hàng hoặc mỗi cửa hàng có bắt buộc phải sở hữu một model riêng hay không.
+- **Kết luận:** Không có quy tắc bắt buộc một cửa hàng bằng một model. Có thể dùng model riêng cho từng đơn vị, một global model chung cho nhiều cửa hàng, hoặc mô hình lai dùng global model chung rồi hiệu chỉnh theo từng khách hàng. Lựa chọn phụ thuộc mức độ tương đồng của ngành hàng, mã sản phẩm, quy mô và lượng lịch sử.
+- **Trạng thái dự án:** Model hiện tại là `SingleStoreGlobalDataset`: một model dùng chung cho 50 item trong đúng Store 1, với item one-hot và scaler train-only riêng theo item. Nó không nhận diện nhiều store/customer và artifact ghi một `storeId`; vì vậy hiện tại chỉ nên xem đây là model của một cửa hàng demo, không phải model đa khách hàng.
+- **Hướng phù hợp trước mắt:** Với khách hàng thật đầu tiên, dùng một deployment model đã onboarding và kiểm định cho khách hàng đó là phương án ít rủi ro nhất. Nếu khách hàng có nhiều chi nhánh cùng loại sản phẩm và hành vi tương đồng, có thể thiết kế một model chung cho toàn chuỗi với `customer_id/store_id/item_id`, thay vì tạo model cho từng cửa hàng.
+- **Hướng mở rộng:** Khi có dữ liệu của nhiều khách hàng, đánh giá global multi-customer model và tách dữ liệu/scaler/permission theo tenant. Khách hàng hoặc mặt hàng mới thiếu lịch sử dùng baseline/cold-start; không tự động tạo và train một model mới sau mỗi lần upload.
+- **Thay đổi và xác minh:** Chỉ đối chiếu source và cập nhật tài liệu; không sửa code, schema, dữ liệu, model, scaler hoặc checkpoint và không chạy training. `SingleStoreGlobalDataset` hiện từ chối panel khác store và deployment metadata lưu đúng một `storeId`.
+- **Giới hạn:** Dự án chưa có tenant/customer schema, store identity feature, multi-store training, model registry theo khách hàng hoặc kiểm thử cô lập tenant. Do đó lựa chọn global đa khách hàng mới là định hướng, chưa phải chức năng đã triển khai.
+- **Commit đề xuất:** `docs: clarify model scope across customers`
+
+## 080 - 2026-10-13 - Đánh giá khả năng theo dõi tiến độ ingestion
+
+- **Mục tiêu:** Xác định người dùng hiện có thể xem file upload đang xử lý đến bước nào, mất bao lâu và đạt tốc độ bao nhiêu hay chưa.
+- **Kết quả hiện tại:** Dashboard polling API mỗi hai giây và hiển thị tên file, số bản ghi, số lần chạy, lỗi/retry cùng ba mốc `Đã tiếp nhận`, `Đang xử lý bằng Spark`, `Hoàn thành` hoặc `Thất bại`. API lưu thời điểm bắt đầu/kết thúc; `pipeline_runs` có raw rows, gold rows và tổng `duration_ms`, nên sau khi kết thúc đã có dữ liệu nền để trình bày thời gian và throughput trung bình.
+- **Phần chưa có:** Khi status là `RUNNING`, toàn bộ Spark ETL vẫn chỉ là một bước; chưa có các stage chi tiết như tải MinIO, kiểm tra dữ liệu, đọc Bronze, biến đổi, ghi Silver, ghi Gold và publish PostgreSQL. Chưa lưu phần trăm, bytes đã upload, rows/giây theo thời gian, ETA, Spark application/job/stage ID hoặc log live. File log tạm của `SparkSubmitter` chỉ được đọc khi process kết thúc rồi bị xóa, nên Dashboard không thể theo dõi log Spark trực tiếp.
+- **Hướng triển khai đúng:** Bổ sung stage/event bền vững với timestamp và row counters; API progress riêng; Dashboard timeline, thời gian đã chạy, thanh tiến độ và tốc độ. Phần upload có thể đo byte thực tế. Phần Spark nên lấy stage/counter thật từ event/status do job phát ra hoặc Spark status API; không dùng phần trăm giả chỉ dựa trên thời gian. Sau hoàn thành tính `gold_rows / duration` và hiển thị thời lượng từng bước.
+- **Các bước nghiệp vụ đề xuất:** `UPLOAD` → `VALIDATE` → `STORE_BRONZE` → `SPARK_READ` → `SPARK_TRANSFORM` → `WRITE_SILVER_GOLD` → `PUBLISH_POSTGRESQL` → `REFRESH_DASHBOARD`. Mỗi bước có trạng thái chờ/đang chạy/hoàn thành/thất bại, bắt đầu, kết thúc, số bản ghi và thông báo lỗi.
+- **Thay đổi và xác minh:** Chỉ điều tra source/API/schema/giao diện và cập nhật tài liệu; không sửa chức năng, database, container hoặc dữ liệu và không chạy test chức năng. Đã đối chiếu polling frontend, `IngestionRunRepository`, `SparkSubmitter`, migration và statistics của Spark job.
+- **Giới hạn:** Đây là đánh giá khả thi, chưa phải chức năng giám sát chi tiết đã triển khai. Hiện người dùng chỉ xem được trạng thái tổng quát ba bước; tốc độ và tiến độ chi tiết chưa xuất hiện trên web.
+- **Commit đề xuất:** `docs: assess ingestion progress observability`
+
+## 081 - 2026-10-13 - Nâng cấp giao diện theo dõi tiến độ ingestion
+
+- **Mục tiêu:** Hiển thị file upload đang đến bước nào, phần trăm, số bản ghi, thời gian và tốc độ xử lý trên Dashboard bằng dữ liệu tiến độ thật.
+- **TDD:** Backend parser test và frontend content check ban đầu RED do chưa có progress marker/parser và các nhãn giao diện. Sau triển khai, focused backend PASS 5/5; full backend PASS 13/13; Spark PASS 3/3; frontend `npm test` và `npm run build` PASS.
+- **Backend/database:** Flyway V3 thêm `current_stage`, `processed_rows` và `ingestion_stage_events` theo run/attempt. Repository lưu stage, trạng thái, row counters, started/finished time và lỗi; API chi tiết run trả timeline cùng raw/gold/duration.
+- **Spark:** `IncrementalSalesEtlJob` phát `INGESTION_PROGRESS` sau đọc + quality gate, sau Silver và sau Gold. `SparkSubmitter` đọc stdout khi process còn chạy, parse marker và callback cập nhật database trong khi vẫn giữ timeout cùng log lỗi giới hạn.
+- **Dashboard:** Thay ba ô trạng thái bằng timeline bảy bước, thanh phần trăm, elapsed time, throughput trung bình, processed/total rows và trạng thái từng bước; bổ sung bố cục responsive một cột.
+- **Runtime:** Build/recreate image backend và frontend thành công; cả hai container healthy, API health UP và Dashboard HTTP 200. Run `5` được quan sát giữa chừng ở `SPARK_READ/RUNNING`, sau đó hoàn thành 7/7 stage với raw/gold `3/3`, duration `29.731 ms` và timestamp riêng từng bước. File smoke tạm đã xóa khỏi repository; ba dòng runtime vẫn là dữ liệu ingestion đã publish.
+- **Model:** Không gọi training, không sửa model/scaler/checkpoint và không thay train-only normalization hoặc split thời gian.
+- **Giới hạn:** IAB báo không khả dụng nên chưa có visual/keyboard QA. Timeline chi tiết hiện chỉ hiển thị cho file vừa upload trong state của phiên; bảng pipeline lịch sử chưa có nút mở lại chi tiết. Throughput là trung bình bản ghi/giây, không phải tốc độ CPU/network tức thời.
+- **Commit đề xuất:** `feat: add live ingestion progress tracking`
+
+## 082 - 2026-10-13 - Thêm CSV mẫu để thử luồng upload
+
+- **Mục tiêu:** Cung cấp một file CSV mới để người dùng tự upload và quan sát timeline xử lý chi tiết trên Dashboard.
+- **Thay đổi:** Thêm `examples/ingestion-upload-sample.csv` gồm đúng bốn cột `date,store,item,sales`, 21 bản ghi của Store 1, ba item 1-3 trong bảy ngày từ 2018-01-04 đến 2018-01-10. Nội dung khác checksum các file smoke trước để không bị idempotency trả về run cũ.
+- **Kiểm tra:** Header khớp tuyệt đối; 21/21 dòng đọc được; không có ngày sai, store/item ngoài phạm vi, sales âm hoặc khóa `date,store,item` trùng. File có kích thước 400 byte. Công cụ artifact spreadsheet không khởi tạo được kernel sau một lần retry nên kiểm tra được thực hiện trực tiếp bằng parser CSV PowerShell.
+- **Phạm vi:** Chỉ tạo file mẫu trong repository; chưa upload file, chưa ghi MinIO/PostgreSQL, chưa gọi Spark và không thay model/training.
+- **Giới hạn:** Các giá trị sales là dữ liệu minh họa để kiểm tra kỹ thuật, không đại diện dữ liệu kinh doanh thật. Sau khi upload, checksum sẽ ngăn xử lý lại chính file không thay đổi.
+- **Commit đề xuất:** `test: add ingestion upload sample csv`

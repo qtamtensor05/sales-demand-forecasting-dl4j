@@ -30,6 +30,14 @@ const required = [
   "Sản phẩm bán chạy theo tháng",
   "aggregateSales",
   "/api/analytics/monthly-demand",
+  "Tiến độ tổng",
+  "Tốc độ xử lý",
+  "Thời gian đã chạy",
+  "Lưu bản gốc vào MinIO",
+  "Spark đọc và kiểm tra dữ liệu",
+  "Tạo dữ liệu Silver và Gold",
+  "Cập nhật PostgreSQL",
+  "progress-meter",
 ];
 const forbidden = [
   "Bước 1",

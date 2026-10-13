@@ -10,7 +10,7 @@
 4. [Spark ETL](03-spark-etl.md): Silver/Gold Parquet, quality gate, count và runtime parity.
 5. [DL4J Forecast Service](04-model-serving.md): CPU checkpoint serving, HTTP contract và forecast parity.
 6. [PostgreSQL và Spring Boot API](05-api.md): migration, endpoint, timeout, idempotency và bằng chứng runtime.
-7. [React Dashboard](06-dashboard.md): sáu màn hình, API proxy và giới hạn browser QA.
+7. [React Dashboard](06-dashboard.md): bảy màn hình gồm nhập CSV, API proxy và giới hạn browser QA.
 8. [Checklist triển khai Big Data](11-implementation-checklist.md): trạng thái từng giai đoạn và 12 tiêu chí nghiệm thu.
 9. [Lịch sử triển khai](implementation-history.md): từng bước, nhu cầu, thay đổi và kết quả.
 10. [Trạng thái hiện tại](current-state.md): pipeline, giao diện các lớp, số liệu và giới hạn.

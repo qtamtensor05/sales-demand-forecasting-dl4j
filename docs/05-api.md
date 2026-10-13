@@ -19,7 +19,9 @@ Migration `V1__create_sales_platform.sql` tạo `stores`, `items`, `sales_record
 - `POST /api/forecasts` với `{"itemId":1,"originDate":"2017-06-30"}`;
 - `GET /api/forecasts/{forecastId}`;
 - `GET /api/models`, `/api/metrics`, `/api/pipelines`, `/api/benchmarks`;
-- `POST /api/pipelines/ingest` yêu cầu header `Idempotency-Key`.
+- `POST /api/pipelines/ingest` nhận multipart field `file` chứa CSV;
+- `GET /api/pipelines/ingest/{id}` trả tiến trình và lỗi xử lý;
+- `POST /api/pipelines/ingest/{id}/retry` thử lại run đang `FAILED`.
 
 Forecast client có connect/read timeout, gọi Forecast Service nội bộ và lưu request cùng bảy horizon
 vào PostgreSQL. Frontend chỉ gọi `/api`; Nginx proxy sang backend, không truy cập MinIO trực tiếp.
@@ -40,3 +42,31 @@ Spark. Bảng metrics/benchmarks chỉ trả dữ liệu thật đã lưu và c�
 tháng, xếp hạng trong từng tháng và trả top N với `month`, `itemId`, `totalSales`,
 `averageDailySales`, `peakDailySales`, `rank`. API chấp nhận năm 2013-2017 và limit 1-50; tham số ngoài
 phạm vi trả HTTP 400. Truy vấn tổng hợp chạy trong PostgreSQL để tránh frontend phải tải 50 chuỗi ngày.
+
+## Luồng nhập CSV tự động
+
+Backend kiểm tra đúng header `date,store,item,sales`, file rỗng, ngày/số sai, giá trị âm và khóa
+`date + store + item` trùng trong cùng file. Phạm vi hiện tại chỉ nhận Store 1 và item 1-50 để khớp
+Dashboard/model hiện hành. SHA-256 của toàn bộ byte file là khóa idempotency; upload
+lại cùng nội dung trả run cũ và không gọi Spark lần nữa. File hợp lệ được lưu bất biến trong Bronze
+theo `uploads/{checksum}/{fileName}`.
+
+Worker một luồng chuyển trạng thái `ACCEPTED -> RUNNING`, gọi `spark-submit` cho
+`IncrementalSalesEtlJob`, ghi Silver/Gold/statistics theo `run-{id}`. Chỉ khi Spark exit `0`, backend
+mới upsert dữ liệu vào `sales_records` trong transaction và chuyển run sang `COMPLETED`; mọi lỗi được
+ghi `FAILED` và có thể retry. Luồng này không gọi training và không thay model/scaler/checkpoint.
+
+Từ migration V3, mỗi run còn có timeline bền vững theo attempt: `UPLOAD`, `VALIDATE`, `STORE_BRONZE`,
+`SPARK_READ`, `WRITE_SILVER_GOLD`, `PUBLISH_POSTGRESQL`, `REFRESH_DASHBOARD`. Spark phát marker
+`INGESTION_PROGRESS` trên stdout sau các hành động thật; backend đọc stream trong lúc process đang chạy
+và lưu stage, trạng thái, số dòng hoàn thành/tổng số dòng cùng thời điểm bắt đầu/kết thúc. Endpoint chi
+tiết run trả thêm `currentStage`, `processedRows`, `stages`, `durationMillis`, `rawRows` và `goldRows`.
+
+Smoke test runtime run `4` xử lý 4 bản ghi trong `examples/ingestion-sample.csv`: Bronze,
+Silver/Gold Snappy Parquet và JSON statistics đều có `_SUCCESS`; pipeline lưu `COMPLETED`, raw/gold
+đều bằng 4 và PostgreSQL tăng từ 91.300 lên 91.304 dòng. Upload lần hai trả `duplicate=true`, cùng ID
+`4`, attempts vẫn bằng `1`.
+
+Giới hạn: CSV được kiểm tra trong bộ nhớ và giới hạn multipart 50 MB; executor hiện tuần tự để tránh
+hai lần publish đồng thời trên máy local. Nếu backend dừng đúng lúc job đang chạy, run có thể cần đánh
+dấu lỗi/retry thủ công sau khi dịch vụ lên lại; chưa có cơ chế lease/recovery phân tán.

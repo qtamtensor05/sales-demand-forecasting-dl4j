@@ -184,6 +184,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      spark-master:
+        condition: service_started
       forecast-service:
         condition: service_healthy
     environment:
@@ -194,6 +198,13 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-postgres-password}
       FORECAST_SERVICE_URL: http://forecast-service:8083
       SALES_CSV_PATH: /opt/data/train.csv
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-salesadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-change-me-minio-password}
+      SPARK_MASTER_URL: spark://spark-master:7077
+      SPARK_SUBMIT: /opt/spark/bin/spark-submit
+      SPARK_JOB_JAR: /opt/spark-jobs/spark-etl.jar
+      SPARK_TIMEOUT_SECONDS: ${SPARK_TIMEOUT_SECONDS:-600}
     ports:
       - "${BACKEND_API_PORT:-8084}:8084"
     healthcheck:
