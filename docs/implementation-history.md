@@ -848,3 +848,161 @@ Luồng Spark Silver/Gold, DL4J serving, schema/API, dashboard, parity/E2E và b
 Tổng hợp hiện tại là 3 tiêu chí đạt, 3 đạt một phần và 6 chưa đạt.
 
 **Commit đề xuất:** `docs: add big data implementation checklist`.
+
+## 39. Xác nhận full regression suite và cập nhật đường găng
+
+**Bằng chứng người dùng cung cấp:** `mvn -B test` kết thúc lúc 18:09:14 ngày 2026-10-13 với 63 test,
+0 failure, 0 error, 0 skip, `BUILD SUCCESS`, tổng thời gian 04:46.
+
+**Kết luận:** dependency CUDA đã tải đủ cho lượt test và các lệnh gốc hiện không có hồi quy được bộ test
+phát hiện. Tiêu chí nghiệm thu 12 chuyển sang đạt. Đồng thời sửa phép đếm checklist trước đó theo chính
+các trạng thái trong bảng: hiện là 4 đạt, 1 đạt một phần và 7 chưa đạt.
+
+**Việc tiếp theo:** hoàn thành Spark runtime ETL và parity trước; sau đó mới triển khai Forecast Service
+CPU, migrations/Spring Boot API, React dashboard, integration/E2E, benchmark và tài liệu bàn giao.
+
+**Commit đề xuất:** `docs: record successful full regression suite`.
+
+## 40. Chạy Spark Silver/Gold và phục vụ checkpoint trên CPU
+
+**Triển khai:** thêm Spark Java ETL đọc Bronze S3A, quality/window gates, train-only scaler, sáu feature
+causal, 50 identity channels, Silver/Gold Parquet, runtime stats và parity job. Thay Forecast bootstrap
+bằng HTTP service dùng nguyên GlobalResidualAR, deployment scaler/checkpoint seed 123 và ND4J CPU.
+
+**TDD:** feature contract, window counts và request validation đều có RED do chưa triển khai, sau đó
+GREEN. Spark runtime build PASS 3/3 test. ETL lần đầu fail vì executor không thấy mount local; sửa sang
+Bronze S3A rồi chạy thành công trên đúng hai executor.
+
+**Bằng chứng:** đúng 91.300 rows, 50 items, ba split và 52.300/18.000/17.950 counts; Spark parity 12
+rows PASS `1e-9`. Forecast Service healthy, đúng model hash, trả H1-H7; parity 21 điểm với GPU artifact
+có max diff `5,07e-5`, Weekly diff 0. Không train lại hoặc đổi checkpoint/scaler.
+
+**Giới hạn:** chưa có Spring Boot API/React/E2E/benchmark 1-vs-2. CPU fat JAR 1,45 GB và S3A standard
+committer cần tối ưu trước production.
+
+**Commit đề xuất:** `feat: run spark etl and serve forecasts on cpu`.
+
+## 41. Triển khai Spring Boot API và React Dashboard miễn phí
+
+**Nhu cầu:** thay hai bootstrap còn lại bằng luồng ứng dụng dễ chạy local, không cần cloud hoặc dịch vụ
+trả phí, đồng thời nối PostgreSQL → REST API → Dashboard với Forecast Service hiện có.
+
+**TDD và triển khai:** test validation forecast chạy RED với 1 failure/1 error do implementation stub,
+sau đó GREEN 2/2. Thêm module Spring Boot Java 11, Flyway schema, CSV importer, JDBC endpoints,
+OpenAPI, timeout/idempotency và persistence dự báo. Thêm React/TypeScript/Vite dashboard sáu màn hình,
+SVG chart và Nginx `/api` proxy; Dockerfiles multi-stage thay bootstrap trong Compose.
+
+**Bằng chứng runtime:** backend/frontend healthy; migration chạy trên PostgreSQL volume cũ; database có
+91.300 sales rows. OpenAPI/frontend HTTP 200, frontend proxy trả database UP. Forecast Item 1 origin
+2017-06-30 trả COMPLETED/7 horizon và lưu 7 rows. Item 99 trả 400; hai ingestion request cùng key chỉ
+tạo một row. `npm run build`, backend 2/2 test và Compose config PASS.
+
+**Giới hạn:** chưa có browser visual QA do công cụ browser không khả dụng; ingest endpoint mới ghi
+ACCEPTED, chưa chạy Spark tự động; benchmark 1/2 Workers và automated API/PostgreSQL/browser E2E còn
+thiếu. Không thay model, scaler, checkpoint, split hoặc artifact và không chạy training.
+
+**Commit đề xuất:** `feat: add local spring api and react dashboard`.
+
+## 42. Đơn giản hóa thuật ngữ dự báo trên Dashboard
+
+**Nhu cầu:** người dùng không hiểu H1-H7, Item, origin và các cột prediction/baseline/actual nên cần
+giao diện tự giải thích, không đòi hỏi kiến thức ML.
+
+**Triển khai:** thêm hướng dẫn ba bước, đổi origin thành “Ngày bắt đầu dự báo”, đổi H1-H7 thành bảy
+thẻ “Ngày dự báo 1-7” có ngày cụ thể và số lượng dự kiến bán. Diễn giải Weekly Naive là mốc cùng thứ
+tuần trước và Actual là thực tế lịch sử. Mọi Item hiển thị “Sản phẩm #N (mã ẩn danh)” vì source CSV
+không có tên hàng hóa; không tự bịa tên. Tổng quan và phân tích cũng dùng ngôn ngữ nghiệp vụ.
+
+**TDD/kiểm tra:** `npm test` ban đầu RED do thiếu sáu cụm giải thích, sau thay đổi PASS
+`DASHBOARD_COPY_OK`. `npm run build` PASS; Docker image build/deploy PASS; frontend healthy, HTTP 200
+và JavaScript bundle live chứa các nhãn mới. Không thay API, dữ liệu, model hoặc công thức dự báo.
+
+**Giới hạn:** công cụ browser vẫn không khả dụng nên chưa có visual/responsive/keyboard QA thực tế.
+
+**Commit đề xuất:** `feat: simplify forecast dashboard language`.
+
+## 43. Tập trung Dashboard vào giá trị dự báo theo ngày và tổng tuần
+
+**Nhu cầu:** bỏ nội dung hướng dẫn theo bước và ví dụ; thay tên ngày kỹ thuật bằng ngày cụ thể trong
+lịch, ghi rõ mỗi giá trị đo số sản phẩm nào và tận dụng diện tích theo bố cục dọc. Đồng thời bổ sung
+tổng nhu cầu dự báo của cả bảy ngày.
+
+**TDD và triển khai:** cập nhật content regression test để yêu cầu tổng tuần, ngày định dạng tiếng Việt,
+ba nhãn giá trị có đơn vị và cấm các cụm `Bước 1-3`, `Ví dụ` cùng `Ngày dự báo {horizon}`. Test RED với
+sáu nội dung thiếu và năm nội dung cũ còn tồn tại. Sau đó màn hình được rút gọn thành form và kết quả;
+mỗi ngày là một thẻ dọc, hai cột trên desktop/một cột trên màn hình hẹp. Tổng tuần được cộng từ bảy
+prediction gốc và chỉ làm tròn khi hiển thị.
+
+**Kiểm tra:** `npm test` PASS `DASHBOARD_RESULT_COPY_OK`; `npm run build` PASS. Docker Compose build và
+recreate frontend thành công; container healthy, HTTP 200 và JavaScript bundle live chứa đủ ba nhãn
+kết quả mới. Không sửa backend, model, scaler, checkpoint, split hoặc dữ liệu huấn luyện.
+
+**Giới hạn:** môi trường không có browser khả dụng nên chưa xác minh trực quan, responsive hoặc bàn
+phím trên trình duyệt thật; responsive hiện được kiểm tra ở mức CSS/build.
+
+**Commit đề xuất:** `feat: clarify daily forecasts and add weekly total`.
+
+## 44. Bổ sung trục và giá trị tương tác cho biểu đồ phân tích
+
+**Nhu cầu:** biểu đồ đường cũ chỉ vẽ đường doanh số, không có trục hoặc giá trị nên người dùng không
+xác định được một điểm nằm ở ngày nào và có bao nhiêu sản phẩm.
+
+**TDD và triển khai:** content regression test được mở rộng để yêu cầu nhãn hai trục, ba thống kê,
+grid/axis và tooltip điểm dữ liệu; test RED vì thiếu toàn bộ tám thành phần. Sau đó Chart được bổ sung
+trục `Số sản phẩm đã bán` và `Ngày bán`, sáu mốc Y, năm mốc X, đường lưới, điểm hover có ngày–giá trị
+chính xác, cùng ba thẻ min/average/max. CSS riêng giữ biểu đồ đủ rộng và cho phép cuộn trên màn hình nhỏ.
+
+**Kiểm tra:** `npm test` PASS `DASHBOARD_RESULT_COPY_OK`; `npm run build` PASS. Chỉ image frontend được
+build và recreate; container healthy, HTTP 200 và bundle live có đủ sáu nhãn đại diện. API live cho
+Sản phẩm #1 trả 365 dòng, min `5`, average `22,2`, max `50`. Không sửa backend, dữ liệu hoặc mô hình.
+
+**Giới hạn:** chưa có visual/responsive/keyboard QA bằng trình duyệt thật vì browser tích hợp không
+khả dụng; tooltip SVG hiện phục vụ thao tác chuột, chưa bổ sung cơ chế focus riêng cho từng điểm.
+
+**Commit đề xuất:** `feat: add readable axes and values to sales chart`.
+
+## 45. Phân tích doanh số theo ngày, tuần, tháng và xếp hạng sản phẩm
+
+**Nhu cầu:** giúp người dùng quan sát xu hướng ở nhiều độ phân giải, nhận ra kỳ nhu cầu cao và biết
+sản phẩm nào bán nhiều trong từng tháng thay vì chỉ xem một chuỗi ngày của một sản phẩm.
+
+**TDD và triển khai:** API test ban đầu RED 2/2 vì endpoint chưa tồn tại. Thêm endpoint PostgreSQL dùng
+monthly aggregation và window ranking, kiểm tra year/limit. Frontend content test tiếp tục RED vì thiếu
+bộ chọn Ngày/Tuần/Tháng, tổng nhu cầu, biến động kỳ và ranking. Dashboard sau đó tổng hợp tuần theo
+thứ Hai-Chủ Nhật, tổng hợp tháng, tính total/average/peak/period-over-period và hiển thị top 5 sản phẩm
+theo tháng cùng average/day và peak/day.
+
+**Kiểm tra:** backend focused test GREEN 2/2 và full module PASS 4/4; frontend content test PASS,
+TypeScript/Vite build PASS. Hai image được build/recreate; backend và frontend healthy. API live trả
+60 hàng cho top 5 của 12 tháng; tháng 01/2017 top 1 là Sản phẩm #15 với 2.015 sản phẩm. Bundle live có
+đủ nhãn ba chế độ và các chỉ số. Không sửa mô hình, preprocessing, split, scaler hoặc checkpoint.
+
+**Giới hạn:** đây là descriptive/temporal analysis trên lịch sử Store 1 năm 2017, không phải causal
+analysis, demand forecast hoặc quyết định nhập kho. Chưa có drill-down nhiều năm, giá/doanh thu, tồn
+kho, khuyến mãi hay tên SKU vì nguồn không cung cấp. Chưa có visual/keyboard QA trên browser thật.
+
+**Commit đề xuất:** `feat: add weekly monthly sales analytics and rankings`.
+
+## 46. So sánh tổng dự báo với cùng kỳ và hoàn thiện ignore rules
+
+**Nhu cầu:** ngoài tổng dự báo bảy ngày, người dùng cần biết tổng cùng kỳ tuần trước và tỷ lệ nhu cầu
+tăng/giảm; đồng thời cập nhật `.gitignore` cho các module và artifact mới của nền tảng Docker.
+
+**TDD và triển khai:** content test RED vì thiếu năm điều kiện về tổng kỳ trước, chênh lệch, chiều thay
+đổi và bảo vệ mẫu số 0. `ForecastSummary` sau đó cộng bảy `weeklyNaive`, tính chênh lệch tuyệt đối và
+phần trăm, hiển thị tăng/giảm/không đổi; khi tổng kỳ trước bằng 0 không tính phần trăm. CSS mở rộng khối
+tổng và giữ bố cục một cột trên màn hình nhỏ. `.gitignore` thêm Node modules, dist, Vite cache, log npm,
+tsbuildinfo, output.zip, PID/tmp và các thư mục dữ liệu container/MinIO/PostgreSQL/Spark cục bộ.
+`output.zip` vốn đã tracked nên chưa tự bỏ khỏi index; quy tắc ignore sẽ áp dụng sau khi file được
+untrack trong một thao tác Git được người dùng cho phép.
+
+**Kiểm tra:** frontend content test PASS `DASHBOARD_RESULT_COPY_OK`, TypeScript/Vite build PASS; image
+frontend build/recreate thành công và container healthy. Forecast live Item #1 tại 2017-06-30 hoàn tất
+7 dòng: tổng dự báo `209,051`, tổng cùng kỳ `215`, chênh `-5,949`, giảm `2,8%`. Bundle live chứa đủ
+các nhãn mới. `git check-ignore` xác nhận node_modules, dist và Maven target được bỏ qua đúng quy tắc.
+
+**Giới hạn:** so sánh dùng Weekly Naive do API hiện có, nghĩa là bảy ngày tương ứng ngay tuần trước;
+đây là mức tham chiếu lịch sử, không phải nguyên nhân của thay đổi hay confidence interval. Chưa có
+visual/keyboard QA bằng browser thật. Không sửa model, scaler, checkpoint hoặc preprocessing.
+
+**Commit đề xuất:** `feat: compare forecast total with prior week demand`.

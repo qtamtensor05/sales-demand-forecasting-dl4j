@@ -1528,3 +1528,307 @@ và benchmark chưa hoàn thành. Không sửa code, model, scaler, checkpoint h
 `git diff --check`. Không chạy thêm Maven test để tránh cạnh tranh với lượt tải/test của người dùng.
 
 **Commit đề xuất:** `docs: add big data implementation checklist`
+
+## 055 - 2026-10-13 - Làm rõ lỗi nhập đường dẫn trong PowerShell
+
+**Mục tiêu:** hướng dẫn chạy full test sau khi PowerShell báo đường dẫn repository không phải cmdlet.
+
+**Chẩn đoán:** prompt đã hiển thị terminal đang đứng tại repository và branch
+`feature/bigdata-docker-platform`. Người dùng nhập lại đường dẫn trần nên PowerShell cố thực thi đường
+dẫn đó như tên chương trình. Không có lỗi repository, Maven hay Docker được chứng minh bởi thông báo này.
+
+**Hướng dẫn:** chạy trực tiếp `mvn -B test`. Nếu terminal ở thư mục khác thì dùng
+`Set-Location 'C:\Users\quangTam\Documents\DL4j\sales-demand-forecasting-dl4j'` trước. Không sửa code
+hoặc cấu hình và không chạy test thay người dùng trong lượt hướng dẫn này.
+
+**Kiểm tra:** liên kết Markdown và `git diff --check` PASS. Kết quả test vẫn phải chờ terminal trả
+`BUILD SUCCESS` hoặc `BUILD FAILURE`.
+
+**Commit đề xuất:** `docs: clarify powershell test invocation`
+
+## 056 - 2026-10-13 - Ghi nhận full test thành công và phần triển khai còn lại
+
+**Mục tiêu:** cập nhật tiến độ sau khi người dùng hoàn tất `mvn -B test` và xác định các hạng mục còn
+thiếu để hoàn thành yêu cầu Big Data end-to-end.
+
+**Kết quả do người dùng cung cấp:** 63 test PASS, 0 failure, 0 error, 0 skip; `BUILD SUCCESS`; thời gian
+04:46; kết thúc lúc 18:09:14+07:00 ngày 2026-10-13. Đây là bằng chứng terminal do người dùng gửi, không
+phải lượt Maven do trợ lý chạy lại.
+
+**Thay đổi tài liệu:** cập nhật checklist, trạng thái hiện tại và lịch sử triển khai. Tiêu chí bảo toàn
+training/evaluation cũ chuyển sang đạt. Sửa tổng đếm từ bản checklist trước theo trạng thái thực tế trong
+bảng thành 4/12 đạt, 1/12 đạt một phần và 7/12 chưa đạt.
+
+**Phần còn lại:** Spark Silver/Gold runtime và parity; Forecast Service DL4J CPU; PostgreSQL migrations
+và Spring Boot API; React dashboard; integration/E2E; benchmark 1/2 Workers; tài liệu 03-10 và demo.
+Không sửa code/model/scaler/checkpoint và không chạy training trong yêu cầu cập nhật trạng thái này.
+
+**Kiểm tra:** liên kết Markdown và `git diff --check` PASS sau cập nhật.
+
+**Commit đề xuất:** `docs: record successful full regression suite`
+
+## 057 - 2026-10-13 - Triển khai Spark ETL và DL4J CPU Forecast Service
+
+**Mục tiêu:** tiếp tục hoàn thiện yêu cầu/checklist bằng luồng Bronze → Silver/Gold và inference thật.
+
+**Thay đổi:** thêm Spark ETL/parity jobs, quality gates cho raw/split/window counts, profile runtime và
+tài liệu 03. Thêm request validation, CPU service health/metadata/forecast, profile `cpu-service`,
+Dockerfile và tài liệu 04; Compose mount dataset/model read-only và cấp 2 GiB cho service.
+
+**Kết quả:** ETL chạy thật trên hai workers, đúng toàn bộ count và parity. Forecast container dùng
+`CpuBackend`, load đúng hash seed 123, trả đủ H1-H7 và parity 21 điểm với artifact GPU. Checklist tăng
+từ 4/12 lên 10/12 acceptance criteria đạt. Không training hoặc thay artifact.
+
+**TDD/kiểm tra:** các vòng RED/GREEN được ghi trong lịch sử; Spark package PASS 3/3; Compose config,
+health, invalid request và runtime parity PASS. Full root `mvn -B test` PASS 64/64, 0 failure/error/skip,
+`BUILD SUCCESS` trong 03:17 trên JCublasBackend/RTX 4050. Markdown links và `git diff --check` được
+kiểm tra cuối.
+
+**Giới hạn:** Spring Boot API, migrations, React dashboard, E2E và benchmark 1/2 Workers còn thiếu.
+CPU fat JAR 1,45 GB cần thu gọn Linux-only; S3A standard committer còn cảnh báo.
+
+**Commit đề xuất:** `feat: run spark etl and serve forecasts on cpu`
+
+## 058 - 2026-10-13 - Xác định bước triển khai tiếp theo
+
+**Mục tiêu và lý do:** xác định hạng mục nên thực hiện ngay sau khi Spark ETL và Forecast Service đã
+chạy thật, để tiếp tục hoàn thiện hệ thống end-to-end theo checklist thay vì tối ưu một thành phần chưa
+chặn luồng nghiệp vụ.
+
+**Kết luận:** ưu tiên Giai đoạn 5 - PostgreSQL migrations và Spring Boot Backend API. Hạng mục đầu tiên
+nên gồm schema nghiệp vụ có version, dữ liệu nền Store 1/items/model, REST DTO có validation và xử lý
+lỗi, client gọi Forecast Service có timeout, cùng integration tests cho migration/API. Sau khi API ổn
+định mới triển khai React Dashboard lấy toàn bộ dữ liệu qua API; bước này trực tiếp mở khóa tiêu chí
+nghiệm thu số 8.
+
+**Thứ tự sau đó:** hoàn thành React Dashboard và browser E2E, rồi chạy benchmark Spark lặp lại với một
+và hai Workers trên cùng input/logic/resource policy để đóng tiêu chí số 11. Việc thu gọn CPU fat JAR
+và thay S3A committer vẫn cần làm trước production nhưng không phải blocker kế tiếp của luồng MVP.
+
+**Thay đổi và kiểm tra:** chỉ cập nhật nhật ký định hướng; không sửa code, cấu hình, model, scaler,
+checkpoint hoặc artifact và không chạy training/test chức năng. Kết luận được đối chiếu với checklist
+hiện tại 10/12 tiêu chí đạt; liên kết Markdown và `git diff --check` được kiểm tra sau cập nhật.
+
+**Commit đề xuất:** `docs: record next implementation priority`
+
+## 059 - 2026-10-13 - Triển khai Spring Boot API và React Dashboard local
+
+**Mục tiêu và lý do:** tiếp tục hoàn thiện prompt/checklist bằng backend và dashboard thật, ưu tiên
+miễn phí, dễ chạy bằng Docker Compose trên máy cá nhân và không phụ thuộc tài khoản cloud.
+
+**Thay đổi:** thêm module Spring Boot Java 11 với Flyway, mười bảng kể cả `sales_records`, CSV importer,
+JDBC REST endpoints, OpenAPI, pagination, validation, global errors, forecast timeout và ingestion
+idempotency. Thay frontend bootstrap bằng React/TypeScript/Vite sáu màn hình, SVG chart và Nginx proxy
+`/api`. Thêm Dockerfile multi-stage, mount dataset read-only, tài liệu 05/06 và cập nhật kiến trúc,
+README, trạng thái/checklist. Sửa frontend healthcheck dùng `127.0.0.1` vì Alpine resolve `localhost`
+sang địa chỉ không được Nginx lắng nghe trong container.
+
+**TDD và kết quả:** validation test RED 1 failure/1 error với stub, sau đó GREEN 2/2. `npm run build`
+PASS; Compose config PASS. Runtime có 91.300 sales rows, 50 items, Flyway baseline+migration; backend,
+frontend HTTP và OpenAPI trả 200. Forecast qua frontend/API cho Item 1 origin 2017-06-30 trả
+`COMPLETED`, 7 horizon và lưu 7 rows. Item 99 trả 400; hai request ingestion cùng key trả cùng ID và
+chỉ có một row. Không chạy training hoặc thay model/scaler/checkpoint.
+
+**Giới hạn:** browser automation không khả dụng nên chưa có visual/responsive/keyboard QA. Ingest API
+mới ghi `ACCEPTED`, chưa tự submit Spark; automated PostgreSQL/API/browser E2E và benchmark 1/2 Workers
+còn thiếu. Root full suite 64/64 là bằng chứng lượt trước, không chạy lại trong lượt này.
+
+**Commit đề xuất:** `feat: add local spring api and react dashboard`
+
+## 060 - 2026-10-13 - Giải thích luồng hoạt động của hệ thống web
+
+**Mục tiêu và lý do:** giải thích ngắn gọn cách dashboard, API, Forecast Service, PostgreSQL, Spark và
+MinIO phối hợp để người dùng hiểu dữ liệu đi đâu khi xem doanh số hoặc chạy một dự báo.
+
+**Kết quả kiểm tra:** tại thời điểm giải thích, `frontend`, `backend-api`, `forecast-service` và
+`postgres` đều đang chạy healthy. Gọi `http://localhost:3000/api/health` qua reverse proxy trả
+backend/database `UP`; pipeline gần nhất trả `COMPLETED`, 91.300 raw rows, 91.300 Gold rows và
+`durationMillis=64695`. Đây là kiểm tra read-only, không tạo forecast hoặc pipeline run mới.
+
+**Nội dung hướng dẫn:** mô tả hai luồng riêng: dữ liệu offline CSV → MinIO → Spark → Gold/PostgreSQL,
+và luồng online trình duyệt → Nginx → Spring Boot → PostgreSQL hoặc DL4J Forecast Service → lưu kết
+quả → trả dashboard. Làm rõ frontend không gọi MinIO trực tiếp và việc bấm dự báo không huấn luyện lại
+mô hình.
+
+**Thay đổi và giới hạn:** không sửa code/cấu hình/hành vi hệ thống; chỉ bổ sung nhật ký hướng dẫn và
+sửa thứ tự mục lục tài liệu bị lặp số. Không chạy test chức năng vì không có thay đổi production.
+Liên kết Markdown và `git diff --check` được kiểm tra sau cập nhật.
+
+**Commit đề xuất:** `docs: explain web application flow`
+
+## 061 - 2026-10-13 - Làm Dashboard dự báo dễ hiểu cho người mới
+
+**Mục tiêu và lý do:** loại bỏ rào cản thuật ngữ H1-H7, Item và origin; giúp người dùng biết đang chọn
+sản phẩm nào, dự báo điều gì và đọc kết quả ra sao mà không cần kiến thức ML.
+
+**Thay đổi:** giao diện Dự báo có hướng dẫn ba bước; dùng “Ngày bắt đầu dự báo” và “Ngày dự báo 1-7”,
+hiển thị ngày đích, số lượng dự kiến bán, mốc tuần trước và thực tế lịch sử. Item 1-50 được đổi thành
+“Sản phẩm #N (mã ẩn danh)” kèm giải thích dataset không chứa tên hàng thật, nên không tạo tên giả.
+Thêm phần bắt đầu nhanh ở Tổng quan và giải thích trục doanh số ở Phân tích.
+
+**TDD và kết quả:** content test ban đầu RED, báo thiếu đủ sáu cụm hướng dẫn; sau triển khai PASS
+`DASHBOARD_COPY_OK`. TypeScript/Vite build PASS. Image mới build/deploy thành công, frontend healthy,
+HTTP 200; bundle live có đủ ba nhãn đại diện được kiểm tra. Không sửa backend/model/scaler/checkpoint,
+không tạo dự báo mới và không chạy training.
+
+**Giới hạn:** chưa có browser visual/responsive/keyboard QA vì công cụ browser không khả dụng trong
+phiên; xác minh hiện tại là source test, production build, container health và HTTP bundle.
+
+**Commit đề xuất:** `feat: simplify forecast dashboard language`
+## 062 - 2026-10-13 - Giải thích đơn vị và ý nghĩa con số dự báo
+
+### Mục tiêu và lý do
+
+- Làm rõ cho người dùng con số trên màn hình dự báo đại diện cho đại lượng nào, có đơn vị gì và nên đọc như thế nào.
+- Phân biệt kết quả mô hình với doanh thu, phần trăm, xác suất, lượng đặt hàng và tổng nhu cầu bảy ngày.
+
+### Kết quả kiểm tra và diễn giải
+
+- Kiểm tra chỉ đọc kết quả `COMPLETED` gần nhất của API cho `Item #47`, ngày bắt đầu dự báo `2017-06-30`.
+- Trường `prediction` là **số lượng đơn vị sản phẩm dự kiến bán trong riêng ngày đích**. Đây là nhu cầu bán hàng theo đơn vị đếm, không phải tiền hay phần trăm.
+- Ví dụ `H1` cho ngày `2017-07-01`: mô hình dự báo `32.8554`, tức khoảng **33 sản phẩm**; mốc `Weekly Naive` là `41` và số thực tế lịch sử `actual` là `29`. Như vậy mô hình dự báo cao hơn thực tế khoảng `3.8554` sản phẩm ở ngày này.
+- Kết quả có phần thập phân vì mô hình hồi quy sinh giá trị liên tục. Giao diện giữ số gốc để đánh giá; khi diễn giải nghiệp vụ có thể làm tròn thành số sản phẩm gần nhất.
+- `H1` đến `H7` là bảy ngày đích liên tiếp; mỗi giá trị thuộc một ngày, không phải tổng cộng dồn. Nếu cộng riêng bảy dự báo của kết quả này thì được khoảng `191.95`, tương đương khoảng `192` sản phẩm trong cả bảy ngày.
+- `Weekly Naive` là mốc so sánh lấy doanh số của cùng thứ tuần trước. `actual` là số bán thực tế và chỉ có sau khi ngày đích đã xảy ra; dữ liệu năm 2017 cho phép hiển thị trường này để đánh giá.
+- Dữ liệu hiện chỉ cung cấp mã `store_id` và `item_id`, không có tên thương mại/SKU, nên hệ thống chỉ có thể ghi `Item #47`. Muốn dùng thực tế cần thêm bảng ánh xạ `item_id -> tên/SKU` từ doanh nghiệp.
+- Dự báo hỗ trợ lập kế hoạch tồn kho; nó không tự động là số lượng phải đặt hàng vì quyết định đặt hàng còn phụ thuộc tồn kho hiện có, hàng đang về, tồn kho an toàn và thời gian giao hàng.
+
+### Phạm vi xác minh và giới hạn
+
+- Chỉ đọc dữ liệu live hiện có; không chạy huấn luyện, không tạo dự báo mới và không thay đổi mã nguồn/cấu hình.
+- Kết luận về đơn vị dựa trên trường doanh số dạng số lượng của pipeline hiện tại và bản ghi dự báo đã hoàn tất.
+
+### Tiêu đề commit đề xuất
+
+`docs: clarify forecast value units`
+
+## 063 - 2026-10-13 - Tối ưu màn hình kết quả dự báo cho người dùng
+
+**Mục tiêu và lý do:** làm màn hình dễ đọc nhất có thể bằng cách bỏ hướng dẫn theo bước/ví dụ, thay
+nhãn ngày kỹ thuật bằng ngày lịch cụ thể, ghi rõ ý nghĩa và đơn vị của từng con số, dùng bố cục dọc và
+bổ sung tổng nhu cầu dự báo trong tuần.
+
+**Thay đổi:** rút màn hình Dự báo còn form chọn dữ liệu và phần kết quả. Mỗi ngày hiển thị thứ/ngày/
+tháng/năm cùng ba dòng `Sản phẩm dự kiến bán`, `Số sản phẩm bán cùng ngày tuần trước` và `Số sản phẩm
+thực tế đã bán`; mỗi số được làm tròn và gắn đơn vị `sản phẩm`. Thêm khối `Tổng nhu cầu dự báo trong 7
+ngày`, tính từ tổng bảy prediction gốc. Thẻ ngày xếp hai cột trên desktop, một cột trên màn hình hẹp.
+
+**TDD và kết quả:** content test mới chạy RED đúng dự kiến với sáu nội dung thiếu và năm nội dung cũ
+cần bỏ. Sau triển khai, `npm test` PASS `DASHBOARD_RESULT_COPY_OK`; `npm run build` PASS. Docker Compose
+build/recreate frontend thành công; container healthy, HTTP 200 và bundle live chứa đủ các nhãn kết
+quả mới. Không sửa API, model, scaler, checkpoint, dữ liệu hoặc chạy huấn luyện.
+
+**Tệp ảnh hưởng:** `frontend/src/main.tsx`, `frontend/src/forecast.css`,
+`frontend/scripts/check-dashboard-copy.mjs`, output build `frontend/dist/` và tài liệu liên quan.
+
+**Giới hạn:** trình duyệt tích hợp không khả dụng nên chưa có visual/responsive/keyboard QA thực tế;
+bố cục responsive mới được xác minh ở mức source CSS và production build.
+
+**Commit đề xuất:** `feat: clarify daily forecasts and add weekly total`
+
+## 064 - 2026-10-13 - Làm rõ phạm vi dữ liệu của Data Lake
+
+**Mục tiêu và lý do:** xác định Data Lake đang chứa toàn bộ dữ liệu nguồn hay chỉ các bản ghi của Cửa
+hàng 1, đồng thời phân biệt chính xác dữ liệu ở Bronze với đầu ra Silver/Gold.
+
+**Kết quả kiểm tra:** `infrastructure/minio/init-minio.sh` sao chép nguyên file `data/train.csv` vào
+`s3a://bronze/store-1/train.csv`, không lọc dòng trước khi tải lên. File nguồn hiện có `913.001` dòng
+tính cả header, tương ứng `913.000` bản ghi của 10 cửa hàng và dung lượng `17.333.449` byte. Trong
+`Store1EtlJob.readStore1`, Spark đọc file Bronze rồi mới áp dụng `store = 1`; vì vậy Silver và Gold
+chỉ chứa `91.300` bản ghi của Cửa hàng 1, gồm 50 sản phẩm và 1.826 ngày mỗi sản phẩm.
+
+**Phát hiện giao diện:** màn hình Data Lake hiện ghi cố định `91.300` cho cả Bronze, Silver và Gold.
+Con số Silver/Gold đúng với pipeline Store 1, nhưng con số Bronze không phản ánh file vật lý đang lưu:
+Bronze thực tế có `913.000` bản ghi. Đường dẫn `bronze/store-1/train.csv` và metadata `storeId: 1` cũng
+dễ gây hiểu nhầm vì object bên trong vẫn là file nguồn của tất cả cửa hàng.
+
+**Thay đổi và kiểm tra:** không sửa code, cấu hình, dữ liệu hoặc giao diện vì yêu cầu hiện tại là câu
+hỏi làm rõ. Đối chiếu read-only file nguồn, script nạp MinIO, mã Spark ETL và tài liệu hiện hành;
+không chạy lại ETL hoặc huấn luyện.
+
+**Giới hạn:** chưa thống kê trực tiếp object qua MinIO API trong lượt này; số dòng/byte được kiểm tra
+từ đúng file local mà script init sao chép nguyên trạng. Cần một yêu cầu triển khai riêng để sửa nhãn
+Dashboard hoặc đổi Bronze thành tập Store 1 thực sự.
+
+**Commit đề xuất:** `docs: clarify bronze and store one data scope`
+
+## 065 - 2026-10-13 - Làm biểu đồ Phân tích dễ đọc và xác định giá trị
+
+**Mục tiêu và lý do:** giúp người dùng xác định rõ mỗi điểm trên biểu đồ thuộc ngày nào, có bao nhiêu
+sản phẩm đã bán và nhanh chóng nhận biết biên độ doanh số thay vì chỉ nhìn một đường không có trục.
+
+**Thay đổi:** thêm trục đứng `Số sản phẩm đã bán`, trục ngang `Ngày bán`, sáu mốc giá trị, năm mốc ngày,
+vạch lưới và điểm dữ liệu có tooltip ngày–số lượng. Bổ sung ba thẻ `Giá trị thấp nhất`, `Trung bình mỗi
+ngày`, `Giá trị cao nhất`. Biểu đồ giữ chiều rộng tối thiểu và cuộn ngang trên màn hình nhỏ. Thêm CSS
+riêng tại `frontend/src/analysis.css` và mở rộng content regression test.
+
+**TDD và kết quả:** test ban đầu RED vì thiếu tám thành phần biểu đồ yêu cầu. Sau triển khai,
+`npm test` PASS `DASHBOARD_RESULT_COPY_OK` và `npm run build` PASS. Frontend image được build riêng,
+container recreate thành công, healthy và trả HTTP 200; bundle live chứa đủ các nhãn mới. API live
+cho Sản phẩm #1 năm 2017 có 365 ngày, min `5`, trung bình `22,2`, max `50` sản phẩm.
+
+**Tệp ảnh hưởng:** `frontend/src/main.tsx`, `frontend/src/analysis.css`,
+`frontend/scripts/check-dashboard-copy.mjs`, output `frontend/dist/` và tài liệu liên quan.
+
+**Giới hạn:** chưa kiểm tra trực quan/responsive/bàn phím bằng trình duyệt thật vì browser tích hợp
+không khả dụng. Tooltip từng điểm hiện dùng SVG title cho chuột; chưa hỗ trợ focus bàn phím từng điểm.
+
+**Commit đề xuất:** `feat: add readable axes and values to sales chart`
+
+## 066 - 2026-10-13 - Bổ sung phân tích ngày, tuần, tháng và nhu cầu sản phẩm
+
+**Mục tiêu và lý do:** visual hóa lịch sử bán hàng theo nhiều mức thời gian, giúp nhận biết xu hướng,
+kỳ cao điểm và sản phẩm có nhu cầu lớn trong từng tháng bằng các phương pháp phân tích mô tả dễ đọc.
+
+**Thay đổi backend:** thêm `GET /api/analytics/monthly-demand?year=&limit=`. PostgreSQL tổng hợp tổng,
+trung bình ngày, đỉnh ngày theo sản phẩm-tháng và dùng window function xếp hạng top N trong mỗi tháng.
+Validate năm 2013-2017 và limit 1-50. Thêm `ApiControllerAnalyticsTest` cho kết quả và HTTP 400.
+
+**Thay đổi frontend:** thêm bộ chọn Theo ngày/Tuần/Tháng; tuần tính từ thứ Hai đến Chủ Nhật, tháng
+tính theo tháng lịch. Hiển thị tổng nhu cầu, trung bình theo kỳ, kỳ cao nhất, phần trăm so với kỳ trước,
+biểu đồ tương ứng và tooltip. Thêm bảng top 5 sản phẩm theo tháng với tổng, trung bình/ngày, đỉnh/ngày.
+
+**TDD và xác minh:** API test đầu tiên RED 2/2 với HTTP 404; sau triển khai focused test PASS 2/2 và
+backend full module PASS 4/4. Frontend test RED vì thiếu tám thành phần mới, sau triển khai PASS
+`DASHBOARD_RESULT_COPY_OK`; production build PASS. Backend/frontend image được build và recreate,
+cả hai container healthy. API live qua frontend trả 60 hàng cho 12 tháng; tháng 01/2017 top 5 lần lượt
+là sản phẩm #15/#18/#28/#38/#13, trong đó #15 bán 2.015 sản phẩm. Bundle live chứa đủ nhãn mới.
+
+**Tệp ảnh hưởng:** `backend-api/.../ApiController.java`, `ApiControllerAnalyticsTest.java`,
+`frontend/src/main.tsx`, `frontend/src/analysis.css`, content test, build output và tài liệu 05/06.
+
+**Giới hạn:** phân tích chỉ mô tả dữ liệu Store 1 năm 2017; không suy luận nguyên nhân, không thay thế
+dự báo và không đưa ra lượng nhập hàng. Nguồn thiếu giá, doanh thu, tồn kho, khuyến mãi, danh mục và
+tên SKU. Chưa có visual/responsive/keyboard QA bằng browser thật trong phiên.
+
+**Commit đề xuất:** `feat: add weekly monthly sales analytics and rankings`
+
+## 067 - 2026-10-13 - So sánh tổng dự báo với cùng kỳ và cập nhật gitignore
+
+**Mục tiêu và lý do:** giúp người dùng biết nhu cầu bảy ngày dự báo tăng hay giảm so với cùng bảy ngày
+tuần trước, đồng thời ngăn artifact build/runtime mới bị đưa nhầm vào Git.
+
+**Thay đổi giao diện:** `ForecastSummary` cộng tổng bảy prediction và bảy Weekly Naive, hiển thị `Tổng
+cùng kỳ tuần trước`, `Chênh lệch nhu cầu`, số sản phẩm chênh và tỷ lệ phần trăm. Trạng thái được ghi rõ
+`Nhu cầu tăng`, `Nhu cầu giảm` hoặc `Nhu cầu không đổi`. Khi tổng kỳ trước bằng 0, phần trăm là `—` và
+giao diện giải thích không thể chia cho 0. CSS mở rộng khối tổng và responsive một cột.
+
+**Thay đổi `.gitignore`:** thêm `node_modules/`, `dist/`, `.vite/`, log package manager,
+`*.tsbuildinfo`, `/output.zip`, PID/tmp và thư mục trạng thái `.docker-data`, MinIO, PostgreSQL,
+Spark event cục bộ. Không ignore source frontend, package lock, Dockerfile, docs hoặc cấu hình Compose.
+File `output.zip` đã được Git theo dõi từ trước nên quy tắc mới chỉ ngăn các lần add mới sau khi file
+được bỏ khỏi index; lượt này không tự chạy `git rm --cached` để tránh thay đổi staging ngoài yêu cầu.
+
+**TDD và kết quả:** test đầu tiên RED vì thiếu năm nội dung/điều kiện mới; sau triển khai `npm test`
+PASS và `npm run build` PASS. Frontend image build/recreate thành công, container healthy. Forecast
+live Item #1 origin `2017-06-30`: 7 dòng, tổng dự báo `209,051`, cùng kỳ `215`, chênh `-5,949`, giảm
+`2,8%`; bundle live có đủ nhãn. `git check-ignore` xác nhận frontend node_modules/dist và Maven target.
+
+**Tệp ảnh hưởng:** `.gitignore`, `frontend/src/main.tsx`, `frontend/src/forecast.css`, content test,
+frontend build output và tài liệu dự án.
+
+**Giới hạn:** cùng kỳ hiện được định nghĩa là cùng các thứ của tuần liền trước qua Weekly Naive. Đây
+là so sánh mức nhu cầu, không giải thích nguyên nhân và không thay đổi mô hình. Chưa có visual QA.
+`output.zip` vẫn đang tracked cho đến khi người dùng chủ động bỏ nó khỏi Git index.
+
+**Commit đề xuất:** `feat: compare forecast total with prior week demand`

@@ -1,0 +1,15 @@
+**
+!target/
+target/*
+!target/forecast-service.jar
+!infrastructure/
+infrastructure/*
+!infrastructure/forecast-service/
+!infrastructure/forecast-service/Dockerfile
+!infrastructure/backend-api/
+!infrastructure/backend-api/Dockerfile
+!backend-api/
+!backend-api/pom.xml
+!backend-api/src/
+!backend-api/src/**
+backend-api/target/

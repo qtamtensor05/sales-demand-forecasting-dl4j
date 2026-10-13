@@ -13,4 +13,10 @@ class Store1QualityRulesTest {
         assertThrows(IllegalStateException.class, () -> Store1QualityRules.requireExpected(
                 91_300, 50, 1, 0, 54_750, 18_300, 18_250));
     }
+
+    @Test void acceptsOnlyVerifiedWindowAndOriginCounts() {
+        assertDoesNotThrow(() -> Store1QualityRules.requireExpectedWindows(52_300, 18_000, 17_950));
+        assertThrows(IllegalStateException.class,
+                () -> Store1QualityRules.requireExpectedWindows(52_299, 18_000, 17_950));
+    }
 }

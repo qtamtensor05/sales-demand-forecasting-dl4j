@@ -499,5 +499,54 @@ Module `spark-etl` có Store 1 quality gate, focused test 1/1 PASS. Silver/Gold 
 chưa chạy, nên Giai đoạn 3 chưa hoàn thành.
 
 Checklist đối chiếu đầy đủ yêu cầu triển khai nằm tại `docs/11-implementation-checklist.md`. Tại lần
-cập nhật 2026-10-13, 3/12 tiêu chí nghiệm thu đã đạt, 3/12 đạt một phần và 6/12 chưa đạt. Đường găng
-hiện tại là Spark ETL/Parquet và preprocessing parity trước khi tích hợp Forecast Service thật.
+cập nhật sau triển khai ngày 2026-10-13, 10/12 tiêu chí nghiệm thu đã đạt và 2/12 chưa đạt. Full suite
+sau thay đổi PASS 64/64, 0 failure/error/skip, `BUILD SUCCESS` trong 03:17. Đường găng hiện tại là
+Spring Boot API/migrations, React dashboard qua API và benchmark Spark 1/2 Workers.
+
+### Spark ETL và Forecast Service thực
+
+Spark ETL đã đọc Bronze qua S3A trên hai worker, ghi Silver/Gold Snappy Parquet và fail-fast khi count
+sai. Lượt chạy cuối xác nhận 91.300 raw/Gold rows, split 54.750/18.300/18.250 và window/origin
+52.300/18.000/17.950. Runtime preprocessing parity PASS ở tolerance `1e-9`.
+
+Forecast Service bootstrap đã được thay bằng DL4J CPU service. Container load checkpoint seed 123 đúng
+SHA-256, trả health/metadata/H1-H7 và Weekly Naive. Forecast parity với artifact GPU PASS 21 điểm, max
+diff `5,07e-5` ở tolerance `1e-3`. Checklist hiện là 10/12 đạt; còn frontend qua API và benchmark thật.
+
+### Spring Boot API và React Dashboard thực
+
+Backend bootstrap đã được thay bằng Spring Boot 2.7/Java 11. Flyway tạo schema nghiệp vụ, importer nạp
+91.300 Store 1 rows vào PostgreSQL, API có OpenAPI, pagination, validation, global error handling,
+forecast timeout và ingestion idempotency. Forecast end-to-end qua API trả 7 horizon và lưu đủ 7 rows.
+
+Frontend bootstrap đã được thay bằng React 18/TypeScript/Vite với sáu màn hình; Nginx proxy `/api`
+thành công và không để browser truy cập MinIO. Checklist tăng lên 11/12; chỉ tiêu chí benchmark 1/2
+Workers còn chưa đạt. Browser automation không khả dụng nên chưa xác minh trực quan/responsive.
+
+Dashboard hiện có hướng dẫn ba bước cho người mới, đổi H1-H7 thành “Ngày dự báo 1-7”, hiển thị ngày
+đích và diễn giải prediction/Weekly Naive/Actual bằng tiếng Việt. Item được ghi rõ là mã sản phẩm ẩn
+danh vì CSV không có tên hàng; không bổ sung tên giả. Frontend image mới đang healthy và bundle HTTP
+đã được kiểm tra có đủ các nhãn hướng dẫn.
+
+Dashboard Dự báo hiện đã thay phần hướng dẫn/ví dụ bằng kết quả nghiệp vụ trực tiếp. Mỗi ngày hiển thị
+ngày lịch đầy đủ và ba dòng có đơn vị `sản phẩm`; phần đầu kết quả hiển thị tổng nhu cầu dự báo trong
+bảy ngày. Thẻ kết quả dùng hai cột trên desktop và một cột trên màn hình hẹp. Frontend container đã
+được build lại, healthy, HTTP 200 và bundle live chứa các nhãn mới; chưa có visual QA do trình duyệt
+không khả dụng trong phiên.
+
+Biểu đồ Phân tích hiện có trục ngày, trục số sản phẩm, vạch lưới, nhãn mốc và tooltip từng điểm; phía
+trên có số thấp nhất, trung bình và cao nhất của chuỗi đang xem. Với Sản phẩm #1 năm 2017, API live
+trả 365 ngày với min `5`, trung bình `22,2` và max `50` sản phẩm. Frontend mới đã được build/deploy,
+container healthy và HTTP 200; chưa có visual QA do trình duyệt tích hợp không khả dụng.
+
+Phân tích bán hàng hiện hỗ trợ tổng hợp Ngày/Tuần/Tháng, tổng nhu cầu, trung bình kỳ, kỳ cao nhất và
+thay đổi so với kỳ trước. API `/api/analytics/monthly-demand` xếp hạng top 5 trong từng tháng trên cả
+50 sản phẩm. Kiểm tra live năm 2017 trả 60 dòng cho 12 tháng; tháng 01/2017 đứng đầu là Sản phẩm #15
+với 2.015 sản phẩm. Backend/frontend đều healthy và HTTP qua proxy hoạt động. Đây là thống kê lịch sử,
+không phải forecast hoặc phân tích nhân quả; visual QA bằng trình duyệt vẫn chưa khả dụng.
+
+Khối tổng dự báo bảy ngày hiện so sánh tổng prediction với tổng Weekly Naive của cùng kỳ tuần trước,
+hiển thị chênh lệch sản phẩm và tỷ lệ tăng/giảm; trường hợp mẫu số bằng 0 được xử lý riêng. Kiểm tra
+live Item #1, origin 2017-06-30 trả tổng dự báo `209,051`, cùng kỳ `215`, chênh `-5,949`, tương đương
+nhu cầu giảm `2,8%`. Frontend container đã được build lại và healthy. `.gitignore` cũng đã bổ sung
+artifact Node/frontend, output archive, PID/tmp và thư mục trạng thái container/Data Lake cục bộ.

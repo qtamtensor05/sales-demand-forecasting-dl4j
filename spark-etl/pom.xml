@@ -29,6 +29,14 @@
         <dependency><groupId>org.apache.hadoop</groupId><artifactId>hadoop-aws</artifactId><version>3.3.4</version></dependency>
         <dependency><groupId>com.amazonaws</groupId><artifactId>aws-java-sdk-bundle</artifactId><version>1.12.262</version></dependency>
       </dependencies>
+      <build><plugins>
+        <plugin>
+          <groupId>org.codehaus.mojo</groupId><artifactId>build-helper-maven-plugin</artifactId><version>3.6.1</version>
+          <executions><execution><id>add-spark-source</id><phase>generate-sources</phase><goals><goal>add-source</goal></goals>
+            <configuration><sources><source>src/spark/java</source></sources></configuration>
+          </execution></executions>
+        </plugin>
+      </plugins></build>
     </profile>
   </profiles>
 </project>

@@ -12,26 +12,26 @@ Quy ước:
 
 | Giai đoạn | Trạng thái | Bằng chứng hiện có | Việc còn lại |
 | --- | --- | --- | --- |
-| 0. Audit repository | `[-]` | Có `00-repository-audit.md`; đã đối chiếu Java 11, Maven, DL4J/ND4J, dataset, checkpoint, scaler, schema, hash và source preprocessing/inference | Chưa chứng minh checkpoint seed 123 được nạp bằng CPU bên trong Forecast Service Docker |
-| 1. Docker infrastructure | `[x]` | Compose đã build/start; MinIO, PostgreSQL và ba bootstrap HTTP healthy; Spark Master nhận 2 Workers; network, volume, port, restart policy và resource limit đã có | Các container ứng dụng vẫn là bootstrap, chức năng thuộc các phase sau |
-| 2. MinIO Data Lake | `[-]` | Đã tạo đủ bucket/prefix; Bronze có CSV nguyên trạng và metadata; artifacts có sáu file seed 123; MinIO giữ dữ liệu sau restart | Silver/Gold mới có prefix, chưa có Parquet hoặc dữ liệu đã xử lý |
-| 3. Spark ETL | `[-]` | Cluster 1 Master + 2 Workers hoạt động; module `spark-etl` có quality gate và JUnit 1/1 PASS | Chưa có ingestion/validation/cleaning/feature/statistics/benchmark jobs; chưa chạy runtime Spark, parity test hay xuất Parquet |
-| 4. DL4J Forecast Service | `[ ]` | Checkpoint được mount read-only; bootstrap `/health` trả `UP` | Chưa restore checkpoint CPU, scaler, inference H1-H7, Weekly Naive, metadata/error handling và forecast parity |
-| 5. PostgreSQL + Spring Boot API | `[ ]` | PostgreSQL healthy và volume persistence đã được kiểm tra | Chưa có migrations, tám bảng nghiệp vụ, Spring Boot endpoints, DTO, validation, OpenAPI, pagination, timeout hoặc idempotency |
-| 6. React Dashboard | `[ ]` | Nginx bootstrap trả HTTP 200 | Chưa có React/TypeScript/Vite và năm trang nghiệp vụ; chưa lấy dữ liệu qua API |
-| 7. Integration và kiểm thử | `[-]` | Compose smoke test, persistence probe và một focused ETL unit test đã PASS | Full root `mvn -B test` hiện đang chờ tải CUDA; chưa có Spark parity, checkpoint/service, API, migration và E2E tests |
+| 0. Audit repository | `[x]` | Có `00-repository-audit.md`; đã đối chiếu source/artifact và Forecast Service Docker đã load checkpoint seed 123 bằng CPU | Không còn blocker audit cho luồng MVP |
+| 1. Docker infrastructure | `[x]` | Compose đã build/start; MinIO, PostgreSQL, Forecast, Spring Boot API và React/Nginx healthy; Spark Master nhận 2 Workers | Không còn bootstrap ứng dụng trong luồng MVP |
+| 2. MinIO Data Lake | `[x]` | Bronze nguyên trạng; Silver và Gold Snappy Parquet; artifacts seed 123; benchmark stats; persistence đã kiểm tra | S3A committer hiện còn cảnh báo FileOutputCommitter |
+| 3. Spark ETL | `[-]` | ETL chạy trên 2 workers, đúng toàn bộ count, feature và parity; có Silver/Gold/statistics | Chưa có benchmark lặp 1 Worker/2 Workers và retry orchestration riêng |
+| 4. DL4J Forecast Service | `[x]` | CPU backend load đúng hash seed 123, health/metadata/forecast H1-H7, Weekly Naive, validation lỗi và parity 21 điểm PASS | Fat JAR đa nền tảng 1,45 GB cần tối ưu Linux-only |
+| 5. PostgreSQL + Spring Boot API | `[x]` | Flyway tạo schema, nhập 91.300 sales rows; endpoint tối thiểu, OpenAPI, pagination, timeout và idempotency chạy thật | Ingest mới ghi ACCEPTED, chưa tự orchestration Spark |
+| 6. React Dashboard | `[-]` | React/TypeScript/Vite có sáu màn hình; frontend gọi API và chạy forecast thật | Chưa browser QA; biểu đồ Actual/model/baseline và metric chi tiết còn cần hoàn thiện |
+| 7. Integration và kiểm thử | `[-]` | Có unit, Compose/runtime migration, API/forecast HTTP end-to-end, Spark/forecast parity và root 64/64 | Chưa có automated PostgreSQL/API integration suite và browser E2E |
 | 8. Benchmark Big Data | `[ ]` | Chưa có benchmark runtime | Cần chạy lặp 1 Worker/2 Workers, cùng input/logic/resource policy và lưu số đo thật |
 | 9. Tài liệu bàn giao | `[-]` | Có README và tài liệu 00, 01, 02; có sơ đồ kiến trúc và bằng chứng Docker/Data Lake | Thiếu tài liệu 03-10, hướng dẫn deployment/backup/troubleshooting, testing, benchmark và demo hoàn chỉnh |
 
 ## Checklist thành phần đích
 
-- [-] Data Lake MinIO: Bronze và artifact đã có; Silver/Gold chưa có dữ liệu xử lý.
+- [x] Data Lake MinIO: Bronze, Silver/Gold Parquet, artifact và runtime stats đã có.
 - [x] Spark Standalone: một Master và hai Workers đã đăng ký `ALIVE`.
-- [ ] Spark ETL đầy đủ cho Store 1.
-- [ ] Forecast Service DL4J thực hiện inference thật.
-- [ ] Spring Boot REST API nghiệp vụ.
-- [-] PostgreSQL: hạ tầng/persistence có, schema nghiệp vụ chưa có.
-- [ ] React + TypeScript dashboard.
+- [-] Spark ETL Store 1: ingestion/validation/feature/Parquet/statistics/parity đã có; benchmark job còn thiếu.
+- [x] Forecast Service DL4J thực hiện inference CPU thật.
+- [x] Spring Boot REST API nghiệp vụ và OpenAPI.
+- [x] PostgreSQL: Flyway schema, 91.300 sales rows, model/pipeline/forecast persistence.
+- [-] React + TypeScript dashboard: chạy thật và lấy dữ liệu qua API; còn browser QA/biểu đồ nâng cao.
 - [x] Docker Compose khởi động toàn bộ topology nền tảng.
 - [-] Bộ test: mới có smoke/persistence/quality-rule test; các lớp kiểm thử bắt buộc khác còn thiếu.
 - [ ] Benchmark 1 Worker so với 2 Workers.
@@ -43,26 +43,24 @@ Quy ước:
 | ---: | --- | :---: | --- |
 | 1 | Docker Compose khởi động thành công | `[x]` | `docker compose up --build -d` exit 0; các service dài hạn đang chạy |
 | 2 | Spark Master nhận 2 Workers | `[x]` | Hai worker được Spark Master ghi nhận `ALIVE` |
-| 3 | MinIO có đủ Bronze/Silver/Gold | `[-]` | Đủ bucket/prefix; chỉ Bronze có dữ liệu thật, Silver/Gold chưa có Parquet |
-| 4 | Pipeline xử lý đúng 91.300 bản ghi | `[ ]` | Chỉ có constant/quality rule; chưa có kết quả Spark runtime |
-| 5 | Các split đúng số lượng | `[ ]` | Rule biết 54.750/18.300/18.250 nhưng chưa đo trên output ETL |
-| 6 | Forecast Service load checkpoint | `[ ]` | File được mount nhưng service chưa restore checkpoint bằng CPU |
-| 7 | Dự báo H1-H7 hoạt động | `[ ]` | Implementation gốc có artifact Test; service Docker chưa cung cấp dự báo |
-| 8 | Frontend lấy dữ liệu qua API | `[ ]` | Frontend và backend hiện chỉ là bootstrap độc lập |
-| 9 | Forecast không lệch bất thường so với model gốc | `[ ]` | Chưa có forecast parity test giữa service và implementation gốc |
+| 3 | MinIO có đủ Bronze/Silver/Gold | `[x]` | Cả ba layer có dữ liệu thật; Silver/Gold là Snappy Parquet |
+| 4 | Pipeline xử lý đúng 91.300 bản ghi | `[x]` | Spark runtime báo raw và Gold đều 91.300 |
+| 5 | Các split đúng số lượng | `[x]` | 54.750/18.300/18.250 và 52.300/18.000/17.950 đều qua fail-fast gate |
+| 6 | Forecast Service load checkpoint | `[x]` | CPU backend load seed 123 với đúng SHA-256 deployment |
+| 7 | Dự báo H1-H7 hoạt động | `[x]` | POST `/forecast` trả đủ bảy horizon và Weekly Naive |
+| 8 | Frontend lấy dữ liệu qua API | `[x]` | React gọi `/api`; Nginx proxy tới Spring Boot, health và forecast H1-H7 end-to-end PASS |
+| 9 | Forecast không lệch bất thường so với model gốc | `[x]` | 21 điểm: max CPU/GPU diff `5,07e-5` < `1e-3`; Weekly diff 0 |
 | 10 | Restart container không mất dữ liệu | `[x]` | MinIO giữ CSV và PostgreSQL giữ probe row sau restart |
 | 11 | Benchmark lưu số đo thực tế | `[ ]` | Chưa triển khai/chạy benchmark Spark 1 Worker và 2 Workers |
-| 12 | Không làm hỏng training/evaluation cũ | `[-]` | Lịch sử gần nhất có full suite 61/61 PASS trước phần Docker; lượt `mvn -B test` hiện tại chưa hoàn tất do đang tải CUDA |
+| 12 | Không làm hỏng training/evaluation cũ | `[x]` | Full suite sau thay đổi: 64/64 PASS, 0 failure/error/skip, `BUILD SUCCESS` trong 03:17 |
 
-Hiện có **3/12 tiêu chí đạt**, **3/12 đạt một phần** và **6/12 chưa đạt**. Đây là phép đếm theo
+Hiện có **11/12 tiêu chí đạt**, **0/12 đạt một phần** và **1/12 chưa đạt**. Đây là phép đếm theo
 bằng chứng chạy thực tế, không phải phần trăm khối lượng phát triển.
 
 ## Đường găng tiếp theo
 
-1. Hoàn tất Spark runtime ETL: Bronze → Silver Parquet → Gold, đo đủ count và dừng khi sai.
-2. Viết parity tests giữa Spark Gold và Java preprocessing hiện tại.
-3. Thay bootstrap Forecast Service bằng DL4J CPU inference dùng đúng checkpoint/scaler seed 123.
-4. Tạo migrations và Spring Boot API, sau đó nối React dashboard qua API.
-5. Bổ sung integration/E2E tests, benchmark 1/2 Workers và tài liệu 03-10.
+1. Chạy benchmark lặp 1/2 Workers và lưu số đo thật.
+2. Bổ sung automated API/migration và browser E2E tests; hoàn thiện biểu đồ nâng cao.
+3. Hoàn thiện tài liệu 07-10, deployment/backup/troubleshooting và demo.
 
 Không chạy lại training, không đổi model/scaler/checkpoint và không dùng Test 2017 để chọn mô hình.

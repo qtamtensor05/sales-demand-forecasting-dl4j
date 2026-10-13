@@ -156,9 +156,8 @@ services:
 
   forecast-service:
     build:
-      context: infrastructure/bootstrap-service
-      args:
-        SERVICE_NAME: forecast-service
+      context: .
+      dockerfile: infrastructure/forecast-service/Dockerfile
     restart: unless-stopped
     environment:
       SERVICE_NAME: forecast-service
@@ -167,6 +166,7 @@ services:
       - "${FORECAST_SERVICE_PORT:-8083}:8083"
     volumes:
       - ./output/runs/2026-10-13_025422_624_gpu/deployment:/opt/model:ro
+      - ./data:/opt/data:ro
     healthcheck:
       <<: *app-healthcheck
       test: [CMD, wget, -q, -O, /dev/null, http://localhost:8083/health]
@@ -174,13 +174,12 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1G
+          memory: 2G
 
   backend-api:
     build:
-      context: infrastructure/bootstrap-service
-      args:
-        SERVICE_NAME: backend-api
+      context: .
+      dockerfile: infrastructure/backend-api/Dockerfile
     restart: unless-stopped
     depends_on:
       postgres:
@@ -191,12 +190,17 @@ services:
       SERVICE_NAME: backend-api
       SERVER_PORT: 8084
       DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-sales_forecast}
+      POSTGRES_USER: ${POSTGRES_USER:-sales_app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-postgres-password}
       FORECAST_SERVICE_URL: http://forecast-service:8083
+      SALES_CSV_PATH: /opt/data/train.csv
     ports:
       - "${BACKEND_API_PORT:-8084}:8084"
     healthcheck:
       <<: *app-healthcheck
-      test: [CMD, wget, -q, -O, /dev/null, http://localhost:8084/health]
+      test: [CMD, wget, -q, -O, /dev/null, http://localhost:8084/api/health]
+    volumes:
+      - ./data:/opt/data:ro
     networks: [forecast-network]
     deploy:
       resources:
@@ -205,7 +209,7 @@ services:
 
   frontend:
     build:
-      context: infrastructure/frontend-bootstrap
+      context: frontend
     restart: unless-stopped
     depends_on:
       backend-api:
@@ -214,7 +218,7 @@ services:
       - "${FRONTEND_PORT:-3000}:80"
     healthcheck:
       <<: *app-healthcheck
-      test: [CMD, wget, -q, -O, /dev/null, http://localhost/]
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1/]
     networks: [forecast-network]
     deploy:
       resources:

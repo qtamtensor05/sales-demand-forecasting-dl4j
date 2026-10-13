@@ -1,0 +1,28 @@
+server:
+  port: ${SERVER_PORT:8084}
+spring:
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/sales_forecast}
+    username: ${POSTGRES_USER:sales_app}
+    password: ${POSTGRES_PASSWORD:change-me-postgres-password}
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+forecast:
+  service-url: ${FORECAST_SERVICE_URL:http://localhost:8083}
+  connect-timeout-ms: ${FORECAST_CONNECT_TIMEOUT_MS:2000}
+  read-timeout-ms: ${FORECAST_READ_TIMEOUT_MS:30000}
+sales:
+  csv-path: ${SALES_CSV_PATH:/opt/data/train.csv}
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html

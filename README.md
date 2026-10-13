@@ -14,19 +14,23 @@ mật khẩu mẫu, rồi kiểm tra và khởi động topology:
 
 ```powershell
 Copy-Item .env.example .env
+mvn -B -Pcpu-service -DskipTests package
 docker compose config --quiet
 docker compose up --build -d
 docker compose ps
 ```
 
 Topology gồm MinIO, PostgreSQL, Spark master + 2 workers + job runner, Forecast, Backend và Frontend.
-Ở Giai đoạn 1, ba service ứng dụng chỉ là bootstrap health endpoint; chưa phải DL4J serving, Spring Boot
-API hoặc React Dashboard hoàn chỉnh. Xem [audit](docs/00-repository-audit.md) và
+Forecast Service hiện load checkpoint seed 123 bằng ND4J CPU và cung cấp `/health`, `/metadata`,
+`/forecast`; Backend là Spring Boot/Flyway/PostgreSQL và Frontend là React/TypeScript Dashboard chạy
+chỉnh. Xem [audit](docs/00-repository-audit.md) và
 [kiến trúc](docs/01-architecture.md) trước khi chạy.
 
 Sau lần khởi động đầu, kiểm tra Spark tại `http://localhost:8080` (phải có 2 worker ALIVE), MinIO
-Console tại `http://localhost:9001`, frontend bootstrap tại `http://localhost:3000` và chi tiết ingest
-tại [Data Lake pipeline](docs/02-data-pipeline.md). Không dùng mật khẩu mẫu ngoài máy local.
+Console tại `http://localhost:9001`, React Dashboard tại `http://localhost:3000` và chi tiết ingest
+tại [Data Lake pipeline](docs/02-data-pipeline.md). Cách chạy Spark và inference nằm trong
+[Spark ETL](docs/03-spark-etl.md) và [Model serving](docs/04-model-serving.md). Không dùng mật khẩu mẫu
+ngoài máy local.
 
 ## Chức năng
 

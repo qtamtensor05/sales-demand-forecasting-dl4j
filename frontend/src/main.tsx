@@ -1,0 +1,698 @@
+import React, { useEffect, useState } from "react";
+import { createRoot } from "react-dom/client";
+import "./style.css";
+import "./forecast.css";
+import "./analysis.css";
+
+type Json = Record<string, any>;
+const get = async (url: string) => {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+};
+
+function App() {
+  const [tab, setTab] = useState("Tổng quan");
+  const [health, setHealth] = useState<Json | null>(null);
+  const [items, setItems] = useState<Json[]>([]);
+  const [pipes, setPipes] = useState<Json[]>([]);
+  const [models, setModels] = useState<Json[]>([]);
+  const [bench, setBench] = useState<Json[]>([]);
+  const [item, setItem] = useState(1);
+  const [origin, setOrigin] = useState("2017-06-30");
+  const [forecast, setForecast] = useState<Json | null>(null);
+  const [sales, setSales] = useState<Json[]>([]);
+  const [monthlyDemand, setMonthlyDemand] = useState<Json[]>([]);
+  const [period, setPeriod] = useState<"day" | "week" | "month">("month");
+  const [rankingMonth, setRankingMonth] = useState("2017-01");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const load = () =>
+    Promise.all([
+      get("/api/health").then(setHealth),
+      get("/api/items").then(setItems),
+      get("/api/pipelines").then(setPipes),
+      get("/api/models").then(setModels),
+      get("/api/benchmarks").then(setBench),
+    ]).catch((e) => setError(String(e)));
+  useEffect(() => {
+    load();
+  }, []);
+  useEffect(() => {
+    if (tab === "Phân tích")
+      Promise.all([
+        get(
+          `/api/items/${item}/sales?from=2017-01-01&to=2017-12-31&size=400`,
+        ).then((x) => setSales(x.content)),
+        get("/api/analytics/monthly-demand?year=2017&limit=5").then(
+          setMonthlyDemand,
+        ),
+      ]).catch((e) => setError(String(e)));
+  }, [tab, item]);
+  const run = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const r = await fetch("/api/forecasts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: item, originDate: origin }),
+      });
+      const x = await r.json();
+      if (!r.ok) throw new Error(x.message || "Forecast failed");
+      setForecast(x);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const tabs = [
+    "Tổng quan",
+    "Data Lake",
+    "Phân tích",
+    "Dự báo",
+    "Đánh giá",
+    "Spark Benchmark",
+  ];
+  return (
+    <div>
+      <aside>
+        <div className="brand">
+          DEMAND<span>LAB</span>
+        </div>
+        {tabs.map((x) => (
+          <button
+            className={tab === x ? "active" : ""}
+            onClick={() => setTab(x)}
+          >
+            {x}
+          </button>
+        ))}
+        <small>
+          Store 1 · Local MVP
+          <br />
+          Miễn phí · Docker Compose
+        </small>
+      </aside>
+      <main>
+        <header>
+          <div>
+            <p className="eyebrow">BIG DATA FORECASTING</p>
+            <h1>{tab}</h1>
+          </div>
+          <span className={health ? "ok" : "bad"}>
+            ● {health ? "Hệ thống hoạt động" : "Đang kết nối"}
+          </span>
+        </header>
+        {error && <div className="error">{error}</div>}
+        {tab === "Tổng quan" && (
+          <>
+            <div className="notice">
+              <strong>Bắt đầu ở đâu?</strong>
+              <span>
+                Vào mục <b>Dự báo</b>, chọn một mã sản phẩm, chọn ngày bắt đầu
+                rồi nhấn <b>Dự báo 7 ngày tiếp theo</b>.
+              </span>
+            </div>
+            <section className="cards">
+              <Card label="Bản ghi bán hàng" value="91.300" />
+              <Card
+                label="Mã sản phẩm ẩn danh"
+                value={String(items.length || 50)}
+              />
+              <Card label="Khoảng dữ liệu" value="2013—2017" />
+              <Card
+                label="Mô hình đang dùng"
+                value={models[0]?.status === "ACTIVE" ? "Đang hoạt động" : "—"}
+              />
+            </section>
+            <Panel title="Dữ liệu đi qua hệ thống như thế nào?">
+              <div className="flow">
+                CSV <b>→</b> Kho dữ liệu MinIO <b>→</b> Spark xử lý <b>→</b>{" "}
+                DL4J dự báo <b>→</b> PostgreSQL lưu kết quả <b>→</b> Dashboard
+                hiển thị
+              </div>
+            </Panel>
+          </>
+        )}
+        {tab === "Data Lake" && (
+          <>
+            <section className="cards">
+              <Card label="Bronze" value="91.300" />
+              <Card label="Silver" value="91.300" />
+              <Card label="Gold" value="91.300" />
+            </section>
+            <Panel title="Pipeline gần nhất">
+              <Table rows={pipes} />
+            </Panel>
+          </>
+        )}
+        {tab === "Phân tích" && (
+          <Panel title="Phân tích xu hướng và nhu cầu bán hàng năm 2017">
+            <div className="help">
+              Phân tích sử dụng số lượng đã bán thực tế của Cửa hàng 1. Sản phẩm
+              chỉ có mã ẩn danh vì dữ liệu nguồn không cung cấp tên hàng hóa.
+            </div>
+            <SalesAnalysis
+              item={item}
+              setItem={setItem}
+              items={items}
+              rows={sales}
+              period={period}
+              setPeriod={setPeriod}
+              monthlyDemand={monthlyDemand}
+              rankingMonth={rankingMonth}
+              setRankingMonth={setRankingMonth}
+            />
+          </Panel>
+        )}
+        {tab === "Dự báo" && (
+          <Panel title="Dự báo số sản phẩm bán trong 7 ngày">
+            <div className="form">
+              <Picker item={item} setItem={setItem} items={items} />
+              <label>
+                Ngày cuối cùng đã có doanh số
+                <input
+                  type="date"
+                  value={origin}
+                  onChange={(e) => setOrigin(e.target.value)}
+                />
+              </label>
+              <button className="primary" disabled={busy} onClick={run}>
+                {busy ? "Đang tính…" : "Xem dự báo 7 ngày"}
+              </button>
+            </div>
+            {forecast && (
+              <>
+                <ForecastSummary
+                  itemId={forecast.itemId}
+                  rows={forecast.forecasts}
+                />
+                <ForecastTable rows={forecast.forecasts} />
+              </>
+            )}
+          </Panel>
+        )}
+        {tab === "Đánh giá" && (
+          <>
+            <section className="cards">
+              <Card label="Checkpoint" value="Seed 123" />
+              <Card label="Horizon" value="7 ngày" />
+              <Card label="CPU/GPU parity" value="PASS" />
+            </section>
+            <Panel title="Model đang phục vụ">
+              <Table rows={models} />
+            </Panel>
+          </>
+        )}
+        {tab === "Spark Benchmark" && (
+          <Panel title="1 Worker so với 2 Workers">
+            {bench.length ? (
+              <Table rows={bench} />
+            ) : (
+              <div className="empty">
+                Chưa có số đo benchmark. Không hiển thị dữ liệu giả.
+              </div>
+            )}
+          </Panel>
+        )}
+      </main>
+    </div>
+  );
+}
+const Card = ({ label, value }: { label: string; value: string }) => (
+  <article className="card">
+    <span>{label}</span>
+    <strong>{value}</strong>
+  </article>
+);
+const Panel = ({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) => (
+  <section className="panel">
+    <h2>{title}</h2>
+    {children}
+  </section>
+);
+const Picker = ({
+  item,
+  setItem,
+  items,
+}: {
+  item: number;
+  setItem: (n: number) => void;
+  items: Json[];
+}) => (
+  <label>
+    Mã sản phẩm <small>Dữ liệu gốc không có tên hàng hóa</small>
+    <select value={item} onChange={(e) => setItem(+e.target.value)}>
+      {(items.length
+        ? items
+        : Array.from({ length: 50 }, (_, i) => ({ id: i + 1 }))
+      ).map((x) => (
+        <option value={x.id}>Sản phẩm #{x.id} (mã ẩn danh)</option>
+      ))}
+    </select>
+  </label>
+);
+const dateOptions: Intl.DateTimeFormatOptions = {
+  weekday: "long",
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+};
+const formatDate = (value: string) =>
+  new Date(`${value}T00:00:00`).toLocaleDateString("vi-VN", dateOptions);
+const formatUnits = (value: any) => `${Math.round(Number(value))} sản phẩm`;
+const ForecastSummary = ({
+  itemId,
+  rows,
+}: {
+  itemId: number;
+  rows: Json[];
+}) => {
+  const total = rows.reduce((sum, row) => sum + Number(row.prediction || 0), 0);
+  const previousTotal = rows.reduce(
+    (sum, row) => sum + Number(row.weeklyNaive || 0),
+    0,
+  );
+  const difference = total - previousTotal;
+  const percentage = previousTotal > 0 ? (difference / previousTotal) * 100 : null;
+  const demandDirection =
+    difference > 0
+      ? "Nhu cầu tăng"
+      : difference < 0
+        ? "Nhu cầu giảm"
+        : "Nhu cầu không đổi";
+  return (
+    <section className="forecast-total">
+      <span>Sản phẩm #{itemId}</span>
+      <div>
+        <small>Tổng nhu cầu dự báo trong 7 ngày</small>
+        <strong>{formatUnits(total)}</strong>
+      </div>
+      <div className="previous-total">
+        <small>Tổng cùng kỳ tuần trước</small>
+        <strong>{formatUnits(previousTotal)}</strong>
+      </div>
+      <div className={difference >= 0 ? "demand-up" : "demand-down"}>
+        <small>Chênh lệch nhu cầu</small>
+        <strong>
+          {demandDirection} {percentage == null ? "—" : `${Math.abs(percentage).toFixed(1)}%`}
+        </strong>
+        <span>
+          {difference >= 0 ? "+" : "−"}
+          {formatUnits(Math.abs(difference))}
+        </span>
+        {percentage == null && <em>Không tính được phần trăm vì cùng kỳ trước bằng 0.</em>}
+      </div>
+      <p>
+        {formatDate(rows[0].targetDate)} –{" "}
+        {formatDate(rows[rows.length - 1].targetDate)}
+      </p>
+    </section>
+  );
+};
+const ForecastTable = ({ rows }: { rows: Json[] }) => (
+  <div className="forecast-grid">
+    {rows.map((r) => (
+      <article key={r.horizon}>
+        <h3>{formatDate(r.targetDate)}</h3>
+        <dl>
+          <div className="forecast-main">
+            <dt>Sản phẩm dự kiến bán</dt>
+            <dd>{formatUnits(r.prediction)}</dd>
+          </div>
+          <div>
+            <dt>Số sản phẩm bán cùng ngày tuần trước</dt>
+            <dd>{formatUnits(r.weeklyNaive)}</dd>
+          </div>
+          <div>
+            <dt>Số sản phẩm thực tế đã bán</dt>
+            <dd>
+              {r.actual == null ? "Chưa có dữ liệu" : formatUnits(r.actual)}
+            </dd>
+          </div>
+        </dl>
+      </article>
+    ))}
+  </div>
+);
+const Table = ({ rows }: { rows: Json[] }) =>
+  rows.length ? (
+    <div className="table">
+      <table>
+        <thead>
+          <tr>
+            {Object.keys(rows[0]).map((k) => (
+              <th>{k}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.slice(0, 20).map((r, i) => (
+            <tr key={i}>
+              {Object.values(r).map((v, j) => (
+                <td key={j}>{v === null ? "—" : String(v)}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  ) : (
+    <div className="empty">Chưa có dữ liệu thực tế.</div>
+  );
+const localIso = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+const aggregateSales = (rows: Json[], period: "day" | "week" | "month"): Json[] => {
+  if (period === "day")
+    return rows.map((row) => ({
+      ...row,
+      label: new Date(`${row.date}T00:00:00`).toLocaleDateString("vi-VN"),
+      shortLabel: shortDate(row.date),
+    }));
+  const grouped = new Map<string, number>();
+  rows.forEach((row) => {
+    const date = new Date(`${row.date}T00:00:00`);
+    let key;
+    if (period === "month") key = row.date.slice(0, 7) + "-01";
+    else {
+      const offset = (date.getDay() + 6) % 7;
+      date.setDate(date.getDate() - offset);
+      key = localIso(date);
+    }
+    grouped.set(key, (grouped.get(key) || 0) + Number(row.sales));
+  });
+  return Array.from(grouped, ([date, sales]) => {
+    if (period === "month") {
+      const d = new Date(`${date}T00:00:00`);
+      return {
+        date,
+        sales,
+        label: `Tháng ${d.getMonth() + 1}/${d.getFullYear()}`,
+        shortLabel: `T${d.getMonth() + 1}`,
+      };
+    }
+    const start = new Date(`${date}T00:00:00`),
+      end = new Date(start);
+    end.setDate(end.getDate() + 6);
+    return {
+      date,
+      sales,
+      label: `Tuần ${shortDate(date)} – ${shortDate(localIso(end))}`,
+      shortLabel: shortDate(date),
+    };
+  });
+};
+const SalesAnalysis = ({
+  item,
+  setItem,
+  items,
+  rows,
+  period,
+  setPeriod,
+  monthlyDemand,
+  rankingMonth,
+  setRankingMonth,
+}: {
+  item: number;
+  setItem: (n: number) => void;
+  items: Json[];
+  rows: Json[];
+  period: "day" | "week" | "month";
+  setPeriod: (value: "day" | "week" | "month") => void;
+  monthlyDemand: Json[];
+  rankingMonth: string;
+  setRankingMonth: (value: string) => void;
+}) => {
+  const aggregated = aggregateSales(rows, period);
+  const values = aggregated.map((row) => Number(row.sales));
+  const total = values.reduce((sum, value) => sum + value, 0);
+  const average = values.length ? total / values.length : 0;
+  const highest = aggregated.reduce(
+    (best, row) =>
+      !best || Number(row.sales) > Number(best.sales) ? row : best,
+    null as Json | null,
+  );
+  const previous = values.length > 1 ? values[values.length - 2] : 0,
+    current = values.length ? values[values.length - 1] : 0;
+  const change = previous ? ((current - previous) / previous) * 100 : null;
+  const ranking = monthlyDemand.filter((row) => row.month === rankingMonth);
+  const periodName =
+    period === "day" ? "ngày" : period === "week" ? "tuần" : "tháng";
+  return (
+    <>
+      <div className="analysis-controls">
+        <Picker item={item} setItem={setItem} items={items} />
+        <div className="period-switch" aria-label="Chọn mức tổng hợp">
+          <button
+            className={period === "day" ? "selected" : ""}
+            onClick={() => setPeriod("day")}
+          >
+            Theo ngày
+          </button>
+          <button
+            className={period === "week" ? "selected" : ""}
+            onClick={() => setPeriod("week")}
+          >
+            Theo tuần
+          </button>
+          <button
+            className={period === "month" ? "selected" : ""}
+            onClick={() => setPeriod("month")}
+          >
+            Theo tháng
+          </button>
+        </div>
+      </div>
+      {aggregated.length ? (
+        <>
+          <section className="insight-cards">
+            <div>
+              <span>Tổng nhu cầu</span>
+              <strong>
+                {Math.round(total).toLocaleString("vi-VN")} sản phẩm
+              </strong>
+            </div>
+            <div>
+              <span>Trung bình mỗi {periodName}</span>
+              <strong>{average.toFixed(1)} sản phẩm</strong>
+            </div>
+            <div>
+              <span>
+                {periodName[0].toUpperCase() + periodName.slice(1)} có nhu cầu
+                cao nhất
+              </span>
+              <strong>{highest?.label}</strong>
+              <small>
+                {Math.round(Number(highest?.sales)).toLocaleString("vi-VN")} sản
+                phẩm
+              </small>
+            </div>
+            <div>
+              <span>So với kỳ trước</span>
+              <strong>
+                {change == null
+                  ? "Chưa đủ dữ liệu"
+                  : `${change >= 0 ? "+" : ""}${change.toFixed(1)}%`}
+              </strong>
+              <small>
+                {change == null
+                  ? ""
+                  : change >= 0
+                    ? "Nhu cầu đang tăng"
+                    : "Nhu cầu đang giảm"}
+              </small>
+            </div>
+          </section>
+          <Chart rows={aggregated} period={period} />
+        </>
+      ) : (
+        <div className="empty">Chưa có dữ liệu.</div>
+      )}
+      <section className="ranking-panel">
+        <div className="ranking-title">
+          <div>
+            <h3>Sản phẩm bán chạy theo tháng</h3>
+            <p>
+              So sánh tổng số lượng bán của 50 mã sản phẩm trong Cửa hàng 1.
+            </p>
+          </div>
+          <label>
+            Tháng
+            <select
+              value={rankingMonth}
+              onChange={(event) => setRankingMonth(event.target.value)}
+            >
+              {Array.from({ length: 12 }, (_, index) => {
+                const value = `2017-${String(index + 1).padStart(2, "0")}`;
+                return (
+                  <option key={value} value={value}>
+                    Tháng {index + 1}/2017
+                  </option>
+                );
+              })}
+            </select>
+          </label>
+        </div>
+        {ranking.length ? (
+          <div className="ranking-list">
+            {ranking.map((row) => (
+              <article key={row.itemId}>
+                <b>#{row.rank}</b>
+                <span>Sản phẩm #{row.itemId}</span>
+                <strong>
+                  {Number(row.totalSales).toLocaleString("vi-VN")} sản phẩm
+                </strong>
+                <small>
+                  TB {Number(row.averageDailySales).toFixed(1)}/ngày · Cao nhất{" "}
+                  {Number(row.peakDailySales)}/ngày
+                </small>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="empty">Chưa có dữ liệu xếp hạng tháng này.</div>
+        )}
+      </section>
+    </>
+  );
+};
+const shortDate = (value: string) =>
+  new Date(`${value}T00:00:00`).toLocaleDateString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+  });
+const formatChartPoint = (row: Json) =>
+  `${row.label || new Date(`${row.date}T00:00:00`).toLocaleDateString("vi-VN")}: ${Math.round(Number(row.sales))} sản phẩm`;
+const Chart = ({
+  rows,
+  period,
+}: {
+  rows: Json[];
+  period: "day" | "week" | "month";
+}) => {
+  if (!rows.length) return <div className="empty">Chưa có dữ liệu.</div>;
+  const vals = rows.map((x) => Number(x.sales));
+  const max = Math.max(...vals);
+  const width = 960,
+    height = 340,
+    left = 68,
+    right = 24,
+    top = 24,
+    bottom = 58,
+    plotWidth = width - left - right,
+    plotHeight = height - top - bottom,
+    axisMax = Math.max(10, Math.ceil(max / 10) * 10);
+  const x = (index: number) =>
+    left + (rows.length === 1 ? 0 : (index / (rows.length - 1)) * plotWidth);
+  const y = (value: number) =>
+    top + plotHeight - (value / axisMax) * plotHeight;
+  const points = vals
+    .map((value, index) => `${x(index)},${y(value)}`)
+    .join(" ");
+  const yTicks = Array.from({ length: 6 }, (_, index) =>
+    Math.round((axisMax * (5 - index)) / 5),
+  );
+  const xIndexes = Array.from(
+    new Set([
+      0,
+      Math.round((rows.length - 1) / 4),
+      Math.round((rows.length - 1) / 2),
+      Math.round(((rows.length - 1) * 3) / 4),
+      rows.length - 1,
+    ]),
+  );
+  const periodLabel =
+    period === "day" ? "ngày" : period === "week" ? "tuần" : "tháng";
+  return (
+    <div className="analysis-chart">
+      <div className="chart-scroll">
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          className="chart"
+          role="img"
+          aria-label={`Biểu đồ số sản phẩm đã bán theo ${periodLabel}`}
+        >
+          <text
+            className="chart-axis-title y-title"
+            x="18"
+            y={top + plotHeight / 2}
+            transform={`rotate(-90 18 ${top + plotHeight / 2})`}
+          >
+            Số sản phẩm đã bán
+          </text>
+          {yTicks.map((value) => (
+            <g key={value} className="chart-grid">
+              <line x1={left} x2={width - right} y1={y(value)} y2={y(value)} />
+              <text x={left - 10} y={y(value) + 4}>
+                {value}
+              </text>
+            </g>
+          ))}
+          <line
+            className="chart-axis"
+            x1={left}
+            x2={left}
+            y1={top}
+            y2={top + plotHeight}
+          />
+          <line
+            className="chart-axis"
+            x1={left}
+            x2={width - right}
+            y1={top + plotHeight}
+            y2={top + plotHeight}
+          />
+          {xIndexes.map((index) => (
+            <g key={index}>
+              <line
+                className="chart-tick"
+                x1={x(index)}
+                x2={x(index)}
+                y1={top + plotHeight}
+                y2={top + plotHeight + 6}
+              />
+              <text
+                className="chart-date"
+                x={x(index)}
+                y={top + plotHeight + 23}
+              >
+                {rows[index].shortLabel || shortDate(rows[index].date)}
+              </text>
+            </g>
+          ))}
+          <text
+            className="chart-axis-title"
+            x={left + plotWidth / 2}
+            y={height - 5}
+          >
+            Kỳ bán hàng ({periodLabel})
+          </text>
+          <polyline className="chart-line" points={points} />
+          {rows.map((row, index) => (
+            <circle
+              className="chart-point"
+              key={row.date}
+              cx={x(index)}
+              cy={y(Number(row.sales))}
+              r="3"
+            >
+              <title>{formatChartPoint(row)}</title>
+            </circle>
+          ))}
+        </svg>
+      </div>
+      <p className="chart-hint">
+        Rê chuột vào một điểm để xem kỳ và tổng số sản phẩm đã bán.
+      </p>
+    </div>
+  );
+};
+createRoot(document.getElementById("root")!).render(<App />);

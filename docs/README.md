@@ -7,14 +7,18 @@
 1. [Audit repository Big Data](00-repository-audit.md): bằng chứng nền tảng, artifact và blocker trước tích hợp.
 2. [Kiến trúc Big Data](01-architecture.md): topology Docker/Spark/MinIO/PostgreSQL và ranh giới từng phase.
 3. [Data Lake và pipeline](02-data-pipeline.md): Bronze ingest, artifact model, persistence và quality gate.
-4. [Checklist triển khai Big Data](11-implementation-checklist.md): trạng thái từng giai đoạn và 12 tiêu chí nghiệm thu.
-5. [Lịch sử triển khai](implementation-history.md): từng bước, nhu cầu, thay đổi và kết quả.
-6. [Trạng thái hiện tại](current-state.md): pipeline, giao diện các lớp, số liệu và giới hạn.
-7. [Nhật ký yêu cầu](change-log.md): cập nhật sau mỗi yêu cầu, bằng chứng kiểm tra và tên commit đề xuất.
-8. [Thí nghiệm Residual AR](residual-experiment.md): thiết kế, protocol, artifact và kết quả full 180 fits.
-9. [Thí nghiệm ResidualAR Huber](residual-huber-experiment.md): full 120 fits đã hoàn tất; Huber gần bằng MSE, chưa vượt Weekly.
-10. [Một store, global model nhiều items](single-store-global-experiment.md): benchmark GPU50items, checkpoint/deployment package, preflight, script GPU và lệnh full 3 seed; full 3 seed chưa chạy.
-11. [Hướng dẫn training trên máy GPU mới](gpu-training-guide.md): prerequisites, preflight, một lệnh full, artifact và audit.
+4. [Spark ETL](03-spark-etl.md): Silver/Gold Parquet, quality gate, count và runtime parity.
+5. [DL4J Forecast Service](04-model-serving.md): CPU checkpoint serving, HTTP contract và forecast parity.
+6. [PostgreSQL và Spring Boot API](05-api.md): migration, endpoint, timeout, idempotency và bằng chứng runtime.
+7. [React Dashboard](06-dashboard.md): sáu màn hình, API proxy và giới hạn browser QA.
+8. [Checklist triển khai Big Data](11-implementation-checklist.md): trạng thái từng giai đoạn và 12 tiêu chí nghiệm thu.
+9. [Lịch sử triển khai](implementation-history.md): từng bước, nhu cầu, thay đổi và kết quả.
+10. [Trạng thái hiện tại](current-state.md): pipeline, giao diện các lớp, số liệu và giới hạn.
+11. [Nhật ký yêu cầu](change-log.md): cập nhật sau mỗi yêu cầu, bằng chứng kiểm tra và tên commit đề xuất.
+12. [Thí nghiệm Residual AR](residual-experiment.md): thiết kế, protocol, artifact và kết quả full 180 fits.
+13. [Thí nghiệm ResidualAR Huber](residual-huber-experiment.md): full 120 fits đã hoàn tất; Huber gần bằng MSE, chưa vượt Weekly.
+14. [Một store, global model nhiều items](single-store-global-experiment.md): benchmark GPU50items, checkpoint/deployment package, preflight, script GPU và lệnh full 3 seed; full 3 seed chưa chạy.
+15. [Hướng dẫn training trên máy GPU mới](gpu-training-guide.md): prerequisites, preflight, một lệnh full, artifact và audit.
 
 Evaluation-only cho checkpoint GlobalResidualAR được gọi bằng
 `scripts/Invoke-GlobalTestEvaluation.ps1 -SourceRun <full-run>`. Runner tạo thư mục
