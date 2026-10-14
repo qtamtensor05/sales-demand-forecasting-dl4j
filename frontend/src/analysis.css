@@ -1,0 +1,241 @@
+.analysis-chart {
+  margin-top: 20px;
+}
+.analysis-controls {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.period-switch {
+  display: flex;
+  padding: 4px;
+  border: 1px solid #d5dfd8;
+  border-radius: 9px;
+  background: #f2f6f3;
+}
+.period-switch button {
+  padding: 9px 14px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #526158;
+  font-weight: 700;
+  cursor: pointer;
+}
+.period-switch button.selected {
+  background: #17693b;
+  color: white;
+  box-shadow: 0 2px 5px #17352026;
+}
+.insight-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin: 20px 0 12px;
+}
+.insight-cards div {
+  min-height: 100px;
+  padding: 15px 16px;
+  border: 1px solid #dce6df;
+  border-radius: 10px;
+  background: #fbfdfb;
+}
+.insight-cards span,
+.insight-cards small {
+  display: block;
+  color: #68776e;
+  font-size: 11px;
+}
+.insight-cards strong {
+  display: block;
+  margin: 9px 0 4px;
+  color: #17693b;
+  font-size: 18px;
+}
+.chart-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.chart-summary div {
+  padding: 14px 16px;
+  border: 1px solid #dce6df;
+  border-radius: 10px;
+  background: #fbfdfb;
+}
+.chart-summary span {
+  display: block;
+  margin-bottom: 7px;
+  color: #68776e;
+  font-size: 12px;
+}
+.chart-summary strong {
+  color: #17693b;
+  font-size: 20px;
+}
+.chart-scroll {
+  overflow-x: auto;
+  border: 1px solid #dce6df;
+  border-radius: 10px;
+  background: white;
+}
+.analysis-chart .chart {
+  display: block;
+  width: 100%;
+  min-width: 720px;
+  height: auto;
+  margin: 0;
+  background: white;
+}
+.chart-grid line {
+  stroke: #e5ebe7;
+  stroke-width: 1;
+}
+.chart-grid text {
+  fill: #65736b;
+  font-size: 11px;
+  text-anchor: end;
+}
+.chart-axis {
+  stroke: #53645a;
+  stroke-width: 1.5;
+}
+.chart-tick {
+  stroke: #53645a;
+}
+.chart-date {
+  fill: #526158;
+  font-size: 11px;
+  text-anchor: middle;
+}
+.chart-axis-title {
+  fill: #31473a;
+  font-size: 12px;
+  font-weight: 700;
+  text-anchor: middle;
+}
+.chart-line {
+  fill: none;
+  stroke: #21884c;
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+}
+.chart-point {
+  fill: #21884c;
+  stroke: white;
+  stroke-width: 1.5;
+  cursor: crosshair;
+}
+.chart-point:hover {
+  fill: #dd7f20;
+  r: 6;
+}
+.chart-hint {
+  margin: 10px 0 0;
+  color: #68776e;
+  font-size: 12px;
+}
+.ranking-panel {
+  margin-top: 28px;
+  padding-top: 22px;
+  border-top: 1px solid #e0e7e2;
+}
+.ranking-title {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 20px;
+}
+.ranking-title h3 {
+  margin: 0 0 5px;
+  font-size: 17px;
+}
+.ranking-title p {
+  margin: 0;
+  color: #68776e;
+  font-size: 12px;
+}
+.ranking-title select {
+  min-width: 150px;
+}
+.ranking-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+.ranking-list article {
+  display: grid;
+  grid-template-columns: 45px minmax(120px, 1fr) minmax(140px, auto) minmax(
+      210px,
+      auto
+    );
+  align-items: center;
+  gap: 12px;
+  padding: 12px 15px;
+  border: 1px solid #e0e7e2;
+  border-radius: 9px;
+  background: #fbfdfb;
+}
+.ranking-list b {
+  color: #17693b;
+  font-size: 17px;
+}
+.ranking-list strong {
+  text-align: right;
+}
+.ranking-list small {
+  color: #68776e;
+  text-align: right;
+}
+.batch-forecast-panel { margin-top: 34px; padding-top: 26px; border-top: 1px solid #dce6df; }
+.batch-forecast-heading { display: flex; align-items: end; justify-content: space-between; gap: 24px; }
+.batch-forecast-heading h3 { margin: 0 0 7px; font-size: 19px; }
+.batch-forecast-heading p { max-width: 620px; margin: 0; color: #68776e; font-size: 12px; line-height: 1.5; }
+.batch-forecast-controls { display: flex; align-items: end; gap: 10px; flex-wrap: wrap; }
+.batch-forecast-controls input { min-width: 190px; }
+.batch-forecast-range { margin: 22px 0 10px; color: #526158; font-size: 12px; }
+.batch-forecast-list { display: grid; gap: 9px; }
+.batch-forecast-list article { overflow: hidden; border: 1px solid #dce6df; border-radius: 10px; background: #fbfdfb; }
+.batch-forecast-list article.expanded { border-color: #79b68f; box-shadow: 0 3px 14px #17352012; }
+.batch-product-summary { width: 100%; display: grid; grid-template-columns: minmax(130px,1fr) repeat(3,minmax(130px,1fr)) minmax(210px,1.4fr); align-items: center; gap: 14px; border: 0; padding: 15px 17px; background: transparent; color: #243b2d; text-align: left; cursor: pointer; }
+.batch-product-summary:hover { background: #f0f7f2; }
+.batch-product-summary span,.batch-product-summary small,.batch-product-summary strong,.batch-product-summary em { display: block; }
+.batch-product-summary b { color: #17693b; font-size: 15px; }
+.batch-product-summary small { margin-bottom: 4px; color: #728078; font-size: 10px; font-style: normal; }
+.batch-product-summary strong { font-size: 13px; }
+.batch-product-summary em { margin-top: 3px; font-size: 11px; font-style: normal; }
+.batch-product-summary .demand-up strong,.batch-product-summary .demand-up em { color: #177142; }
+.batch-product-summary .demand-down strong,.batch-product-summary .demand-down em { color: #a6532c; }
+.batch-date strong { font-size: 11px; line-height: 1.45; }
+.batch-product-detail { padding: 4px 16px 18px; border-top: 1px solid #e4ebe6; background: white; }
+
+@media (max-width: 700px) {
+  .chart-summary,
+  .insight-cards {
+    grid-template-columns: 1fr;
+  }
+  .period-switch {
+    width: 100%;
+  }
+  .period-switch button {
+    flex: 1;
+  }
+  .ranking-title {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .ranking-list article {
+    grid-template-columns: 36px 1fr;
+  }
+  .ranking-list strong,
+  .ranking-list small {
+    grid-column: 2;
+    text-align: left;
+  }
+  .batch-forecast-heading,.batch-forecast-controls { align-items: stretch; flex-direction: column; }
+  .batch-product-summary { grid-template-columns: 1fr 1fr; }
+  .batch-product-summary > span:first-child,.batch-product-summary .batch-date { grid-column: 1 / -1; }
+}

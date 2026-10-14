@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "modelVersion": "global-residual-ar-store1-seed123-2026-10-13",
+  "status": "LEGACY_PATH_ACTIVE",
+  "deploymentPath": "output/runs/2026-10-13_025422_624_gpu/deployment",
+  "checkpointPath": "output/runs/2026-10-13_025422_624_gpu/deployment/model.zip",
+  "checkpointSha256": "f9d2dee2d3fcfb31ed61e08cd7b9b5f92d8ca9a7f1b0a95e5447afa477c7a482",
+  "selectionSplit": "validation-2016",
+  "selectedSeed": 123,
+  "compatibilityPolicy": "Do not move or copy the active package. Change MODEL_ARTIFACT_DIR only after loading, SHA-256 and inference parity verification."
+}

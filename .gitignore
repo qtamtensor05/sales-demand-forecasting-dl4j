@@ -6,6 +6,16 @@ target/
 !**/src/test/**/target/
 .kotlin
 
+### Node.js / frontend build ###
+node_modules/
+dist/
+.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.tsbuildinfo
+
 ### IntelliJ IDEA ###
 .idea/
 .idea/modules.xml
@@ -50,17 +60,30 @@ Desktop.ini
 !/data/.gitkeep
 /output/**
 !/output/.gitkeep
+/output.zip
 
 ### Trained models and checkpoints ###
 /models/**
 !/models/.gitkeep
 /checkpoints/
+/artifacts/**
+!/artifacts/manifests/
+!/artifacts/manifests/*.json
 
 ### Logs and JVM crash dumps ###
 *.log
 hs_err_pid*
 replay_pid*
 *.hprof
+*.pid
+*.tmp
+
+### Local containers and data-lake state ###
+/.docker-data/
+/.minio/
+/minio-data/
+/postgres-data/
+/spark-events/
 
 ### Local environment settings ###
 .env

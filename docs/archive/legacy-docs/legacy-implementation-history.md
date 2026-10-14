@@ -7,7 +7,7 @@ Số thứ tự phản ánh thứ tự triển khai, không khẳng định mỗ
 
 **Nhu cầu và lý do:** xây dựng đồ án bằng Java 11, có dependency và điểm chạy thống nhất trước khi phân tích dữ liệu.
 
-**Thành phần:** [pom.xml](../pom.xml), [Main.java](../src/main/java/com/dl4j/salesforecast/Main.java).
+**Thành phần:** [pom.xml](../../../pom.xml), [Main.java](../../../src/main/java/com/dl4j/salesforecast/Main.java).
 Maven cấu hình Java 11, DL4J/ND4J 1.0.0-M2.1, DataVec, Apache Commons CSV,
 logging, JUnit Jupiter và exec plugin. `Main` dùng đường dẫn tương đối từ thư mục gốc dự án.
 
@@ -18,7 +18,7 @@ nhưng chưa có mô hình được huấn luyện. IntelliJ mở dự án dư�
 
 **Nhu cầu và lý do:** hiểu quy mô và chất lượng dữ liệu trước khi chọn chuỗi để dự báo.
 
-**Thành phần:** [SalesDataAnalyzer.java](../src/main/java/com/dl4j/salesforecast/analysis/SalesDataAnalyzer.java).
+**Thành phần:** [SalesDataAnalyzer.java](../../../src/main/java/com/dl4j/salesforecast/analysis/SalesDataAnalyzer.java).
 Đọc CSV, tổng hợp bản ghi, ngày, cửa hàng, sản phẩm, tổng/trung bình/min/max sales.
 Bổ sung tổng sales theo cửa hàng, top 10 sản phẩm, số bản ghi/ngày sales bằng 0,
 ngày thiếu và bản ghi trùng cho từng kết hợp store + item.
@@ -68,7 +68,7 @@ giấy phép bởi LICENSE của dự án. Các file có sẵn trên máy không
 
 **Nhu cầu và lý do:** chọn store 1 + item 1 để hiểu phân phối, chu kỳ thời gian và chuẩn bị giao diện cho preprocessing.
 
-**Thành phần:** [TimeSeriesAnalyzer.java](../src/main/java/com/dl4j/salesforecast/analysis/TimeSeriesAnalyzer.java).
+**Thành phần:** [TimeSeriesAnalyzer.java](../../../src/main/java/com/dl4j/salesforecast/analysis/TimeSeriesAnalyzer.java).
 `analyze(filePath, storeId, itemId)` lọc CSV, sắp xếp ngày tăng dần;
 tính mean, median, độ lệch chuẩn tổng thể (chia N), ngày zero/thiếu/trùng;
 in trung bình theo thứ/tháng/năm và 10 bản ghi đầu/cuối.
@@ -86,7 +86,7 @@ không thiếu/trùng/khoảng trống; trạng thái `OK`.
 
 **Nhu cầu và lý do:** chuyển chuỗi đã kiểm tra thành cặp input/target, tránh normalization dùng thông tin tương lai.
 
-**Thành phần:** [SalesPreprocessor.java](../src/main/java/com/dl4j/salesforecast/preprocessing/SalesPreprocessor.java).
+**Thành phần:** [SalesPreprocessor.java](../../../src/main/java/com/dl4j/salesforecast/preprocessing/SalesPreprocessor.java).
 Nhận `TimeSeriesResult`, từ chối chuỗi không hoàn chỉnh; chia train/validation/test theo ngày;
 fit Min–Max trên train; tạo sliding window với 30 ngày input và 7 ngày target.
 Có overload cấu hình ngày chia và độ dài cửa sổ.
@@ -123,14 +123,14 @@ Sau đó lịch sử Git quan sát được có commit `133f904` cho analysis/pr
 Mỗi yêu cầu hoàn tất có mục nhật ký và tên commit đề xuất; thay đổi chức năng cập nhật trạng thái/lịch sử tương ứng.
 
 **Kết quả:** có điểm đọc tài liệu chung và quy trình áp dụng trong các phiên agent tiếp theo.
-Chi tiết kiểm tra của yêu cầu này nằm trong [nhật ký](change-log.md).
+Chi tiết kiểm tra của yêu cầu này nằm trong [nhật ký](../../project-management/change-log.md).
 Quy trình không tự commit/push và không phải Git hook.
 
 ## 10. Baseline cùng thứ tuần trước
 
 **Nhu cầu và lý do:** cần một mốc đơn giản để xác định LSTM có cải thiện so với dự báo theo tính mùa vụ hàng tuần.
 
-**Thành phần:** [WeeklyNaiveBaseline.java](../src/main/java/com/dl4j/salesforecast/evaluation/WeeklyNaiveBaseline.java).
+**Thành phần:** [WeeklyNaiveBaseline.java](../../../src/main/java/com/dl4j/salesforecast/evaluation/WeeklyNaiveBaseline.java).
 Đánh giá mỗi target bằng quan sát sales thật trước đó 7 ngày (`t - 7`), trên raw sales;
 tính MAE, RMSE theo từng horizon và toàn bộ các dự báo. `Main` chạy đánh giá trên test của preprocessing.
 
@@ -148,14 +148,14 @@ thành công, đọc đủ 913.000 dòng dataset và in kết quả theo horizon
 **Giới hạn:** mốc mới áp dụng cho store 1 + item 1; protocol là đánh giá cuốn chiếu,
 không tương đương dự báo toàn bộ 7 ngày một lần từ một origin cố định.
 
-Chi tiết hiện hành ở [trạng thái dự án](current-state.md); nhật ký yêu cầu ở [change-log.md](change-log.md).
+Chi tiết hiện hành ở [trạng thái dự án](../../project-management/current-state.md); nhật ký yêu cầu ở [change-log.md](../../project-management/change-log.md).
 
 ## 11. Tensor ND4J và LSTM dự báo trực tiếp 7 ngày
 
 **Nhu cầu và lý do:** chạy thử mô hình học sâu trên cửa sổ đã chuẩn bị, đồng thời kiểm chứng
 shape tensor, fit và suy luận với phiên bản DL4J đang dùng.
 
-**Thành phần:** [SalesLstmForecaster.java](../src/main/java/com/dl4j/salesforecast/model/SalesLstmForecaster.java).
+**Thành phần:** [SalesLstmForecaster.java](../../../src/main/java/com/dl4j/salesforecast/model/SalesLstmForecaster.java).
 Đổi batch thành features `[batch, 1, 30]`, labels `[batch, 7, 30]`, mask `[batch, 30]`.
 LSTM 32 hidden units nối `RnnOutputLayer` identity/MSE 7 units; mask chỉ bật bước cuối,
 nơi network phát vector dự báo 7 ngày.
@@ -178,7 +178,7 @@ in metric weekly naive lẫn LSTM.
 **Giới hạn:** cấu hình mô hình chỉ là điểm khởi đầu; chưa có tuning, lưu model/scaler,
 dự báo model đã nạp lại, hoặc huấn luyện nhiều chuỗi. Kết quả xấu hơn baseline cần được giữ nguyên báo cáo.
 
-Chi tiết metric và kế hoạch tiếp theo trong [trạng thái hiện tại](current-state.md).
+Chi tiết metric và kế hoạch tiếp theo trong [trạng thái hiện tại](../../project-management/current-state.md).
 
 ## 12. Tìm cấu hình LSTM bằng validation và gia cố kiểm tra
 
@@ -528,7 +528,7 @@ leakage, future mutation, mask/shape, finite rollout, checkpoint, metric, runner
 Smoke thực tế hoàn tất exit 0/BUILD SUCCESS trong 38,900 giây; run `2026-10-12_002237_861_gpu`
 ghi SUCCESS với 1 LOW (7/34), seed 42, 6 epoch, 3 best flags và 7.560 prediction. Recompute metric
 khớp CSV trong `2e-9`, reconstruction trong `2e-10`; Java 11.0.32.1/CUDA. Chi tiết và tệp thay đổi
-trong [hồ sơ residual](residual-experiment.md).
+trong [hồ sơ residual](../../05-evaluation/residual-experiment.md).
 
 **Trạng thái và giới hạn:** IMPLEMENTED / TESTED / SMOKE TESTED / FULL EXPERIMENT NOT YET RUN.
 Chưa kết luận residual vượt Weekly macro RMSE 11,1435 hoặc cải thiện MEDIUM/HIGH. Full 180 fits
@@ -586,7 +586,7 @@ reconstruction dưới `4e-15`. MSE smoke predictions khớp smoke cũ. Review c
 **Giới hạn:** IMPLEMENTED / TESTED / SMOKE TESTED / FULL EXPERIMENT NOT YET RUN.
 Smoke Huber RMSE 7,103008 và MSE 7,102983, Weekly 6,870861; không kết luận từ một LOW/seed.
 Full 120 fits ước khoảng 2:11 giờ từ run trước 3:16:03; chưa có kết luận MEDIUM/HIGH, horizon xa
-hoặc seed stability. Chi tiết/tệp/lệnh tại [hồ sơ Huber](residual-huber-experiment.md).
+hoặc seed stability. Chi tiết/tệp/lệnh tại [hồ sơ Huber](../../05-evaluation/residual-huber-experiment.md).
 Không test selection năm 2017, không log1p, không commit/push.
 
 **Commit đề xuất:** `feat: add Huber loss experiment for residual LSTM`
@@ -612,7 +612,7 @@ cả hai dừng sớm 60/60; chỉ một cặp có best epoch khác. Kiểm tra 
 
 **Tệp cập nhật:** README.md, docs/README.md, docs/current-state.md,
 docs/residual-huber-experiment.md, docs/implementation-history.md, docs/change-log.md.
-Chi tiết bảng macro/stratum/horizon/seed trong [hồ sơ Huber](residual-huber-experiment.md).
+Chi tiết bảng macro/stratum/horizon/seed trong [hồ sơ Huber](../../05-evaluation/residual-huber-experiment.md).
 Không sửa code, dependency, dữ liệu hoặc artifact; không commit/push.
 
 **Giới hạn và hướng tiếp:** FULL EXPERIMENT COMPLETED nhưng Huber delta 1 chưa có lợi thế.
@@ -638,7 +638,7 @@ reuse immutable run lifecycle; không thay schema/behavior legacy.
 GlobalExperimentRunner/Report, GlobalArtifactExporter và GlobalStoreTest. Sửa Main,
 ExperimentConfiguration, TimeSeriesAnalyzer (panel reader), AR (visibility helper causal),
 RunArtifactSession; cập nhật README/docs index/current-state/history/change-log và
-[single-store-global-experiment.md](single-store-global-experiment.md).
+[global-model-results.md](../../05-evaluation/global-model-results.md).
 
 **Kiểm chứng:** TDD RED 2 failures/0 errors vì thiếu global CLI/dataset; preprocessing 3/3,
 focused 6/6; sau thêm full-panel fixture, suite 46/46, không failures/errors/skips, exit0,
@@ -686,7 +686,7 @@ không diễn giải validationtotal2,01× là inferencekernel2×. AFTERmean8,77
 150epochước21,93giờ, biến thiên tốc độ hai epoch cho15,1–28,75giờ; earlystop chưa biết.
 Cache thêm một snapshotCPU, không cacheGPU/alltraintensors. RunbaselineđầuFAILED do class
 mismatch giữ làm evidence, không dùng vào phép so sánh. Chưa full5seeds/testselection2017.
-Automation10phút đã dừng theo yêu cầu. Chi tiết tại [hồ sơ global](single-store-global-experiment.md).
+Automation10phút đã dừng theo yêu cầu. Chi tiết tại [hồ sơ global](../../05-evaluation/global-model-results.md).
 
 **Tệp:** profile/fingerprint/tests/oracle mới; configuration/globalrunner/forecaster/report,
 panel reader/preprocessor overload, artifactexport/session/Main; scripts audit và Invoke-GlobalRun;
@@ -793,3 +793,347 @@ BUILD SUCCESS 1:59. Không chạy lại Test 2017. Partial FAILED manifest đư�
 không xóa; thư mục output chuẩn đã sẵn sàng cho command kế tiếp.
 
 **Commit đề xuất:** `fix: distinguish HIGH tier from horizon labels`.
+
+## 36. Audit và dựng nền Docker cho hệ thống Big Data
+
+**Nhu cầu và lý do:** kiểm tra repository/artifact thật trước khi tích hợp, sau đó tạo topology MinIO,
+PostgreSQL, Spark Standalone hai worker và ba điểm triển khai ứng dụng trên Windows 11 + Docker Desktop.
+
+**Triển khai:** thêm audit có đường dẫn dữ liệu/checkpoint/scaler, hash và ranh giới kiểm chứng; thêm
+`compose.yaml`, `.env.example`, init MinIO, named volumes, network chung, healthcheck, restart policy và
+resource limit. MinIO tạo năm bucket `bronze`, `silver`, `gold`, `artifacts`, `benchmarks` cùng các prefix
+Store 1/model. Spark gồm một master, hai worker 1 core/1 GiB và một submit client. Forecast/API dùng
+Java 11 health server tối thiểu; frontend dùng trang Nginx tối thiểu để chỉ kiểm tra orchestration.
+
+**Quyết định:** các bootstrap endpoint không được xem là Forecast Service, Spring Boot API hay React
+Dashboard đã hoàn thành. Artifact deployment được mount read-only; không huấn luyện lại, không thay
+scaler/checkpoint, không thay feature/split/tensor. Gold về sau do Spark xuất Parquet, còn Java giữ
+tensorization để giảm nguy cơ lệch công thức hiện hữu.
+
+**Kiểm tra:** `docker compose --env-file .env.example config --quiet` PASS; bootstrap Java biên dịch
+bằng JDK 11 PASS. Docker CLI và Compose có mặt nhưng Linux engine chưa chạy, nên image build/pull,
+container health, hai worker đăng ký, volume persistence và CPU checkpoint restore chưa được xác minh.
+
+**Commit đề xuất:** `feat: add audited big data docker foundation`.
+
+## 37. Chạy thật Docker foundation và khởi tạo Data Lake
+
+**Nhu cầu:** sau khi Docker Desktop được bật, kiểm chứng cấu hình Giai đoạn 1 và tiếp tục Giai đoạn 2
+thay vì chỉ dựa trên parse tĩnh.
+
+**Triển khai:** sửa image không còn pull được sang Bitnami legacy MinIO/Client và Spark 3.5.9 Java 11.
+MinIO init ingest bản CSV cục bộ vào Bronze, sinh metadata và mirror deployment package seed 123 vào
+artifact bucket. Thêm module `spark-etl` cùng quality gate Store 1 và focused JUnit theo TDD.
+
+**Kết quả thực tế:** 10 service khởi động; MinIO/PostgreSQL/Forecast/Backend/Frontend healthy. Spark
+Master nhận đúng hai worker ALIVE, mỗi worker 1 core/1 GiB. Bronze có CSV 16 MiB và metadata; artifact
+prefix có đủ sáu file deployment. Restart MinIO/PostgreSQL không làm mất object/probe row.
+
+**Giới hạn:** application service vẫn là bootstrap. Spark ETL runtime chưa build/chạy; chưa có
+Silver/Gold Parquet hoặc preprocessing parity. Quality gate chỉ là code/test cho bước fail-fast kế tiếp.
+
+**Commit đề xuất:** `feat: verify docker stack and bootstrap data lake`.
+
+## 38. Đối chiếu checklist triển khai tổng thể
+
+**Nhu cầu:** trong lúc Maven tải phụ thuộc CUDA cho full test, đối chiếu yêu cầu gốc với code, artifact
+và container đang chạy để xác định chính xác hệ thống đã tới đâu.
+
+**Kết quả:** tạo checklist riêng theo chín giai đoạn, các thành phần đích và 12 tiêu chí nghiệm thu.
+Không xem health endpoint bootstrap là Forecast Service/API/React đã hoàn thành; không xem prefix rỗng
+là Silver/Gold đã được xử lý; không xem constant trong quality rule là kết quả Spark runtime.
+
+**Trạng thái:** Docker topology và Spark cluster đã chạy; Bronze/artifact/persistence đã có bằng chứng.
+Luồng Spark Silver/Gold, DL4J serving, schema/API, dashboard, parity/E2E và benchmark còn phải triển khai.
+Tổng hợp hiện tại là 3 tiêu chí đạt, 3 đạt một phần và 6 chưa đạt.
+
+**Commit đề xuất:** `docs: add big data implementation checklist`.
+
+## 39. Xác nhận full regression suite và cập nhật đường găng
+
+**Bằng chứng người dùng cung cấp:** `mvn -B test` kết thúc lúc 18:09:14 ngày 2026-10-13 với 63 test,
+0 failure, 0 error, 0 skip, `BUILD SUCCESS`, tổng thời gian 04:46.
+
+**Kết luận:** dependency CUDA đã tải đủ cho lượt test và các lệnh gốc hiện không có hồi quy được bộ test
+phát hiện. Tiêu chí nghiệm thu 12 chuyển sang đạt. Đồng thời sửa phép đếm checklist trước đó theo chính
+các trạng thái trong bảng: hiện là 4 đạt, 1 đạt một phần và 7 chưa đạt.
+
+**Việc tiếp theo:** hoàn thành Spark runtime ETL và parity trước; sau đó mới triển khai Forecast Service
+CPU, migrations/Spring Boot API, React dashboard, integration/E2E, benchmark và tài liệu bàn giao.
+
+**Commit đề xuất:** `docs: record successful full regression suite`.
+
+## 40. Chạy Spark Silver/Gold và phục vụ checkpoint trên CPU
+
+**Triển khai:** thêm Spark Java ETL đọc Bronze S3A, quality/window gates, train-only scaler, sáu feature
+causal, 50 identity channels, Silver/Gold Parquet, runtime stats và parity job. Thay Forecast bootstrap
+bằng HTTP service dùng nguyên GlobalResidualAR, deployment scaler/checkpoint seed 123 và ND4J CPU.
+
+**TDD:** feature contract, window counts và request validation đều có RED do chưa triển khai, sau đó
+GREEN. Spark runtime build PASS 3/3 test. ETL lần đầu fail vì executor không thấy mount local; sửa sang
+Bronze S3A rồi chạy thành công trên đúng hai executor.
+
+**Bằng chứng:** đúng 91.300 rows, 50 items, ba split và 52.300/18.000/17.950 counts; Spark parity 12
+rows PASS `1e-9`. Forecast Service healthy, đúng model hash, trả H1-H7; parity 21 điểm với GPU artifact
+có max diff `5,07e-5`, Weekly diff 0. Không train lại hoặc đổi checkpoint/scaler.
+
+**Giới hạn:** chưa có Spring Boot API/React/E2E/benchmark 1-vs-2. CPU fat JAR 1,45 GB và S3A standard
+committer cần tối ưu trước production.
+
+**Commit đề xuất:** `feat: run spark etl and serve forecasts on cpu`.
+
+## 41. Triển khai Spring Boot API và React Dashboard miễn phí
+
+**Nhu cầu:** thay hai bootstrap còn lại bằng luồng ứng dụng dễ chạy local, không cần cloud hoặc dịch vụ
+trả phí, đồng thời nối PostgreSQL → REST API → Dashboard với Forecast Service hiện có.
+
+**TDD và triển khai:** test validation forecast chạy RED với 1 failure/1 error do implementation stub,
+sau đó GREEN 2/2. Thêm module Spring Boot Java 11, Flyway schema, CSV importer, JDBC endpoints,
+OpenAPI, timeout/idempotency và persistence dự báo. Thêm React/TypeScript/Vite dashboard sáu màn hình,
+SVG chart và Nginx `/api` proxy; Dockerfiles multi-stage thay bootstrap trong Compose.
+
+**Bằng chứng runtime:** backend/frontend healthy; migration chạy trên PostgreSQL volume cũ; database có
+91.300 sales rows. OpenAPI/frontend HTTP 200, frontend proxy trả database UP. Forecast Item 1 origin
+2017-06-30 trả COMPLETED/7 horizon và lưu 7 rows. Item 99 trả 400; hai ingestion request cùng key chỉ
+tạo một row. `npm run build`, backend 2/2 test và Compose config PASS.
+
+**Giới hạn:** chưa có browser visual QA do công cụ browser không khả dụng; ingest endpoint mới ghi
+ACCEPTED, chưa chạy Spark tự động; benchmark 1/2 Workers và automated API/PostgreSQL/browser E2E còn
+thiếu. Không thay model, scaler, checkpoint, split hoặc artifact và không chạy training.
+
+**Commit đề xuất:** `feat: add local spring api and react dashboard`.
+
+## 42. Đơn giản hóa thuật ngữ dự báo trên Dashboard
+
+**Nhu cầu:** người dùng không hiểu H1-H7, Item, origin và các cột prediction/baseline/actual nên cần
+giao diện tự giải thích, không đòi hỏi kiến thức ML.
+
+**Triển khai:** thêm hướng dẫn ba bước, đổi origin thành “Ngày bắt đầu dự báo”, đổi H1-H7 thành bảy
+thẻ “Ngày dự báo 1-7” có ngày cụ thể và số lượng dự kiến bán. Diễn giải Weekly Naive là mốc cùng thứ
+tuần trước và Actual là thực tế lịch sử. Mọi Item hiển thị “Sản phẩm #N (mã ẩn danh)” vì source CSV
+không có tên hàng hóa; không tự bịa tên. Tổng quan và phân tích cũng dùng ngôn ngữ nghiệp vụ.
+
+**TDD/kiểm tra:** `npm test` ban đầu RED do thiếu sáu cụm giải thích, sau thay đổi PASS
+`DASHBOARD_COPY_OK`. `npm run build` PASS; Docker image build/deploy PASS; frontend healthy, HTTP 200
+và JavaScript bundle live chứa các nhãn mới. Không thay API, dữ liệu, model hoặc công thức dự báo.
+
+**Giới hạn:** công cụ browser vẫn không khả dụng nên chưa có visual/responsive/keyboard QA thực tế.
+
+**Commit đề xuất:** `feat: simplify forecast dashboard language`.
+
+## 43. Tập trung Dashboard vào giá trị dự báo theo ngày và tổng tuần
+
+**Nhu cầu:** bỏ nội dung hướng dẫn theo bước và ví dụ; thay tên ngày kỹ thuật bằng ngày cụ thể trong
+lịch, ghi rõ mỗi giá trị đo số sản phẩm nào và tận dụng diện tích theo bố cục dọc. Đồng thời bổ sung
+tổng nhu cầu dự báo của cả bảy ngày.
+
+**TDD và triển khai:** cập nhật content regression test để yêu cầu tổng tuần, ngày định dạng tiếng Việt,
+ba nhãn giá trị có đơn vị và cấm các cụm `Bước 1-3`, `Ví dụ` cùng `Ngày dự báo {horizon}`. Test RED với
+sáu nội dung thiếu và năm nội dung cũ còn tồn tại. Sau đó màn hình được rút gọn thành form và kết quả;
+mỗi ngày là một thẻ dọc, hai cột trên desktop/một cột trên màn hình hẹp. Tổng tuần được cộng từ bảy
+prediction gốc và chỉ làm tròn khi hiển thị.
+
+**Kiểm tra:** `npm test` PASS `DASHBOARD_RESULT_COPY_OK`; `npm run build` PASS. Docker Compose build và
+recreate frontend thành công; container healthy, HTTP 200 và JavaScript bundle live chứa đủ ba nhãn
+kết quả mới. Không sửa backend, model, scaler, checkpoint, split hoặc dữ liệu huấn luyện.
+
+**Giới hạn:** môi trường không có browser khả dụng nên chưa xác minh trực quan, responsive hoặc bàn
+phím trên trình duyệt thật; responsive hiện được kiểm tra ở mức CSS/build.
+
+**Commit đề xuất:** `feat: clarify daily forecasts and add weekly total`.
+
+## 44. Bổ sung trục và giá trị tương tác cho biểu đồ phân tích
+
+**Nhu cầu:** biểu đồ đường cũ chỉ vẽ đường doanh số, không có trục hoặc giá trị nên người dùng không
+xác định được một điểm nằm ở ngày nào và có bao nhiêu sản phẩm.
+
+**TDD và triển khai:** content regression test được mở rộng để yêu cầu nhãn hai trục, ba thống kê,
+grid/axis và tooltip điểm dữ liệu; test RED vì thiếu toàn bộ tám thành phần. Sau đó Chart được bổ sung
+trục `Số sản phẩm đã bán` và `Ngày bán`, sáu mốc Y, năm mốc X, đường lưới, điểm hover có ngày–giá trị
+chính xác, cùng ba thẻ min/average/max. CSS riêng giữ biểu đồ đủ rộng và cho phép cuộn trên màn hình nhỏ.
+
+**Kiểm tra:** `npm test` PASS `DASHBOARD_RESULT_COPY_OK`; `npm run build` PASS. Chỉ image frontend được
+build và recreate; container healthy, HTTP 200 và bundle live có đủ sáu nhãn đại diện. API live cho
+Sản phẩm #1 trả 365 dòng, min `5`, average `22,2`, max `50`. Không sửa backend, dữ liệu hoặc mô hình.
+
+**Giới hạn:** chưa có visual/responsive/keyboard QA bằng trình duyệt thật vì browser tích hợp không
+khả dụng; tooltip SVG hiện phục vụ thao tác chuột, chưa bổ sung cơ chế focus riêng cho từng điểm.
+
+**Commit đề xuất:** `feat: add readable axes and values to sales chart`.
+
+## 45. Phân tích doanh số theo ngày, tuần, tháng và xếp hạng sản phẩm
+
+**Nhu cầu:** giúp người dùng quan sát xu hướng ở nhiều độ phân giải, nhận ra kỳ nhu cầu cao và biết
+sản phẩm nào bán nhiều trong từng tháng thay vì chỉ xem một chuỗi ngày của một sản phẩm.
+
+**TDD và triển khai:** API test ban đầu RED 2/2 vì endpoint chưa tồn tại. Thêm endpoint PostgreSQL dùng
+monthly aggregation và window ranking, kiểm tra year/limit. Frontend content test tiếp tục RED vì thiếu
+bộ chọn Ngày/Tuần/Tháng, tổng nhu cầu, biến động kỳ và ranking. Dashboard sau đó tổng hợp tuần theo
+thứ Hai-Chủ Nhật, tổng hợp tháng, tính total/average/peak/period-over-period và hiển thị top 5 sản phẩm
+theo tháng cùng average/day và peak/day.
+
+**Kiểm tra:** backend focused test GREEN 2/2 và full module PASS 4/4; frontend content test PASS,
+TypeScript/Vite build PASS. Hai image được build/recreate; backend và frontend healthy. API live trả
+60 hàng cho top 5 của 12 tháng; tháng 01/2017 top 1 là Sản phẩm #15 với 2.015 sản phẩm. Bundle live có
+đủ nhãn ba chế độ và các chỉ số. Không sửa mô hình, preprocessing, split, scaler hoặc checkpoint.
+
+**Giới hạn:** đây là descriptive/temporal analysis trên lịch sử Store 1 năm 2017, không phải causal
+analysis, demand forecast hoặc quyết định nhập kho. Chưa có drill-down nhiều năm, giá/doanh thu, tồn
+kho, khuyến mãi hay tên SKU vì nguồn không cung cấp. Chưa có visual/keyboard QA trên browser thật.
+
+**Commit đề xuất:** `feat: add weekly monthly sales analytics and rankings`.
+
+## 46. So sánh tổng dự báo với cùng kỳ và hoàn thiện ignore rules
+
+**Nhu cầu:** ngoài tổng dự báo bảy ngày, người dùng cần biết tổng cùng kỳ tuần trước và tỷ lệ nhu cầu
+tăng/giảm; đồng thời cập nhật `.gitignore` cho các module và artifact mới của nền tảng Docker.
+
+**TDD và triển khai:** content test RED vì thiếu năm điều kiện về tổng kỳ trước, chênh lệch, chiều thay
+đổi và bảo vệ mẫu số 0. `ForecastSummary` sau đó cộng bảy `weeklyNaive`, tính chênh lệch tuyệt đối và
+phần trăm, hiển thị tăng/giảm/không đổi; khi tổng kỳ trước bằng 0 không tính phần trăm. CSS mở rộng khối
+tổng và giữ bố cục một cột trên màn hình nhỏ. `.gitignore` thêm Node modules, dist, Vite cache, log npm,
+tsbuildinfo, output.zip, PID/tmp và các thư mục dữ liệu container/MinIO/PostgreSQL/Spark cục bộ.
+`output.zip` vốn đã tracked nên chưa tự bỏ khỏi index; quy tắc ignore sẽ áp dụng sau khi file được
+untrack trong một thao tác Git được người dùng cho phép.
+
+**Kiểm tra:** frontend content test PASS `DASHBOARD_RESULT_COPY_OK`, TypeScript/Vite build PASS; image
+frontend build/recreate thành công và container healthy. Forecast live Item #1 tại 2017-06-30 hoàn tất
+7 dòng: tổng dự báo `209,051`, tổng cùng kỳ `215`, chênh `-5,949`, giảm `2,8%`. Bundle live chứa đủ
+các nhãn mới. `git check-ignore` xác nhận node_modules, dist và Maven target được bỏ qua đúng quy tắc.
+
+**Giới hạn:** so sánh dùng Weekly Naive do API hiện có, nghĩa là bảy ngày tương ứng ngay tuần trước;
+đây là mức tham chiếu lịch sử, không phải nguyên nhân của thay đổi hay confidence interval. Chưa có
+visual/keyboard QA bằng browser thật. Không sửa model, scaler, checkpoint hoặc preprocessing.
+
+**Commit đề xuất:** `feat: compare forecast total with prior week demand`.
+
+## 47. Hoàn thiện luồng upload CSV qua MinIO, Spark và PostgreSQL
+
+**Nhu cầu:** bổ sung màn hình tải CSV, kiểm tra dữ liệu, checksum chống xử lý trùng, tự gọi Spark,
+theo dõi bốn trạng thái, chỉ publish PostgreSQL sau thành công, hỗ trợ retry và tuyệt đối không tự
+huấn luyện lại model.
+
+**TDD:** `SalesUploadValidatorTest` ban đầu RED do lớp validator chưa tồn tại. Sau triển khai, backend
+PASS 11/11 test, gồm schema/file rỗng/ngày sai/sales âm/bản ghi trùng, phạm vi Store 1/item 1-50,
+checksum idempotency, Spark lỗi
+không publish và retry chỉ dành cho run thất bại. Spark module PASS 3/3; frontend content test và
+TypeScript/Vite build PASS.
+
+**Triển khai:** Flyway V2 bổ sung checksum, filename, error, attempt và index; Spring Boot nhận multipart,
+lưu Bronze bằng MinIO SDK, chạy worker tuần tự và `spark-submit` job run-scoped. Job ghi Silver/Gold
+Parquet cùng statistics; repository publish sales bằng transaction chỉ sau Spark exit `0`. Dashboard
+có màn hình nhập liệu, polling hai giây, trạng thái tiếng Việt, lỗi và retry. Docker backend đóng gói
+Spark CLI cùng ETL JAR; model serving và training không bị gọi hoặc thay đổi.
+
+**Bằng chứng runtime:** build hai image thành công, backend/frontend healthy. File mẫu 4 dòng tạo run
+`4`, đi qua `ACCEPTED/RUNNING/COMPLETED`, attempts `1`, raw/gold `4/4`; MinIO có object Bronze,
+Silver/Gold `_SUCCESS` + Parquet và statistics `_SUCCESS` + JSON. PostgreSQL tăng từ 91.300 lên 91.304
+dòng, max date `2018-01-02`. Upload lại cùng byte trả `duplicate=true`, ID vẫn `4`, không chạy lại.
+
+**Giới hạn:** chưa có browser visual/keyboard QA do Chrome/IAB không khả dụng; chưa có lease/recovery
+tự động khi backend chết giữa job và chưa benchmark 1/2 Workers. CSV tối đa 50 MB được parse trong
+bộ nhớ. Không chạy training, không đổi model/scaler/checkpoint hoặc split lịch sử.
+
+**Commit đề xuất:** `feat: complete csv ingestion pipeline`
+
+## 48. Theo dõi tiến độ ingestion theo từng công đoạn
+
+**Nhu cầu:** người dùng cần biết file đang xử lý đến đâu, bao nhiêu bản ghi đã hoàn thành, thời gian và
+tốc độ thay vì chỉ thấy một trạng thái Spark tổng quát.
+
+**TDD:** thêm kiểm tra parser marker tiến độ và các nhãn/chỉ số Dashboard trước khi triển khai. RED đúng
+do `SparkSubmitter.Progress`, `parseProgress` và nội dung giao diện chưa tồn tại. Sau triển khai, focused
+backend PASS 5/5, full backend PASS 13/13, Spark PASS 3/3, frontend content test và build đều PASS.
+
+**Triển khai:** Flyway V3 thêm stage event bền vững theo run/attempt. Spark job phát marker thật sau đọc
+và quality gate, ghi Silver và ghi Gold; backend đọc stdout đồng thời, lưu counters/timestamp và không
+làm mất timeout. API run trả timeline cùng raw/gold/duration. Dashboard hiển thị bảy bước, phần trăm,
+thời gian, số dòng, throughput và trạng thái chờ/đang chạy/hoàn thành/thất bại; responsive một cột trên
+màn hình hẹp.
+
+**Runtime:** build và recreate backend/frontend thành công, hai container healthy, HTTP Dashboard 200.
+Run `5` đi qua đủ bảy stage, hoàn thành 3/3 raw/gold rows trong `29.731 ms`; API giữa chừng đã trả
+`SPARK_READ/RUNNING`, cuối cùng trả `REFRESH_DASHBOARD/COMPLETED` và đầy đủ timestamp từng bước.
+
+**Giới hạn:** IAB không khả dụng nên chưa có visual/keyboard QA bằng trình duyệt. Timeline chi tiết chỉ
+hiện cho upload đang giữ trong phiên; chưa có nút mở lại một pipeline lịch sử. Tốc độ là trung bình từ
+row counter và elapsed/duration, không phải CPU/network throughput tức thời.
+
+**Commit đề xuất:** `feat: add live ingestion progress tracking`
+
+## 49. Dọn ba ingestion run mẫu khỏi PostgreSQL
+
+**Nhu cầu:** sau khi kiểm tra upload và timeline, loại dữ liệu của ba file mẫu khỏi database để dữ
+liệu ứng dụng trở lại đúng tập nền trước năm 2018.
+
+**Đối chiếu trước khi xóa:** ingestion run `4`, `5`, `6` lần lượt khớp
+`ingestion-sample.csv` (4 dòng), `ingestion-progress-smoke.csv` (3 dòng) và
+`ingestion-upload-sample.csv` (21 dòng); pipeline tương ứng là `2`, `3`, `4`. Tổng đúng 28 sales rows
+từ 2018-01-01 đến 2018-01-10 và không có forecast request nào dùng origin trong khoảng này.
+
+**Thực hiện và kết quả:** một PostgreSQL transaction đã xóa 28 sales rows, ba pipeline rows và ba
+ingestion rows; 14 stage events được xóa theo foreign-key cascade. Kiểm tra sau commit trả 0 run,
+0 pipeline, 0 stage và 0 sales row mẫu. Database còn 91.300 sales rows, ngày lớn nhất 2017-12-31;
+API pipeline không còn hiển thị run `4-6`.
+
+**Giới hạn:** chỉ PostgreSQL được dọn. CSV trong `examples/` và object Bronze/Silver/Gold/statistics
+trên MinIO vẫn được giữ; thao tác không có bản sao lưu riêng nên dữ liệu DB đã xóa chỉ có thể phục hồi
+bằng cách upload/chạy lại các file mẫu hoặc khôi phục backup volume. Không sửa code hay model.
+
+**Commit đề xuất:** `docs: record sample ingestion database cleanup`
+
+## 50. Dự báo một lượt cho toàn bộ 50 sản phẩm
+
+**Nhu cầu:** chọn ngày một lần để nhận danh sách 50 sản phẩm, có tổng dự báo, cùng kỳ, chênh lệch,
+khoảng ngày và chi tiết bảy ngày khi bấm vào từng sản phẩm.
+
+**TDD và triển khai:** backend và frontend test ban đầu RED vì batch API/UI chưa tồn tại. Forecast
+Service thêm `/forecast/batch` để evaluate 50 mẫu một lượt. Spring Boot thêm
+`POST /api/forecasts/batch`, kiểm tra đủ 50 kết quả và ghi 50 request/350 result trong một transaction.
+Trang Phân tích thêm danh sách responsive, mở/thu gọn bảng bảy ngày hiện có.
+
+**Kiểm tra:** backend PASS 14/14; frontend test/build PASS; gói CPU và ba image build thành công. Ba
+container healthy. End-to-end origin 2017-06-30 trả đủ 50 sản phẩm trong 4,18 giây; database tăng đúng
+50 request và 350 result, mỗi request có bảy result. Frontend HTTP 200 và bundle live có nội dung mới.
+
+**Giới hạn:** dataset chỉ có mã ẩn danh 1-50; cùng kỳ dùng Weekly Naive, không phải doanh thu/tồn kho.
+Chưa có visual/keyboard QA bằng browser thật. Không thay model, checkpoint, normalization hoặc split.
+
+**Commit đề xuất:** `feat: add batch forecasts for all products`.
+
+## 51. Đưa lựa chọn tất cả 50 sản phẩm vào biểu mẫu Dự báo
+
+**Nhu cầu:** chức năng batch trước đó nằm thành khối riêng trên trang Phân tích nên người dùng vào màn
+hình Dự báo vẫn chỉ thấy chọn ngày và một mã sản phẩm, không nhận ra có thể chọn toàn bộ.
+
+**TDD và triển khai:** content test RED vì thiếu `Phạm vi sản phẩm`, `Tất cả 50 sản phẩm` và option
+`all`. Biểu mẫu Dự báo được bổ sung lựa chọn `Tất cả 50 sản phẩm` mặc định hoặc `Một sản phẩm`; nút và
+kết quả chuyển đúng theo phạm vi. Chế độ tất cả gọi batch API và hiển thị danh sách có thể mở chi tiết.
+
+**Kiểm tra:** frontend content test PASS, TypeScript/Vite build PASS. Image frontend build/recreate
+thành công, container healthy, HTTP 200; bundle live chứa đủ ba nhãn `Phạm vi sản phẩm`, `Tất cả 50
+sản phẩm` và `Dự báo tất cả 50 sản phẩm`.
+
+**Giới hạn:** ngày vẫn phải chọn vì mô hình cần origin date để xác định bảy ngày dự báo. Chưa có
+visual/keyboard QA bằng browser thật. Không thay backend, model, checkpoint, preprocessing hoặc split.
+
+**Commit đề xuất:** `fix: expose all-products forecast selection`.
+
+## 52. Tái cấu trúc README theo hướng chạy và triển khai
+
+**Nhu cầu:** README cũ dài và trộn hướng dẫn vận hành với thuật toán, cấu trúc source, protocol cùng
+kết quả thực nghiệm, khiến người đọc khó tìm lệnh chạy và triển khai chính.
+
+**Triển khai:** README được viết lại thành điểm bắt đầu ngắn gọn, chỉ giữ yêu cầu môi trường, cách
+khởi động Docker, địa chỉ dịch vụ, chạy Java trực tiếp, huấn luyện và thay deployment package. Tạo
+`docs/run-and-deployment.md` để giữ hướng dẫn vận hành chi tiết hơn; cập nhật mục lục `docs/README.md`
+và sửa mô tả stale về full global 3 seed.
+
+**Kết quả:** thông tin kiến trúc, thành phần, ingestion, model serving và kết quả thực nghiệm không bị
+xóa mà tiếp tục nằm trong các tài liệu chuyên biệt. README không còn chứa phần diễn giải dài về tensor,
+feature, preprocessing, từng biến thể mô hình hoặc bảng kết quả.
+
+**Giới hạn:** đây là thay đổi tài liệu, không thay code, container, dữ liệu, model, normalization hoặc
+chronological split. Các tài liệu lịch sử vẫn giữ nguyên bằng chứng kỹ thuật và số liệu của từng thời điểm.
+
+**Commit đề xuất:** `docs: streamline project run and deployment guide`.

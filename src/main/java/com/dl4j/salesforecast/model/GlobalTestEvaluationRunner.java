@@ -24,9 +24,15 @@ public final class GlobalTestEvaluationRunner {
     private GlobalTestEvaluationRunner() { }
 
     public static Result run(Path sourceRun,Path dataset) throws IOException {
+        return run(sourceRun,dataset,sourceRun.toAbsolutePath().normalize());
+    }
+
+    public static Result run(Path sourceRun,Path dataset,Path outputRoot) throws IOException {
         long totalStart=System.nanoTime(); sourceRun=sourceRun.toAbsolutePath().normalize(); dataset=dataset.toAbsolutePath().normalize();
         if(!Files.isDirectory(sourceRun)) throw new IOException("Missing source run: "+sourceRun);
-        Path output=sourceRun.resolve("test-evaluation");
+        outputRoot=outputRoot.toAbsolutePath().normalize(); Files.createDirectories(outputRoot);
+        String evaluationId=sourceRun.getFileName()+"_test-2017";
+        Path output=outputRoot.equals(sourceRun) ? sourceRun.resolve("test-evaluation") : outputRoot.resolve(evaluationId);
         if(Files.exists(output)) throw new IOException("Refusing to overwrite existing test evaluation: "+output);
         JsonObject run=readJson(sourceRun.resolve("run.json"));
         require("SUCCESS".equals(string(run,"status")),"Source run is not SUCCESS");
@@ -38,6 +44,9 @@ public final class GlobalTestEvaluationRunner {
         String expectedHash=string(run,"datasetSha256"); String actualHash=sha256(dataset);
         require(expectedHash.equalsIgnoreCase(actualHash),"Dataset SHA-256 mismatch");
         Files.createDirectory(output);
+        if(!outputRoot.equals(sourceRun)) {
+            Files.writeString(outputRoot.resolve("latest.txt"),evaluationId+"\n",StandardCharsets.UTF_8);
+        }
         Instant started=Instant.now(); Map<Long,String> before=new LinkedHashMap<>(),after=new LinkedHashMap<>();
         Map<Long,Double> loadSeconds=new LinkedHashMap<>(),inferenceSeconds=new LinkedHashMap<>();
         try {

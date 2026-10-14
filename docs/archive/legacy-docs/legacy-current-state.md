@@ -67,7 +67,7 @@ Weekly, per-item/epoch/macro/pooled metrics giống nhau, max/mean prediction di
 Suite mới 51/51 PASS, 0 failures/errors/skips; focused 12/12. Smoke qua script build cô lập
 `2026-10-13_005123_869_gpu` SUCCESS, predictions CSV khớp smoke lịch sử cùng cấu hình.
 Kiểm tra 47 liên kết local và git diff --check đạt. Chi tiết, giới hạn nhiễu timing,
-profile và lệnh build cô lập tại [runtime optimization](single-store-global-experiment.md#runtime-optimization-ngày-2026-10-13).
+profile và lệnh build cô lập tại [runtime optimization](../../05-evaluation/global-model-results.md#runtime-optimization-ngày-2026-10-13).
 Pipeline nghiên cứu 12 chuỗi bên dưới được giữ nguyên. CLI mới `--global-store=1` dùng toàn bộ
 50 items, một Global ResidualAR-MSE mỗi seed: chỉ 3 global fits. Window 30→7, 6 dynamic +
 50 one-hot channels, scaler train-only riêng item, train/validation batch do calibration chọn,
@@ -87,7 +87,7 @@ keys duy nhất, finite, hash đúng, metric recompute trong 4,9e-11, reconstruc
 Không dùng test 2017 selection; không tuning Huber/log1p/embedding hoặc thay pipeline cũ.
 Full có thể dài: benchmark AFTER 50 items đo trung bình 8,772 phút/epoch; 150 epochs ước 21,93 giờ,
 biến thiên theo hai epoch cho 15,1–28,75 giờ; early stopping chưa biết. Đây là ước lượng,
-thay ngoại suy smoke 3 items trước đây. Xem [hồ sơ global](single-store-global-experiment.md)
+thay ngoại suy smoke 3 items trước đây. Xem [hồ sơ global](../../05-evaluation/global-model-results.md)
 cho thiết kế, tệp, tests, lệnh và giới hạn. Không commit/push.
 
 ## ResidualAR Huber — full hoàn tất ngày 2026-10-12
@@ -121,7 +121,7 @@ Huber = 5,635588/7,103008. Không dùng smoke kết luận Huber cải thiện h
 Kết quả full và các breakdown đã bổ sung trong hồ sơ Huber; smoke bên trên là bằng chứng lịch sử.
 Schema 3 ghi loss theo model, delta và cột epoch loss trung tính; schema legacy/residual cũ giữ nguyên.
 Chi tiết thiết kế, tests, artifact, lệnh full và ước lượng khoảng 2:11 giờ trong
-[hồ sơ Huber](residual-huber-experiment.md). Không commit/push.
+[hồ sơ Huber](../../05-evaluation/residual-huber-experiment.md). Không commit/push.
 
 ## Residual AR — full experiment ngày 2026-10-12
 
@@ -137,7 +137,7 @@ RMSE finalPrediction ở sales gốc trên validation, không dùng test 2017 đ
 Báo cáo mới có đủ bốn model, macro hai tầng, stratum, horizon, seed và win rate so ba đối chứng.
 Schema residual v2 thêm cột ở cuối CSV, lưu config thật và min/max/scale từng chuỗi; giữ nguyên run
 cũ. Chi tiết thiết kế, tệp thay đổi, kiểm thử, lệnh và giới hạn tại
-[thí nghiệm residual](residual-experiment.md).
+[thí nghiệm residual](../../05-evaluation/residual-experiment.md).
 
 **IMPLEMENTED / TESTED / SMOKE TESTED / FULL EXPERIMENT COMPLETED.** `mvn -B test` trước full run
 đạt 33/33. Run `2026-10-12_092618_825_gpu` hoàn tất 180 fits trên CUDA, giữ nguyên dataset hash,
@@ -354,7 +354,7 @@ Các kiểm thử bao gồm chia cửa sổ, kiểm tra analyzer, weekly baselin
 sample standard deviation và chọn tertile đại diện. `mvn test` đạt 15 tests; `mvn -B compile
 exec:java` chạy 12 chuỗi × 5 seed × 2 mô hình (120 lượt huấn luyện), `BUILD SUCCESS` sau 2:05 giờ;
 không tính metric test.
-Kết quả chi tiết trong [nhật ký](change-log.md).
+Kết quả chi tiết trong [nhật ký](../../project-management/change-log.md).
 
 Thí nghiệm mới chỉ lấy 12/500 chuỗi, dùng cùng cấu hình được chọn trước, và validation chọn epoch
 ở từng seed nên vẫn là dữ liệu tuning. Macro std đo phân tán giữa các chuỗi, không phải độ bất định
@@ -471,3 +471,143 @@ Lỗi report tier của lần chạy đầu đã được sửa: tên group ch�
 và `H7`. Lần evaluation thất bại đã chạy inference nhưng không train; manifest xác nhận hashes trước/sau
 khớp. Partial directory được giữ nguyên bằng cách archive thành
 `test-evaluation-failed-2026-10-13_075006`; vị trí `test-evaluation/` sẵn sàng cho lần chạy lại.
+
+## Nền tảng Big Data Docker (Giai đoạn 0-1)
+
+Repository hiện có `compose.yaml` và `.env.example` cho MinIO, MinIO init, PostgreSQL, Spark master,
+hai Spark worker, Spark job runner, Forecast Service, Backend API và Frontend. Dữ liệu MinIO/PostgreSQL
+dùng named volume; toàn bộ service ở một bridge network. Cấu hình Compose đã parse thành công.
+
+Forecast/API/Frontend hiện chỉ là bootstrap health endpoint để kiểm tra dependency và container lifecycle,
+chưa chứa DL4J inference, Spring Boot REST hoặc React. Spark ETL, migration, API nghiệp vụ, dashboard,
+benchmark và E2E chưa triển khai. Docker Desktop Linux engine đang tắt tại thời điểm kiểm tra, do đó
+chưa có bằng chứng container thực chạy, Spark nhận hai worker hay checkpoint seed 123 restore trên CPU.
+
+Audit hiện hành nằm tại `docs/00-repository-audit.md`. Run GPU `2026-10-13_025422_624_gpu` và deployment
+package vẫn bất biến; test-evaluation manifest hiện có trạng thái `SUCCESS`, 17.950 Test origins,
+376.950 forecast points cho ba seed, không training và hash checkpoint trước/sau giống nhau.
+
+### Xác minh live sau khi bật Docker Desktop
+
+Docker engine 29.8.2 và Compose 5.6.0 đã chạy. `docker compose up --build -d` thành công với 10 service.
+Spark 3.5.9 Master ghi nhận hai worker `ALIVE`, mỗi worker 1 core và 1.024 MiB. MinIO init exit 0;
+PostgreSQL, MinIO và ba HTTP bootstrap đều healthy. Frontend trả HTTP 200.
+
+Bronze đã có `train.csv` 16 MiB cùng ingestion metadata; deployment package seed 123 đã có trong
+`artifacts/models/global-residual-ar/seed-123`. Restart MinIO/PostgreSQL vẫn giữ object và probe row.
+Module `spark-etl` có Store 1 quality gate, focused test 1/1 PASS. Silver/Gold và Spark runtime ETL vẫn
+chưa chạy, nên Giai đoạn 3 chưa hoàn thành.
+
+Checklist đối chiếu đầy đủ yêu cầu triển khai nằm tại `docs/11-implementation-checklist.md`. Tại lần
+cập nhật sau triển khai ngày 2026-10-13, 10/12 tiêu chí nghiệm thu đã đạt và 2/12 chưa đạt. Full suite
+sau thay đổi PASS 64/64, 0 failure/error/skip, `BUILD SUCCESS` trong 03:17. Đường găng hiện tại là
+Spring Boot API/migrations, React dashboard qua API và benchmark Spark 1/2 Workers.
+
+### Spark ETL và Forecast Service thực
+
+Spark ETL đã đọc Bronze qua S3A trên hai worker, ghi Silver/Gold Snappy Parquet và fail-fast khi count
+sai. Lượt chạy cuối xác nhận 91.300 raw/Gold rows, split 54.750/18.300/18.250 và window/origin
+52.300/18.000/17.950. Runtime preprocessing parity PASS ở tolerance `1e-9`.
+
+Forecast Service bootstrap đã được thay bằng DL4J CPU service. Container load checkpoint seed 123 đúng
+SHA-256, trả health/metadata/H1-H7 và Weekly Naive. Forecast parity với artifact GPU PASS 21 điểm, max
+diff `5,07e-5` ở tolerance `1e-3`. Checklist hiện là 10/12 đạt; còn frontend qua API và benchmark thật.
+
+### Spring Boot API và React Dashboard thực
+
+Backend bootstrap đã được thay bằng Spring Boot 2.7/Java 11. Flyway tạo schema nghiệp vụ, importer nạp
+91.300 Store 1 rows vào PostgreSQL, API có OpenAPI, pagination, validation, global error handling,
+forecast timeout và ingestion idempotency. Forecast end-to-end qua API trả 7 horizon và lưu đủ 7 rows.
+
+Frontend bootstrap đã được thay bằng React 18/TypeScript/Vite với sáu màn hình; Nginx proxy `/api`
+thành công và không để browser truy cập MinIO. Checklist tăng lên 11/12; chỉ tiêu chí benchmark 1/2
+Workers còn chưa đạt. Browser automation không khả dụng nên chưa xác minh trực quan/responsive.
+
+Dashboard hiện có hướng dẫn ba bước cho người mới, đổi H1-H7 thành “Ngày dự báo 1-7”, hiển thị ngày
+đích và diễn giải prediction/Weekly Naive/Actual bằng tiếng Việt. Item được ghi rõ là mã sản phẩm ẩn
+danh vì CSV không có tên hàng; không bổ sung tên giả. Frontend image mới đang healthy và bundle HTTP
+đã được kiểm tra có đủ các nhãn hướng dẫn.
+
+Dashboard Dự báo hiện đã thay phần hướng dẫn/ví dụ bằng kết quả nghiệp vụ trực tiếp. Mỗi ngày hiển thị
+ngày lịch đầy đủ và ba dòng có đơn vị `sản phẩm`; phần đầu kết quả hiển thị tổng nhu cầu dự báo trong
+bảy ngày. Thẻ kết quả dùng hai cột trên desktop và một cột trên màn hình hẹp. Frontend container đã
+được build lại, healthy, HTTP 200 và bundle live chứa các nhãn mới; chưa có visual QA do trình duyệt
+không khả dụng trong phiên.
+
+Biểu đồ Phân tích hiện có trục ngày, trục số sản phẩm, vạch lưới, nhãn mốc và tooltip từng điểm; phía
+trên có số thấp nhất, trung bình và cao nhất của chuỗi đang xem. Với Sản phẩm #1 năm 2017, API live
+trả 365 ngày với min `5`, trung bình `22,2` và max `50` sản phẩm. Frontend mới đã được build/deploy,
+container healthy và HTTP 200; chưa có visual QA do trình duyệt tích hợp không khả dụng.
+
+Phân tích bán hàng hiện hỗ trợ tổng hợp Ngày/Tuần/Tháng, tổng nhu cầu, trung bình kỳ, kỳ cao nhất và
+thay đổi so với kỳ trước. API `/api/analytics/monthly-demand` xếp hạng top 5 trong từng tháng trên cả
+50 sản phẩm. Kiểm tra live năm 2017 trả 60 dòng cho 12 tháng; tháng 01/2017 đứng đầu là Sản phẩm #15
+với 2.015 sản phẩm. Backend/frontend đều healthy và HTTP qua proxy hoạt động. Đây là thống kê lịch sử,
+không phải forecast hoặc phân tích nhân quả; visual QA bằng trình duyệt vẫn chưa khả dụng.
+
+Khối tổng dự báo bảy ngày hiện so sánh tổng prediction với tổng Weekly Naive của cùng kỳ tuần trước,
+hiển thị chênh lệch sản phẩm và tỷ lệ tăng/giảm; trường hợp mẫu số bằng 0 được xử lý riêng. Kiểm tra
+live Item #1, origin 2017-06-30 trả tổng dự báo `209,051`, cùng kỳ `215`, chênh `-5,949`, tương đương
+nhu cầu giảm `2,8%`. Frontend container đã được build lại và healthy. `.gitignore` cũng đã bổ sung
+artifact Node/frontend, output archive, PID/tmp và thư mục trạng thái container/Data Lake cục bộ.
+
+### Ingestion CSV tự động
+
+Hệ thống hiện có luồng hoàn chỉnh `Dashboard -> Spring Boot validation/checksum -> MinIO Bronze ->
+spark-submit -> Silver/Gold/statistics -> PostgreSQL -> Dashboard`. Trạng thái lưu bền gồm `ACCEPTED`,
+`RUNNING`, `COMPLETED`, `FAILED`; file cùng SHA-256 không được xử lý lại và run thất bại có endpoint
+retry. PostgreSQL chỉ được cập nhật trong transaction sau khi Spark trả exit `0`; ingestion không gọi
+training hoặc thay đổi model đang phục vụ.
+
+Run smoke `4` đã hoàn thành với 4/4 raw/gold rows. MinIO có đủ object Bronze, Silver/Gold Parquet và
+statistics JSON; PostgreSQL hiện có 91.304 sales rows với ngày lớn nhất `2018-01-02`. Upload lặp trả
+run `4`, `duplicate=true`, attempts vẫn `1`. Backend/frontend đang healthy và frontend HTTP 200.
+
+Kiểm thử hiện tại: backend 11/11 PASS, Spark 3/3 PASS, frontend test/build PASS. Chưa có visual QA do
+Chrome và IAB không khả dụng; chưa có distributed lease/recovery khi backend dừng giữa job, CSV parse
+trong RAM với giới hạn 50 MB và benchmark Spark 1/2 Workers vẫn chưa hoàn thành.
+
+### Tiến độ ingestion chi tiết
+
+Flyway V3 và API hiện lưu timeline theo attempt gồm `UPLOAD`, `VALIDATE`, `STORE_BRONZE`, `SPARK_READ`,
+`WRITE_SILVER_GOLD`, `PUBLISH_POSTGRESQL`, `REFRESH_DASHBOARD`. Marker stdout của Spark cập nhật row
+counter trong lúc job chạy. Dashboard polling hai giây, hiển thị phần trăm, elapsed time, throughput,
+processed/total rows và trạng thái từng bước. Run runtime `5` hoàn thành đủ 7/7 stage, raw/gold `3/3`,
+duration `29.731 ms`; backend/frontend đã recreate và đều healthy. IAB vẫn không khả dụng nên chưa có
+visual/keyboard QA; chưa mở lại timeline chi tiết từ một dòng lịch sử.
+
+### Trạng thái sau khi dọn dữ liệu upload mẫu (2026-10-14)
+
+Theo yêu cầu người dùng, PostgreSQL đã xóa ingestion run `4`, `5`, `6`, pipeline `2`, `3`, `4`, toàn
+bộ 14 stage events liên quan và 28 sales rows mẫu trong khoảng 2018-01-01..2018-01-10. Kiểm tra sau
+transaction: các tập mục tiêu đều còn 0 dòng; API pipeline không còn trả ba run này. `sales_records`
+đã trở lại 91.300 dòng và ngày lớn nhất 2017-12-31. File CSV trong repository và object MinIO được giữ
+nguyên vì phạm vi yêu cầu chỉ là database; không thay model, checkpoint hoặc dữ liệu train cục bộ.
+
+### Rà soát luồng triển khai Frontend Docker (2026-10-13)
+
+Đã rà soát chi tiết luồng triển khai container frontend: multi-stage Dockerfile (`node:20-alpine` build static bundle và `nginx:1.27-alpine` runtime), reverse proxy `/api/` tới `backend-api:8084`, memory limit 128 MB và healthcheck qua `127.0.0.1`. Container hiện healthy, phục vụ cổng 3000 và hoàn toàn tách biệt với luồng training model (chỉ gửi request inference tới backend). Mã nguồn và cấu hình container giữ nguyên.
+
+### Dự báo đồng thời 50 sản phẩm (2026-10-14)
+
+Trang Phân tích hiện cho chọn một origin date và dự báo một lượt toàn bộ 50 sản phẩm. Mỗi dòng hiển
+thị tổng dự báo bảy ngày, cùng kỳ tuần trước, chênh lệch và khoảng ngày; bấm sẽ mở đủ bảy ngày chi tiết.
+Runtime thật trả đủ 50 x 7 trong 4,18 giây; forecast-service, backend-api và frontend đều healthy. Không
+retrain, không đổi model, checkpoint, normalization hoặc chronological split. Chưa có browser QA thật.
+
+### Sửa khả năng tìm thấy lựa chọn 50 sản phẩm (2026-10-14)
+
+Màn hình Dự báo hiện có lựa chọn phạm vi rõ ràng và mặc định `Tất cả 50 sản phẩm`; người dùng có thể
+đổi sang `Một sản phẩm`. Kết quả hàng loạt được hiển thị ngay trên cùng màn hình này. Ngày vẫn được giữ
+vì đó là mốc bắt đầu forecast, không phải lựa chọn sản phẩm. Frontend container đã build lại, healthy,
+HTTP 200 và bundle live có đủ nhãn phạm vi, lựa chọn tất cả cùng nút chạy tương ứng.
+
+### Tài liệu chạy và triển khai (2026-10-14)
+
+README hiện là hướng dẫn ngắn gọn để chuẩn bị môi trường, chạy Docker stack, mở các dịch vụ, vận hành
+container, chạy pipeline Java và triển khai deployment package. Nội dung thuật toán và kết quả thực
+nghiệm được dẫn sang `docs/` thay vì trình bày dàn trải tại trang đầu.
+
+Hướng dẫn vận hành chi tiết nằm tại `docs/run-and-deployment.md`; mục lục `docs/README.md` phân tách
+rõ kiến trúc, Data Lake, Spark, serving, API, Dashboard, trạng thái và hồ sơ thực nghiệm. Thay đổi này
+không tác động runtime, dữ liệu, model, normalization hoặc chronological split.

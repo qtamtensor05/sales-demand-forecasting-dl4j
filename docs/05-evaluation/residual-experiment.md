@@ -48,7 +48,7 @@ rollout H1–H7 của finalPrediction ở sales gốc**, không chọn bằng re
 
 ## Giao diện chạy và artifact
 
-Xem [lệnh PowerShell trong README](../README.md#thí-nghiệm-residual-ar-chế-độ-riêng).
+Xem [training guide](../04-training/training-guide.md).
 Lệnh cũ không tham số giữ 120 fits. `--residual` chạy 180 fits (12×5×3); `--residual-smoke`
 chạy 3 fits (1×1×3), mỗi model tối đa 2 epoch. Full phải đối chiếu cả Weekly, Direct, AR và
 ResidualAR trong cùng run; không ghép smoke với metric cũ để kết luận chất lượng.
@@ -73,21 +73,21 @@ SUCCESS sau khi các artifact hoàn tất; Java exception hoặc đóng session 
 
 ## Tệp triển khai và kiểm thử
 
-- Thêm [ResidualLstmForecaster](../src/main/java/com/dl4j/salesforecast/model/ResidualLstmForecaster.java),
-  [ExperimentConfiguration](../src/main/java/com/dl4j/salesforecast/model/ExperimentConfiguration.java),
-  [ResidualComparisonReport](../src/main/java/com/dl4j/salesforecast/model/ResidualComparisonReport.java).
-- Sửa [AutoregressiveLstmForecaster](../src/main/java/com/dl4j/salesforecast/model/AutoregressiveLstmForecaster.java),
-  [ExperimentRunner](../src/main/java/com/dl4j/salesforecast/model/ExperimentRunner.java),
-  [MultiSeriesExperimentRunner](../src/main/java/com/dl4j/salesforecast/model/MultiSeriesExperimentRunner.java),
-  [TrainingProgress](../src/main/java/com/dl4j/salesforecast/model/TrainingProgress.java),
-  [Main](../src/main/java/com/dl4j/salesforecast/Main.java).
-- Sửa [ValidationPredictionExporter](../src/main/java/com/dl4j/salesforecast/model/ValidationPredictionExporter.java),
-  [SeedMetricsExporter](../src/main/java/com/dl4j/salesforecast/model/SeedMetricsExporter.java),
-  [TrainingHistoryExporter](../src/main/java/com/dl4j/salesforecast/model/TrainingHistoryExporter.java),
-  [RunArtifactSession](../src/main/java/com/dl4j/salesforecast/output/RunArtifactSession.java).
-- Thêm [ResidualLstmForecasterTest](../src/test/java/com/dl4j/salesforecast/model/ResidualLstmForecasterTest.java),
-  [ResidualExperimentTest](../src/test/java/com/dl4j/salesforecast/model/ResidualExperimentTest.java);
-  mở rộng [RunArtifactSessionTest](../src/test/java/com/dl4j/salesforecast/output/RunArtifactSessionTest.java).
+- Thêm [ResidualLstmForecaster](../../src/main/java/com/dl4j/salesforecast/model/ResidualLstmForecaster.java),
+  [ExperimentConfiguration](../../src/main/java/com/dl4j/salesforecast/model/ExperimentConfiguration.java),
+  [ResidualComparisonReport](../../src/main/java/com/dl4j/salesforecast/model/ResidualComparisonReport.java).
+- Sửa [AutoregressiveLstmForecaster](../../src/main/java/com/dl4j/salesforecast/model/AutoregressiveLstmForecaster.java),
+  [ExperimentRunner](../../src/main/java/com/dl4j/salesforecast/model/ExperimentRunner.java),
+  [MultiSeriesExperimentRunner](../../src/main/java/com/dl4j/salesforecast/model/MultiSeriesExperimentRunner.java),
+  [TrainingProgress](../../src/main/java/com/dl4j/salesforecast/model/TrainingProgress.java),
+  [Main](../../src/main/java/com/dl4j/salesforecast/Main.java).
+- Sửa [ValidationPredictionExporter](../../src/main/java/com/dl4j/salesforecast/model/ValidationPredictionExporter.java),
+  [SeedMetricsExporter](../../src/main/java/com/dl4j/salesforecast/model/SeedMetricsExporter.java),
+  [TrainingHistoryExporter](../../src/main/java/com/dl4j/salesforecast/model/TrainingHistoryExporter.java),
+  [RunArtifactSession](../../src/main/java/com/dl4j/salesforecast/output/RunArtifactSession.java).
+- Thêm [ResidualLstmForecasterTest](../../src/test/java/com/dl4j/salesforecast/model/ResidualLstmForecasterTest.java),
+  [ResidualExperimentTest](../../src/test/java/com/dl4j/salesforecast/model/ResidualExperimentTest.java);
+  mở rộng [RunArtifactSessionTest](../../src/test/java/com/dl4j/salesforecast/output/RunArtifactSessionTest.java).
 - Cập nhật README, tài liệu này, current-state, implementation-history và change-log.
 
 Các test JUnit 5 kiểm tra target dương/âm/zero; reconstruction; constant scale; dữ liệu validation/test

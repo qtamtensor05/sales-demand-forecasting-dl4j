@@ -1,8 +1,12 @@
 param([string]$RunDirectory)
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'ProjectPaths.ps1')
+$projectPaths=Get-ProjectPaths
 if (!$RunDirectory) {
-    $id=(Get-Content -LiteralPath 'output/runs/latest.txt' -Raw).Trim()
-    $RunDirectory=Join-Path 'output/runs' $id
+    $latest=Join-Path $projectPaths.TrainingDir 'latest.txt'
+    if(!(Test-Path -LiteralPath $latest)){ $latest=Join-Path $projectPaths.LegacyRunsDir 'latest.txt' }
+    $id=(Get-Content -LiteralPath $latest -Raw).Trim()
+    $RunDirectory=Join-Path (Split-Path -Parent $latest) $id
 }
 $manifest=Get-Content -LiteralPath (Join-Path $RunDirectory 'run.json') -Raw | ConvertFrom-Json
 if ($manifest.status -ne 'SUCCESS') { throw "Run status is $($manifest.status), expected SUCCESS." }

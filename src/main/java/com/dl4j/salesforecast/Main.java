@@ -6,6 +6,7 @@ import com.dl4j.salesforecast.model.ErrorAnalysisRunner;
 import com.dl4j.salesforecast.model.ExperimentConfiguration;
 import com.dl4j.salesforecast.model.ResidualComparisonReport;
 import com.dl4j.salesforecast.output.RunArtifactSession;
+import com.dl4j.salesforecast.output.ProjectPaths;
 import java.nio.file.Path;
 
 public class Main {
@@ -13,11 +14,12 @@ public class Main {
     public static void main(String[] args) throws Throwable {
 
         ExperimentConfiguration configuration = ExperimentConfiguration.fromArgs(args);
-        String trainPath =
-                "data/train.csv";
+        ProjectPaths paths = ProjectPaths.fromEnvironment();
+        Path dataset = paths.trainingDataset();
+        String trainPath = dataset.toString();
 
         if(configuration.isPreflight()) {
-            var check=com.dl4j.salesforecast.model.GlobalPreflight.run(Path.of(trainPath),Path.of("output","runs"),configuration);
+            var check=com.dl4j.salesforecast.model.GlobalPreflight.run(dataset, paths.outputRoot(), configuration);
             System.out.printf("GLOBAL PREFLIGHT PASS%nJava: %s%nBackend: %s%nStore: %d%nItems: %d%nSeeds: %s%nTrain batch: %d%nValidation batch: %d%nDimensions: [batch,56,30] -> H1-H7%nTrain windows: %d%nValidation origins: %d%nForecasts/seed: %d%n",
                     System.getProperty("java.version"),check.backend,configuration.getStoreId(),configuration.getItemIds().size(),configuration.getSeeds(),configuration.getBatchSize(),configuration.getValidationBatchSize(),check.trainWindows,check.validationOrigins,check.forecastsPerSeed);
             if(!check.gpu) System.out.println("WARNING: CPU backend detected. Do not start intended GPU training until CUDA backend is active.");
@@ -25,7 +27,7 @@ public class Main {
         }
 
         RunArtifactSession artifacts = RunArtifactSession.start(
-                Path.of("output", "runs"), Path.of(trainPath), configuration);
+                paths.runRoot(configuration), dataset, configuration);
         System.out.println("Run artifacts: " + artifacts.getDirectory().toAbsolutePath());
         try {
             if (configuration.isGlobalStore()) {
